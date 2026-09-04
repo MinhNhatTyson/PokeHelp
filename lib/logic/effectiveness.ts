@@ -1,4 +1,6 @@
 import {
+  DualTypeDefenseProfile,
+  EffectivenessMultiplier,
   POKEMON_TYPES,
   PokemonTypeName,
   TypeAttackProfile,
@@ -50,4 +52,36 @@ export function getAttackProfile(type: PokemonTypeName): TypeAttackProfile {
 
 export function getTypeMatchup(type: PokemonTypeName): TypeMatchup {
   return { type, attack: getAttackProfile(type), defense: getDefenseProfile(type) };
+}
+
+function getSingleMultiplier(attacker: PokemonTypeName, defender: PokemonTypeName): EffectivenessMultiplier {
+  const profile = DEFENSE_CHART[defender];
+  if (profile.immuneTo.includes(attacker)) return 0;
+  if (profile.weakTo.includes(attacker)) return 2;
+  if (profile.resists.includes(attacker)) return 0.5;
+  return 1;
+}
+
+export function getDualDefenseProfile(
+  type1: PokemonTypeName,
+  type2?: PokemonTypeName
+): DualTypeDefenseProfile {
+  const result: DualTypeDefenseProfile = {
+    quad: [], double: [], neutral: [], half: [], quarter: [], immune: [],
+  };
+
+  for (const attacker of POKEMON_TYPES) {
+    const m1 = getSingleMultiplier(attacker, type1);
+    const m2 = type2 ? getSingleMultiplier(attacker, type2) : 1;
+    const combined = (m1 * m2) as EffectivenessMultiplier;
+
+    if (combined === 0) result.immune.push(attacker);
+    else if (combined === 4) result.quad.push(attacker);
+    else if (combined === 2) result.double.push(attacker);
+    else if (combined === 1) result.neutral.push(attacker);
+    else if (combined === 0.5) result.half.push(attacker);
+    else if (combined === 0.25) result.quarter.push(attacker);
+  }
+
+  return result;
 }
