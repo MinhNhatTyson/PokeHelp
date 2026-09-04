@@ -1,4 +1,5 @@
 import {
+  DualTypeAttackProfile,
   DualTypeDefenseProfile,
   EffectivenessMultiplier,
   POKEMON_TYPES,
@@ -81,6 +82,30 @@ export function getDualDefenseProfile(
     else if (combined === 1) result.neutral.push(attacker);
     else if (combined === 0.5) result.half.push(attacker);
     else if (combined === 0.25) result.quarter.push(attacker);
+  }
+
+  return result;
+}
+
+export function getDualAttackProfile(
+  type1: PokemonTypeName,
+  type2?: PokemonTypeName
+): DualTypeAttackProfile {
+  const result: DualTypeAttackProfile = {
+    superEffectiveAgainst: [],
+    notVeryEffectiveAgainst: [],
+    noEffectAgainst: [],
+  };
+
+  for (const target of POKEMON_TYPES) {
+    const m1 = getSingleMultiplier(type1, target);
+    const m2 = type2 ? getSingleMultiplier(type2, target) : m1;
+    const best = Math.max(m1, m2);
+
+    if (best === 2) result.superEffectiveAgainst.push(target);
+    else if (best === 0.5) result.notVeryEffectiveAgainst.push(target);
+    else if (best === 0) result.noEffectAgainst.push(target);
+    // best === 1 (neutral) is omitted, same convention as the single-type view
   }
 
   return result;

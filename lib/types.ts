@@ -41,3 +41,51 @@ export interface DualTypeDefenseProfile {
   quarter: PokemonTypeName[]; // 0.25x resist
   immune: PokemonTypeName[];  // 0x
 }
+
+export interface PokemonNameEntry {
+  name: string;
+  url: string;
+}
+
+export interface PokemonStatEntry {
+  name: string;
+  baseStat: number;
+}
+
+export interface PokemonAbility {
+  name: string;
+  isHidden: boolean;
+}
+
+export interface PokemonFormLink {
+  name: string;
+}
+
+export interface EvolutionStage {
+  names: string[]; // usually 1; multiple when a species branches (e.g. Eevee)
+}
+
+export interface PokemonDetail extends Pokemon {
+  dexNumber: number;
+  genus: string | null;
+  heightM: number;
+  weightKg: number;
+  abilities: PokemonAbility[];
+  stats: PokemonStatEntry[];
+  eggGroups: string[];
+  forms: PokemonFormLink[];
+  evolutionChain: EvolutionStage[];
+  artworkUrl: string | null;
+}
+
+export interface PokemonAbility {
+  name: string;
+  isHidden: boolean;
+  description: string | null;
+}
+
+export interface DualTypeAttackProfile {
+  superEffectiveAgainst: PokemonTypeName[];
+  notVeryEffectiveAgainst: PokemonTypeName[];
+  noEffectAgainst: PokemonTypeName[];
+}
