@@ -59,6 +59,7 @@ export interface PokemonAbility {
 
 export interface PokemonFormLink {
   name: string;
+  isDefault: boolean;
 }
 
 export interface EvolutionStage {

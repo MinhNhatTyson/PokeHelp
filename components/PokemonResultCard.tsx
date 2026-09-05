@@ -51,6 +51,29 @@ export default function PokemonResultCard({
         </div>
       </div>
 
+      {pokemon.forms.length > 1 && (
+        <div className="mt-4 flex flex-wrap gap-1.5 border-b border-black/10 pb-3">
+          {pokemon.forms.map((f) => {
+            const isActive = f.name === pokemon.name;
+            return (
+              <button
+                key={f.name}
+                type="button"
+                onClick={() => onSelectForm(f.name)}
+                aria-pressed={isActive}
+                className={`rounded-full px-3 py-1 text-sm capitalize transition-colors ${
+                  isActive
+                    ? "bg-[color:var(--accent-gold)] font-medium text-black"
+                    : "bg-black/10 hover:bg-black/20"
+                }`}
+              >
+                {f.name.replace(/-/g, " ")}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
         <div>
           <p className="opacity-50">Height</p>
@@ -60,21 +83,22 @@ export default function PokemonResultCard({
           <p className="opacity-50">Weight</p>
           <p>{pokemon.weightKg} kg</p>
         </div>
-        <div className="mt-3 text-sm">
-          <p className="opacity-50">Abilities</p>
-          <div className="mt-1 space-y-1.5">
-            {pokemon.abilities.map((a) => (
-              <div key={a.name}>
-                <span className="capitalize font-medium">
-                  {a.name.replace(/-/g, " ")}
-                  {a.isHidden && <span className="ml-1 text-xs opacity-50">(hidden)</span>}
-                </span>
-                {a.description && (
-                  <p className="text-xs opacity-70">{a.description}</p>
-                )}
-              </div>
-            ))}
-          </div>
+      </div>
+
+      <div className="mt-3 text-sm">
+        <p className="opacity-50">Abilities</p>
+        <div className="mt-1 space-y-1.5">
+          {pokemon.abilities.map((a) => (
+            <div key={a.name}>
+              <span className="capitalize font-medium">
+                {a.name.replace(/-/g, " ")}
+                {a.isHidden && <span className="ml-1 text-xs opacity-50">(hidden)</span>}
+              </span>
+              {a.description && (
+                <p className="text-xs opacity-70">{a.description}</p>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -174,24 +198,6 @@ export default function PokemonResultCard({
         </div>
       )}
 
-      {/* TODO: forms are links-only per your request — revisit as tabs once the feature's settled */}
-      {pokemon.forms.length > 0 && (
-        <div className="mt-6">
-          <h3 className="font-display text-base">Other forms</h3>
-          <div className="mt-2 flex flex-wrap gap-2 text-sm">
-            {pokemon.forms.map((f) => (
-              <button
-                key={f.name}
-                type="button"
-                onClick={() => onSelectForm(f.name)}
-                className="rounded-full bg-black/10 px-3 py-1 capitalize hover:bg-black/20"
-              >
-                {f.name.replace(/-/g, " ")}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

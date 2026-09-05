@@ -166,7 +166,7 @@ export async function fetchPokemonDetail(nameOrId: string): Promise<PokemonDetai
     abilities,
     stats: pokeData.stats.map((s) => ({ name: s.stat.name, baseStat: s.base_stat })),
     eggGroups: speciesData.egg_groups.map((g) => g.name),
-    forms: speciesData.varieties.filter((v) => !v.is_default).map((v) => ({ name: v.pokemon.name })),
+    forms: speciesData.varieties.map((v) => ({ name: v.pokemon.name, isDefault: v.is_default })),
     evolutionChain,
   };
 
