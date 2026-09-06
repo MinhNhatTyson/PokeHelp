@@ -90,3 +90,22 @@ export interface DualTypeAttackProfile {
   notVeryEffectiveAgainst: PokemonTypeName[];
   noEffectAgainst: PokemonTypeName[];
 }
+
+export interface ItemNameEntry {
+  name: string;
+  url: string;
+}
+
+export interface ItemDetail {
+  id: number;
+  name: string;
+  cost: number;
+  category: string;
+  spriteUrl: string | null;
+  effect: string | null;
+  shortEffect: string | null;
+  flavorText: string | null;
+  flingPower: number | null;
+  flingEffect: string | null;
+  attributes: string[];
+}

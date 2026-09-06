@@ -1,4 +1,4 @@
-import { Pokemon, PokemonTypeName, PokemonNameEntry, PokemonDetail, EvolutionStage } from "@/lib/types";
+import { Pokemon, PokemonTypeName, PokemonNameEntry, PokemonDetail, EvolutionStage, ItemDetail, ItemNameEntry } from "@/lib/types";
 
 const POKEAPI_BASE = "https://pokeapi.co/api/v2";
 
@@ -173,5 +173,67 @@ export async function fetchPokemonDetail(nameOrId: string): Promise<PokemonDetai
 
   detailCache.set(key, detail);
   detailCache.set(String(detail.id), detail);
+  return detail;
+}
+
+let itemListPromise: Promise<ItemNameEntry[]> | null = null;
+const itemDetailCache = new Map<string, ItemDetail>();
+
+interface PokeApiItemResponse {
+  id: number;
+  name: string;
+  cost: number;
+  fling_power: number | null;
+  fling_effect: { name: string } | null;
+  attributes: { name: string }[];
+  category: { name: string };
+  effect_entries: { effect: string; short_effect: string; language: { name: string } }[];
+  flavor_text_entries: { text: string; language: { name: string } }[];
+  sprites: { default: string | null };
+}
+
+export async function fetchItemNameList(): Promise<ItemNameEntry[]> {
+  if (!itemListPromise) {
+    itemListPromise = fetch(`${POKEAPI_BASE}/item?limit=100000`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("item list fetch failed"))))
+      .then((data: PokeApiListResponse) => data.results)
+      .catch(() => {
+        itemListPromise = null;
+        return [];
+      });
+  }
+  return itemListPromise;
+}
+
+export async function fetchItemDetail(nameOrId: string): Promise<ItemDetail | null> {
+  const key = nameOrId.trim().toLowerCase();
+  if (!key) return null;
+
+  const cached = itemDetailCache.get(key);
+  if (cached) return cached;
+
+  const res = await fetch(`${POKEAPI_BASE}/item/${key}`);
+  if (!res.ok) return null;
+  const data: PokeApiItemResponse = await res.json();
+
+  const enEffect = data.effect_entries.find((e) => e.language.name === "en");
+  const enFlavor = [...data.flavor_text_entries].reverse().find((f) => f.language.name === "en");
+
+  const detail: ItemDetail = {
+    id: data.id,
+    name: data.name,
+    cost: data.cost,
+    category: data.category.name,
+    spriteUrl: data.sprites.default,
+    effect: enEffect?.effect ?? null,
+    shortEffect: enEffect?.short_effect ?? null,
+    flavorText: enFlavor?.text.replace(/\f|\n/g, " ") ?? null,
+    flingPower: data.fling_power,
+    flingEffect: data.fling_effect?.name ?? null,
+    attributes: data.attributes.map((a) => a.name),
+  };
+
+  itemDetailCache.set(key, detail);
+  itemDetailCache.set(String(detail.id), detail);
   return detail;
 }
