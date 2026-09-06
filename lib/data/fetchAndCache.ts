@@ -40,6 +40,7 @@ interface PokeApiPokemonResponse {
   name: string;
   height: number;
   weight: number;
+  species: { name: string; url: string };
   sprites: {
     front_default: string | null;
     other?: { "official-artwork"?: { front_default: string | null } };
@@ -129,7 +130,7 @@ export async function fetchPokemonDetail(nameOrId: string): Promise<PokemonDetai
   if (!pokeRes.ok) return null;
   const pokeData: PokeApiPokemonResponse = await pokeRes.json();
 
-  const speciesRes = await fetch(`${POKEAPI_BASE}/pokemon-species/${pokeData.id}`);
+  const speciesRes = await fetch(pokeData.species.url);
   if (!speciesRes.ok) return null;
   const speciesData: PokeApiSpeciesResponse = await speciesRes.json();
 
