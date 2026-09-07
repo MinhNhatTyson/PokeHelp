@@ -12,6 +12,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Type & Pokédex", href: "/" },
   { label: "Items", href: "/items" },
+  { label: "Team Builder", href: "/team" },
   { label: "Trainer Roster", href: "/trainers", comingSoon: true },
 ];
 

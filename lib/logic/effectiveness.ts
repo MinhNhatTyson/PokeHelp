@@ -55,7 +55,7 @@ export function getTypeMatchup(type: PokemonTypeName): TypeMatchup {
   return { type, attack: getAttackProfile(type), defense: getDefenseProfile(type) };
 }
 
-function getSingleMultiplier(attacker: PokemonTypeName, defender: PokemonTypeName): EffectivenessMultiplier {
+export function getSingleMultiplier(attacker: PokemonTypeName, defender: PokemonTypeName): EffectivenessMultiplier {
   const profile = DEFENSE_CHART[defender];
   if (profile.immuneTo.includes(attacker)) return 0;
   if (profile.weakTo.includes(attacker)) return 2;
@@ -110,3 +110,4 @@ export function getDualAttackProfile(
 
   return result;
 }
+
