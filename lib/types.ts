@@ -116,20 +116,6 @@ export interface TeamSlot {
   abilityName: string | null;
 }
 
-export interface TeamTypeCount {
-  type: PokemonTypeName;
-  count: number;
-  members: string[];
-}
-
-export interface TeamDefenseReport {
-  quad: TeamTypeCount[];
-  double: TeamTypeCount[];
-  neutral: TeamTypeCount[];
-  half: TeamTypeCount[];
-  quarter: TeamTypeCount[];
-  immune: TeamTypeCount[];
-}
 
 export interface TeamOffenseReport {
   superEffectiveAgainst: PokemonTypeName[];
@@ -147,4 +133,10 @@ export interface TeamDefenseMatrixRow {
 export interface TeamDefenseMatrix {
   rows: TeamDefenseMatrixRow[];
   weakCounts: Record<PokemonTypeName, number>; // members at 2x or worse, per attacking type
+}
+
+export interface OpponentSlot {
+  pokemon: PokemonDetail | null;
+  /** Best guess at this opponent's ability — you rarely know for certain in team preview */
+  abilityName: string | null;
 }

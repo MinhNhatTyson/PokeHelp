@@ -13,6 +13,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Type & Pokédex", href: "/" },
   { label: "Items", href: "/items" },
   { label: "Team Builder", href: "/team" },
+  { label: "Battle Optimizer", href: "/optimizer" },
   { label: "Trainer Roster", href: "/trainers", comingSoon: true },
 ];
 
