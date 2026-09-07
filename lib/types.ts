@@ -137,3 +137,14 @@ export interface TeamOffenseReport {
   resistedByAll: PokemonTypeName[];
   noEffectFromAll: PokemonTypeName[];
 }
+
+export interface TeamDefenseMatrixRow {
+  name: string;
+  types: PokemonTypeName[];
+  cells: Record<PokemonTypeName, EffectivenessMultiplier>;
+}
+
+export interface TeamDefenseMatrix {
+  rows: TeamDefenseMatrixRow[];
+  weakCounts: Record<PokemonTypeName, number>; // members at 2x or worse, per attacking type
+}

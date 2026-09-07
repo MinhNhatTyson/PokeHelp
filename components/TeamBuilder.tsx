@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useTeamStore } from "@/lib/store/teamStore";
-import { getTeamDefenseReport, getTeamOffenseReport } from "@/lib/logic/teamAnalysis";
+import { getTeamDefenseMatrix, getTeamOffenseReport } from "@/lib/logic/teamAnalysis";
 import TeamSlotPicker from "@/components/TeamSlotPicker";
 import TeamCoverageReport from "@/components/TeamCoverageReport";
 
@@ -12,8 +12,7 @@ export default function TeamBuilder() {
 
   const isComplete = slots.every((s) => s.pokemon && s.itemName && s.abilityName);
   const filledCount = slots.filter((s) => s.pokemon && s.itemName && s.abilityName).length;
-
-  const defense = useMemo(() => (isComplete ? getTeamDefenseReport(slots) : null), [slots, isComplete]);
+  const defenseMatrix = useMemo(() => (isComplete ? getTeamDefenseMatrix(slots) : null), [slots, isComplete]);
   const offense = useMemo(() => (isComplete ? getTeamOffenseReport(slots) : null), [slots, isComplete]);
 
   return (
@@ -39,8 +38,8 @@ export default function TeamBuilder() {
           ))}
         </div>
 
-        {isComplete && defense && offense ? (
-          <TeamCoverageReport defense={defense} offense={offense} teamSize={slots.length} />
+        {isComplete && defenseMatrix && offense ? (
+          <TeamCoverageReport defenseMatrix={defenseMatrix} offense={offense} />
         ) : (
           <p className="mt-8 border-t border-black/10 pt-6 text-sm text-[color:var(--ink)]/50">
             Fill in every slot to see your team&apos;s coverage report.

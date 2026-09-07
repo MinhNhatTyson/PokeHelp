@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ItemDetail, ItemNameEntry } from "@/lib/types";
-import { fetchItemNameList, fetchItemDetail } from "@/lib/data/fetchAndCache";
+import { fetchCompetitiveItemNameList, fetchItemDetail } from "@/lib/data/fetchAndCache";
 import ItemResultCard from "@/components/ItemResultCard";
 
 const MAX_NAME_SUGGESTIONS = 8;
@@ -16,7 +16,7 @@ export default function ItemSearchExplorer() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchItemNameList().then(setNameList);
+    fetchCompetitiveItemNameList().then(setNameList);
   }, []);
 
   useEffect(() => {

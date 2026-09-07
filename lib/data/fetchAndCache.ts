@@ -237,3 +237,50 @@ export async function fetchItemDetail(nameOrId: string): Promise<ItemDetail | nu
   itemDetailCache.set(String(detail.id), detail);
   return detail;
 }
+
+// Categories of items that can actually be held by a Pokémon in battle.
+// Excludes: balls, TMs, mail, key items, vitamins/mints, mulch, apricorns,
+// curry/sandwich ingredients, and other non-battle bag clutter.
+const COMPETITIVE_ITEM_CATEGORIES = [
+  "held-items",
+  "choice",
+  "species-specific",
+  "type-enhancement",
+  "in-a-pinch",
+  "type-protection",
+  "picky-healing",
+  "plates",
+  "mega-stones",
+  "z-crystals",
+  "jewels",
+  "memories",
+  "dynamax-crystals",
+  "bad-held-items",
+] as const;
+
+interface PokeApiItemCategoryResponse {
+  items: { name: string; url: string }[];
+}
+
+let competitiveItemListPromise: Promise<ItemNameEntry[]> | null = null;
+
+export async function fetchCompetitiveItemNameList(): Promise<ItemNameEntry[]> {
+  if (!competitiveItemListPromise) {
+    competitiveItemListPromise = Promise.all(
+      COMPETITIVE_ITEM_CATEGORIES.map((category) =>
+        fetch(`${POKEAPI_BASE}/item-category/${category}`)
+          .then((res) => (res.ok ? res.json() : { items: [] }))
+          .then((data: PokeApiItemCategoryResponse) => data.items)
+          .catch(() => [])
+      )
+    ).then((lists) => {
+      const seen = new Map<string, ItemNameEntry>();
+      for (const item of lists.flat()) seen.set(item.name, item);
+      return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }).catch(() => {
+      competitiveItemListPromise = null;
+      return [];
+    });
+  }
+  return competitiveItemListPromise;
+}

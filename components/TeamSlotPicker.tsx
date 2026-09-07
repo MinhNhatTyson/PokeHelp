@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTeamStore } from "@/lib/store/teamStore";
-import { fetchPokemonNameList, fetchPokemonDetail, fetchItemNameList } from "@/lib/data/fetchAndCache";
+import { fetchPokemonNameList, fetchPokemonDetail, fetchCompetitiveItemNameList } from "@/lib/data/fetchAndCache";
 import { ItemNameEntry, PokemonNameEntry } from "@/lib/types";
 import TypeBadge from "@/components/TypeBadge";
 
@@ -28,7 +28,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
 
   useEffect(() => {
     fetchPokemonNameList().then(setPokeNames);
-    fetchItemNameList().then(setItemNames);
+    fetchCompetitiveItemNameList().then(setItemNames);
   }, []);
 
   useEffect(() => {
