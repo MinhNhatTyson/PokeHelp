@@ -249,6 +249,8 @@ const COMPETITIVE_ITEM_CATEGORIES = [
   "in-a-pinch",
   "type-protection",
   "picky-healing",
+  "status-cures",
+  "pp-recovery",
   "plates",
   "mega-stones",
   "z-crystals",
@@ -262,15 +264,24 @@ interface PokeApiItemCategoryResponse {
   items: { name: string; url: string }[];
 }
 
+// Attributes (not categories!) mark items that do something when held in
+// battle. "holdable" alone also covers non-battle items like Poké Balls
+// (technically holdable, does nothing), so we need the more specific pair.
+const HOLDABLE_ATTRIBUTES = ["holdable-active", "holdable-passive"] as const;
+
+interface PokeApiItemAttributeResponse {
+  items: { name: string; url: string }[];
+}
+
 let competitiveItemListPromise: Promise<ItemNameEntry[]> | null = null;
 
 export async function fetchCompetitiveItemNameList(): Promise<ItemNameEntry[]> {
   if (!competitiveItemListPromise) {
     competitiveItemListPromise = Promise.all(
-      COMPETITIVE_ITEM_CATEGORIES.map((category) =>
-        fetch(`${POKEAPI_BASE}/item-category/${category}`)
+      HOLDABLE_ATTRIBUTES.map((attribute) =>
+        fetch(`${POKEAPI_BASE}/item-attribute/${attribute}`)
           .then((res) => (res.ok ? res.json() : { items: [] }))
-          .then((data: PokeApiItemCategoryResponse) => data.items)
+          .then((data: PokeApiItemAttributeResponse) => data.items)
           .catch(() => [])
       )
     ).then((lists) => {

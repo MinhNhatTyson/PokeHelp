@@ -140,3 +140,10 @@ export interface OpponentSlot {
   /** Best guess at this opponent's ability — you rarely know for certain in team preview */
   abilityName: string | null;
 }
+
+export interface SavedTeam {
+  id: string;
+  name: string;
+  savedAt: number;
+  slots: TeamSlot[];
+}
