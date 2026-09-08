@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useOpponentTeamStore, OPPONENT_TEAM_SIZE } from "@/lib/store/opponentTeamStore";
-import { rankBringFourCombos, CoverageMon } from "@/lib/logic/battleOptimizer";
+import { rankBringFourCombos, statsFromEntries, CoverageMon } from "@/lib/logic/battleOptimizer";
 import OpponentSlotPicker from "@/components/OpponentSlotPicker";
 import ComboResultCard from "@/components/ComboResultCard";
 
@@ -18,11 +18,17 @@ export default function BattleOptimizer() {
   const opponentReady = opponentSlots.every((s) => s.pokemon);
 
   const userCoverage: CoverageMon[] = useMemo(
-    () => userSlots.map((s) => ({ name: s.pokemon?.name ?? "", types: s.pokemon?.types ?? [], abilityName: s.abilityName })),
+    () => userSlots.map((s) => ({
+      name: s.pokemon?.name ?? "", types: s.pokemon?.types ?? [], abilityName: s.abilityName,
+      stats: s.pokemon ? statsFromEntries(s.pokemon.stats) : undefined,
+    })),
     [userSlots]
   );
   const opponentCoverage: CoverageMon[] = useMemo(
-    () => opponentSlots.map((s) => ({ name: s.pokemon?.name ?? "", types: s.pokemon?.types ?? [], abilityName: s.abilityName })),
+    () => opponentSlots.map((s) => ({
+      name: s.pokemon?.name ?? "", types: s.pokemon?.types ?? [], abilityName: s.abilityName,
+      stats: s.pokemon ? statsFromEntries(s.pokemon.stats) : undefined,
+    })),
     [opponentSlots]
   );
 

@@ -5,6 +5,7 @@ import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
 import { fetchPokemonNameList, fetchPokemonDetail } from "@/lib/data/fetchAndCache";
 import { PokemonNameEntry } from "@/lib/types";
 import TypeBadge from "@/components/TypeBadge";
+import { getCommonSet } from "@/lib/data/commonSets";
 
 const MAX_SUGGESTIONS = 8;
 
@@ -46,6 +47,11 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
     setPokeLoading(true);
     const detail = await fetchPokemonDetail(name);
     setSlotPokemon(index, detail);
+    if (detail) {
+      const commonSet = getCommonSet(detail.name);
+      const matchesLegalAbility = commonSet && detail.abilities.some((a) => a.name === commonSet.likelyAbility);
+      if (matchesLegalAbility) setSlotAbility(index, commonSet.likelyAbility);
+    }
     setPokeLoading(false);
   }
 
@@ -115,6 +121,14 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
                 </option>
               ))}
             </select>
+            {(() => {
+              const commonSet = getCommonSet(slot.pokemon!.name);
+              return commonSet ? (
+                <p className="mt-1.5 text-xs text-[color:var(--ink)]/50">
+                  Commonly runs: <span className="capitalize">{commonSet.commonMoves.join(", ").toLowerCase()}</span> · {commonSet.topItem}
+                </p>
+              ) : null;
+            })()}
           </div>
         </div>
       )}

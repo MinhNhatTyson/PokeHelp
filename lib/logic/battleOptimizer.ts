@@ -4,14 +4,31 @@ import { getAbilitySignal } from "@/lib/logic/abilitySignals";
 
 export interface CoverageMon {
   name: string;
-  types: PokemonTypeName[]; // length 1 or 2
+  types: PokemonTypeName[];
   abilityName: string | null;
+  stats?: { hp: number; attack: number; defense: number; spAttack: number; spDefense: number; speed: number };
+}
+
+export function statsFromEntries(entries: { name: string; baseStat: number }[]) {
+  const get = (n: string) => entries.find((e) => e.name === n)?.baseStat ?? 0;
+  return {
+    hp: get("hp"), attack: get("attack"), defense: get("defense"),
+    spAttack: get("special-attack"), spDefense: get("special-defense"), speed: get("speed"),
+  };
+}
+
+const BASELINE_ATTACKING_STAT = 80;
+
+function bestAttackingStat(mon: CoverageMon): number {
+  if (!mon.stats) return BASELINE_ATTACKING_STAT; // unknown stats -> assume average threat
+  return Math.max(mon.stats.attack, mon.stats.spAttack);
 }
 
 export interface ComboScoreBreakdown {
   defenseScore: number;
   offenseScore: number;
   abilityScore: number;
+  speedScore: number;
   total: number;
   /** Types where 2+ combo members are weak, weighted by how many opponents carry that type */
   sharedWeaknesses: PokemonTypeName[];
@@ -68,15 +85,19 @@ function scoreCombo(members: CoverageMon[], opponents: CoverageMon[]): ComboScor
   let defenseScore = 0;
   const weaknessWeight = new Map<PokemonTypeName, number>();
   for (const [attackType, weight] of opponentTypeWeight) {
+    const attackersOfType = opponents.filter((o) => o.types.includes(attackType));
+    const avgPower = attackersOfType.reduce((sum, o) => sum + bestAttackingStat(o), 0) / attackersOfType.length;
+    const powerFactor = avgPower / BASELINE_ATTACKING_STAT; // >1 = hits harder than average
+
     let membersWeak = 0;
     for (const member of members) {
       const m = defenseMultiplier(attackType, member);
       if (m >= 2) membersWeak += 1;
-      else if (m === 0) defenseScore += 1 * weight; // immunity is a strong defensive asset
+      else if (m === 0) defenseScore += 1 * weight;
       else if (m <= 0.5) defenseScore += 0.5 * weight;
     }
     if (membersWeak > 0) {
-      defenseScore -= membersWeak * weight;
+      defenseScore -= membersWeak * weight * powerFactor;
       weaknessWeight.set(attackType, membersWeak * weight);
     }
   }
@@ -103,13 +124,17 @@ function scoreCombo(members: CoverageMon[], opponents: CoverageMon[]): ComboScor
     abilityScore += beneficiaries * 2; // weather + payoff on the same 4 is a real combo
   }
 
+    // --- Speed: rough proxy for who's more likely to act first as a team ---
+  let speedScore = 0;
+  const yourFastest = Math.max(0, ...members.map((m) => m.stats?.speed ?? 0));
+  const oppFastest = Math.max(0, ...opponents.map((o) => o.stats?.speed ?? 0));
+  if (yourFastest > oppFastest) speedScore += 1;
+  else if (yourFastest < oppFastest) speedScore -= 1;
+
   return {
-    defenseScore,
-    offenseScore,
-    abilityScore,
-    total: defenseScore + offenseScore + abilityScore,
-    sharedWeaknesses,
-    offensiveGaps,
+    defenseScore, offenseScore, abilityScore, speedScore,
+    total: defenseScore + offenseScore + abilityScore + speedScore,
+    sharedWeaknesses, offensiveGaps,
   };
 }
 
