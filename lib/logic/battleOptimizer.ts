@@ -1,6 +1,90 @@
 import { PokemonTypeName, POKEMON_TYPES, EffectivenessMultiplier } from "@/lib/types";
 import { getSingleMultiplier } from "@/lib/logic/effectiveness";
 import { getAbilitySignal } from "@/lib/logic/abilitySignals";
+import { getCommonSet } from "@/lib/data/commonSets";
+
+interface LeadSignals {
+  hasFakeOut: boolean;
+  hasRedirection: boolean;
+  isIntimidate: boolean;
+  isWeatherSetter: boolean;
+  isTrickRoomSetter: boolean;
+  isTailwindSetter: boolean;
+}
+
+function getLeadSignals(mon: CoverageMon): LeadSignals {
+  const moves = getCommonSet(mon.name)?.commonMoves.map((m) => m.toLowerCase()) ?? [];
+  const abilitySignal = getAbilitySignal(mon.abilityName);
+  return {
+    hasFakeOut: moves.includes("fake out"),
+    hasRedirection: moves.includes("rage powder") || moves.includes("follow me"),
+    isIntimidate: !!abilitySignal?.isIntimidate,
+    isWeatherSetter: !!abilitySignal?.weatherSets,
+    isTrickRoomSetter: moves.includes("trick room"),
+    isTailwindSetter: moves.includes("tailwind"),
+  };
+}
+
+function leadScore(mon: CoverageMon): number {
+  const s = getLeadSignals(mon);
+  let score = 0;
+  if (s.hasFakeOut) score += 3;
+  if (s.isIntimidate) score += 2;
+  if (s.hasRedirection) score += 2;
+  if (s.isWeatherSetter) score += 2;
+  if (s.isTailwindSetter) score += 1;
+  if (s.isTrickRoomSetter) score += 1;
+  score += (mon.stats?.speed ?? 0) / 100; // mild tiebreak, not a real speed calc
+  return score;
+}
+
+function pickLead(members: CoverageMon[]): { lead: CoverageMon[]; backLine: CoverageMon[] } {
+  const sorted = [...members].sort((a, b) => leadScore(b) - leadScore(a));
+  return { lead: sorted.slice(0, 2), backLine: sorted.slice(2) };
+}
+
+function buildStrategyNotes(
+  lead: CoverageMon[],
+  backLine: CoverageMon[],
+  breakdown: ComboScoreBreakdown
+): string[] {
+  const notes: string[] = [];
+  const leadNames = lead.map((m) => m.name).join(" + ");
+
+  const leadTags = lead.flatMap((m) => {
+    const s = getLeadSignals(m);
+    const tags: string[] = [];
+    if (s.hasFakeOut) tags.push(`${m.name}'s Fake Out`);
+    if (s.isIntimidate) tags.push(`${m.name}'s Intimidate`);
+    if (s.hasRedirection) tags.push(`${m.name}'s redirection`);
+    if (s.isWeatherSetter) tags.push(`${m.name}'s weather`);
+    if (s.isTailwindSetter) tags.push(`${m.name}'s Tailwind`);
+    if (s.isTrickRoomSetter) tags.push(`${m.name}'s Trick Room`);
+    return tags;
+  });
+
+  notes.push(
+    leadTags.length > 0
+      ? `Lead with ${leadNames} to open with ${leadTags.join(", ")}.`
+      : `Lead with ${leadNames} — no standout lead tools in the curated data for these two, so this is mostly a speed/matchup guess.`
+  );
+
+  if (breakdown.sharedWeaknesses.length > 0) {
+    notes.push(`Watch out: ${breakdown.sharedWeaknesses.join("/")} threats hit more than one member of this lineup at once.`);
+  }
+
+  notes.push(
+    breakdown.offensiveGaps.length > 0
+      ? `This lineup struggles to dent ${breakdown.offensiveGaps.join(", ")} — keep ${backLine.map((m) => m.name).join(" and ")} in the back ready to pivot in on a better matchup.`
+      : `Every opposing Pokémon can be hit super-effectively by at least one member here.`
+  );
+
+  if (breakdown.abilityScore > 0) {
+    notes.push(`Ability synergy (Intimidate/weather) is actively contributing to this combo's score.`);
+  }
+
+  return notes;
+}
 
 export interface CoverageMon {
   name: string;
@@ -37,10 +121,14 @@ export interface ComboScoreBreakdown {
 }
 
 export interface ComboResult {
-  indices: [number, number, number, number]; // indices into the original 6-mon user team
+  indices: [number, number, number, number];
   members: CoverageMon[];
   breakdown: ComboScoreBreakdown;
+  recommendedLead: CoverageMon[];
+  backLine: CoverageMon[];
+  strategyNotes: string[];
 }
+
 
 // All C(6,4) = 15 ways to choose 4 of 6 team slots.
 function fourOfSixCombinations(): [number, number, number, number][] {
@@ -143,7 +231,10 @@ export function rankBringFourCombos(userTeam: CoverageMon[], opponentTeam: Cover
 
   const results = fourOfSixCombinations().map((indices) => {
     const members = indices.map((i) => userTeam[i]);
-    return { indices, members, breakdown: scoreCombo(members, opponentTeam) };
+    const breakdown = scoreCombo(members, opponentTeam);
+    const { lead, backLine } = pickLead(members);
+    const strategyNotes = buildStrategyNotes(lead, backLine, breakdown);
+    return { indices, members, breakdown, recommendedLead: lead, backLine, strategyNotes };
   });
 
   return results.sort((a, b) => b.breakdown.total - a.breakdown.total);
