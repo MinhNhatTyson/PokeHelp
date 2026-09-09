@@ -2,6 +2,7 @@ import { PokemonTypeName, POKEMON_TYPES, EffectivenessMultiplier } from "@/lib/t
 import { getSingleMultiplier } from "@/lib/logic/effectiveness";
 import { getAbilitySignal } from "@/lib/logic/abilitySignals";
 import { getCommonSet } from "@/lib/data/commonSets";
+import { checkLeadDamage, LeadDamageCheck } from "@/lib/logic/damageCheck";
 
 interface LeadSignals {
   hasFakeOut: boolean;
@@ -127,6 +128,7 @@ export interface ComboResult {
   recommendedLead: CoverageMon[];
   backLine: CoverageMon[];
   strategyNotes: string[];
+  leadDamageChecks: LeadDamageCheck[];
 }
 
 
@@ -229,12 +231,25 @@ function scoreCombo(members: CoverageMon[], opponents: CoverageMon[]): ComboScor
 export function rankBringFourCombos(userTeam: CoverageMon[], opponentTeam: CoverageMon[]): ComboResult[] {
   if (userTeam.length !== 6) throw new Error("rankBringFourCombos expects exactly 6 user team members");
 
+  const { lead: opponentLead } = pickLead(opponentTeam);
+
   const results = fourOfSixCombinations().map((indices) => {
     const members = indices.map((i) => userTeam[i]);
     const breakdown = scoreCombo(members, opponentTeam);
     const { lead, backLine } = pickLead(members);
     const strategyNotes = buildStrategyNotes(lead, backLine, breakdown);
-    return { indices, members, breakdown, recommendedLead: lead, backLine, strategyNotes };
+
+    // Paired matchup checks (lead[0] vs opponentLead[0], lead[1] vs opponentLead[1])
+    // in both directions — a simplification, not a guarantee of real targeting.
+    const leadDamageChecks: LeadDamageCheck[] = [];
+    for (let i = 0; i < Math.min(lead.length, opponentLead.length); i++) {
+      const out = checkLeadDamage(lead[i], opponentLead[i]);
+      if (out) leadDamageChecks.push(out);
+      const inc = checkLeadDamage(opponentLead[i], lead[i]);
+      if (inc) leadDamageChecks.push(inc);
+    }
+
+    return { indices, members, breakdown, recommendedLead: lead, backLine, strategyNotes, leadDamageChecks };
   });
 
   return results.sort((a, b) => b.breakdown.total - a.breakdown.total);

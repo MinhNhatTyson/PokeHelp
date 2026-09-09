@@ -137,8 +137,11 @@ export interface TeamDefenseMatrix {
 
 export interface OpponentSlot {
   pokemon: PokemonDetail | null;
-  /** Best guess at this opponent's ability — you rarely know for certain in team preview */
   abilityName: string | null;
+  /** Resolved Mega-form detail when this species has a curated Mega Stone in
+   *  commonSets — fetched once on selection, null if not applicable or the
+   *  form isn't in PokeAPI yet. Used for scoring in place of the base form. */
+  megaFormDetail?: PokemonDetail | null;
 }
 
 export interface SavedTeam {

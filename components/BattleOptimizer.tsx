@@ -7,6 +7,7 @@ import { useOpponentTeamStore, OPPONENT_TEAM_SIZE } from "@/lib/store/opponentTe
 import { rankBringFourCombos, statsFromEntries, CoverageMon } from "@/lib/logic/battleOptimizer";
 import OpponentSlotPicker from "@/components/OpponentSlotPicker";
 import ComboResultCard from "@/components/ComboResultCard";
+import { getCommonSet } from "@/lib/data/commonSets";
 
 export default function BattleOptimizer() {
   const userSlots = useTeamStore((s) => s.slots);
@@ -25,10 +26,17 @@ export default function BattleOptimizer() {
     [userSlots]
   );
   const opponentCoverage: CoverageMon[] = useMemo(
-    () => opponentSlots.map((s) => ({
-      name: s.pokemon?.name ?? "", types: s.pokemon?.types ?? [], abilityName: s.abilityName,
-      stats: s.pokemon ? statsFromEntries(s.pokemon.stats) : undefined,
-    })),
+    () => opponentSlots.map((s) => {
+      const commonSet = s.pokemon ? getCommonSet(s.pokemon.name) : null;
+      const effective = s.megaFormDetail ?? s.pokemon;
+      const abilityName = s.megaFormDetail ? commonSet?.megaForm?.formAbility ?? null : s.abilityName;
+      return {
+        name: s.pokemon?.name ?? "", // keep displaying the base/preview species name
+        types: effective?.types ?? [],
+        abilityName,
+        stats: effective ? statsFromEntries(effective.stats) : undefined,
+      };
+    }),
     [opponentSlots]
   );
 

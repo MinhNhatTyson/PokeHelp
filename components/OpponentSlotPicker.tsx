@@ -20,6 +20,7 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
   const [pokeLoading, setPokeLoading] = useState(false);
   const [showPokeDropdown, setShowPokeDropdown] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const setSlotMegaFormDetail = useOpponentTeamStore((s) => s.setSlotMegaFormDetail);
 
   useEffect(() => {
     fetchPokemonNameList().then(setPokeNames);
@@ -47,10 +48,18 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
     setPokeLoading(true);
     const detail = await fetchPokemonDetail(name);
     setSlotPokemon(index, detail);
+
     if (detail) {
       const commonSet = getCommonSet(detail.name);
-      const matchesLegalAbility = commonSet && detail.abilities.some((a) => a.name === commonSet.likelyAbility);
-      if (matchesLegalAbility) setSlotAbility(index, commonSet.likelyAbility);
+      if (commonSet?.megaForm) {
+        // Commonly holds a Mega Stone — we assume an immediate turn-1 Mega
+        // Evolution for scoring (see battleOptimizer design notes), so the
+        // pre-Mega ability dropdown below is mostly informational here.
+        const megaDetail = await fetchPokemonDetail(commonSet.megaForm.formSpecies);
+        setSlotMegaFormDetail(index, megaDetail); // null if PokeAPI doesn't have this form yet — fails soft
+      } else if (commonSet && detail.abilities.some((a) => a.name === commonSet.likelyAbility)) {
+        setSlotAbility(index, commonSet.likelyAbility);
+      }
     }
     setPokeLoading(false);
   }
@@ -123,9 +132,9 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
             </select>
             {(() => {
               const commonSet = getCommonSet(slot.pokemon!.name);
-              return commonSet ? (
+              return commonSet?.megaForm ? (
                 <p className="mt-1.5 text-xs text-[color:var(--ink)]/50">
-                  Commonly runs: <span className="capitalize">{commonSet.commonMoves.join(", ").toLowerCase()}</span> · {commonSet.topItem}
+                  Likely Mega Evolves via {commonSet.topItem} → <span className="capitalize">{commonSet.megaForm.formAbility.replace(/-/g, " ")}</span>
                 </p>
               ) : null;
             })()}

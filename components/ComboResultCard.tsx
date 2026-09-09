@@ -2,7 +2,7 @@ import { ComboResult } from "@/lib/logic/battleOptimizer";
 import TypeBadge from "@/components/TypeBadge";
 
 export default function ComboResultCard({ rank, result }: { rank: number; result: ComboResult }) {
-  const { members, breakdown, recommendedLead, backLine, strategyNotes } = result;
+  const { members, breakdown, recommendedLead, backLine, strategyNotes, leadDamageChecks } = result;
   return (
     <div className={`rounded-lg border p-4 ${rank === 1 ? "border-[color:var(--accent-gold)] bg-black/5" : "border-black/10"}`}>
       <div className="flex items-center justify-between">
@@ -50,6 +50,17 @@ export default function ComboResultCard({ rank, result }: { rank: number; result
         <ul className="mt-3 space-y-1 border-t border-black/10 pt-2 text-xs text-[color:var(--ink)]/70">
           {strategyNotes.map((note, i) => <li key={i}>{note}</li>)}
         </ul>
+      )}
+
+      {leadDamageChecks.length > 0 && (
+        <div className="mt-3 border-t border-black/10 pt-2">
+          <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Opening damage check</p>
+          <ul className="mt-1 space-y-1 text-xs text-[color:var(--ink)]/70">
+            {leadDamageChecks.map((c, i) => (
+              <li key={i}>{c.description}</li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );
