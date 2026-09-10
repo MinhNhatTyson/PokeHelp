@@ -25,7 +25,11 @@ export const COMMON_SETS: Record<string, CommonSetEntry> = {
   whimsicott: { species: "whimsicott", showdownName: "Whimsicott", likelyAbility: "prankster", commonMoves: ["Tailwind", "Moonblast", "Encore", "Protect"], topItem: "Focus Sash", regulation: "VGC 2026 Reg M-B" },
   kingambit: { species: "kingambit", showdownName: "Kingambit", likelyAbility: "defiant", commonMoves: ["Sucker Punch", "Kowtow Cleave", "Iron Head", "Protect"], topItem: "Chople Berry", regulation: "VGC 2026 Reg M-B" },
   incineroar: { species: "incineroar", showdownName: "Incineroar", likelyAbility: "intimidate", commonMoves: ["Fake Out", "Knock Off", "Flare Blitz", "Parting Shot"], topItem: "Sitrus Berry", regulation: "VGC 2026 Reg M-B" },
-  sneasler: { species: "sneasler", showdownName: "Sneasler", likelyAbility: "unburden", commonMoves: ["Dire Claw", "Close Combat", "Throat Chop", "Fake Out"], topItem: "Electric Seed", regulation: "VGC 2026 Reg I" },
+  sneasler: {
+    species: "sneasler", showdownName: "Sneasler", likelyAbility: "unburden",
+    commonMoves: ["Close Combat", "Fake Out", "Dire Claw", "Protect"],
+    topItem: "White Herb", regulation: "VGC 2026 Reg M-B (Champions)",
+  },
   pikachu: { species: "pikachu", showdownName: "Pikachu", likelyAbility: "lightning-rod", commonMoves: ["Fake Out", "Thunderbolt", "Quick Attack", "Protect"], topItem: "Light Ball", regulation: "VGC 2026 Reg M-B" },
   "chi-yu": { species: "chi-yu", showdownName: "Chi-Yu", likelyAbility: "beads-of-ruin", commonMoves: ["Heat Wave", "Dark Pulse", "Overheat", "Snarl"], topItem: "Choice Scarf", regulation: "VGC 2026 Reg I" },
   charizard: {
@@ -77,6 +81,12 @@ export const COMMON_SETS: Record<string, CommonSetEntry> = {
     species: "gholdengo", showdownName: "Gholdengo", likelyAbility: "good-as-gold",
     commonMoves: ["Make It Rain", "Shadow Ball", "Protect", "Nasty Plot"],
     topItem: "Life Orb", regulation: "VGC 2026 Reg M-B",
+  },
+  tyranitar: {
+    species: "tyranitar", showdownName: "Tyranitar", likelyAbility: "sand-stream",
+    commonMoves: ["Rock Slide", "Knock Off", "Protect", "Low Kick"],
+    topItem: "Tyranitarite", regulation: "VGC 2026 Reg M-B",
+    megaForm: { formSpecies: "tyranitar-mega", formShowdownName: "Tyranitar-Mega", formAbility: "sand-stream" },
   },
 };
 

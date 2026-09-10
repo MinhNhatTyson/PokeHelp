@@ -47,7 +47,8 @@ function pickLead(members: CoverageMon[]): { lead: CoverageMon[]; backLine: Cove
 function buildStrategyNotes(
   lead: CoverageMon[],
   backLine: CoverageMon[],
-  breakdown: ComboScoreBreakdown
+  breakdown: ComboScoreBreakdown,
+  opponents: CoverageMon[]
 ): string[] {
   const notes: string[] = [];
   const leadNames = lead.map((m) => m.name).join(" + ");
@@ -79,6 +80,8 @@ function buildStrategyNotes(
       ? `This lineup struggles to dent ${breakdown.offensiveGaps.join(", ")} — keep ${backLine.map((m) => m.name).join(" and ")} in the back ready to pivot in on a better matchup.`
       : `Every opposing Pokémon can be hit super-effectively by at least one member here.`
   );
+
+  notes.push(...detectWeatherContests([...lead, ...backLine], opponents));
 
   if (breakdown.abilityScore > 0) {
     notes.push(`Ability synergy (Intimidate/weather) is actively contributing to this combo's score.`);
@@ -237,7 +240,7 @@ export function rankBringFourCombos(userTeam: CoverageMon[], opponentTeam: Cover
     const members = indices.map((i) => userTeam[i]);
     const breakdown = scoreCombo(members, opponentTeam);
     const { lead, backLine } = pickLead(members);
-    const strategyNotes = buildStrategyNotes(lead, backLine, breakdown);
+    const strategyNotes = buildStrategyNotes(lead, backLine, breakdown, opponentTeam);
 
     // Paired matchup checks (lead[0] vs opponentLead[0], lead[1] vs opponentLead[1])
     // in both directions — a simplification, not a guarantee of real targeting.
@@ -253,4 +256,30 @@ export function rankBringFourCombos(userTeam: CoverageMon[], opponentTeam: Cover
   });
 
   return results.sort((a, b) => b.breakdown.total - a.breakdown.total);
+}
+
+function detectWeatherContests(members: CoverageMon[], opponents: CoverageMon[]): string[] {
+  const notes: string[] = [];
+
+  for (const mon of members) {
+    const ownWeather = getAbilitySignal(mon.abilityName)?.weatherSets;
+    if (!ownWeather) continue;
+
+    const opposingSetter = opponents.find((o) => {
+      const oppWeather = getAbilitySignal(o.abilityName)?.weatherSets;
+      return oppWeather && oppWeather !== ownWeather;
+    });
+    if (!opposingSetter) continue;
+
+    const commonSet = getCommonSet(mon.name);
+    const requiresMegaForWeather = commonSet?.megaForm && commonSet.likelyAbility !== commonSet.megaForm.formAbility;
+
+    notes.push(
+      requiresMegaForWeather
+        ? `${mon.name}'s ${ownWeather} will likely be contested by ${opposingSetter.name} — since the Mega is what grants ${ownWeather} here, you may still need to Mega early to get any weather value, but expect it to get overwritten and plan a re-answer.`
+        : `${mon.name}'s ${ownWeather} will likely be contested by ${opposingSetter.name} — consider holding the Mega Evolution as a reset rather than leading with it, so you can re-flip the weather back after they set theirs.`
+    );
+  }
+
+  return notes;
 }
