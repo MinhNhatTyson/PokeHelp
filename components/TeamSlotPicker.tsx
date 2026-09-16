@@ -14,6 +14,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
   const setSlotItem = useTeamStore((s) => s.setSlotItem);
   const setSlotAbility = useTeamStore((s) => s.setSlotAbility);
   const clearSlot = useTeamStore((s) => s.clearSlot);
+  const setSlotNotes = useTeamStore((s) => s.setSlotNotes);
 
   const [pokeQuery, setPokeQuery] = useState("");
   const [pokeNames, setPokeNames] = useState<PokemonNameEntry[]>([]);
@@ -161,6 +162,16 @@ export default function TeamSlotPicker({ index }: { index: number }) {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="mt-3">
+            <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Role on team</label>
+            <textarea
+              value={slot.roleNotes ?? ""}
+              onChange={(e) => setSlotNotes(index, e.target.value || null)}
+              placeholder="e.g. Fake Out + redirect for the sweeper"
+              rows={2}
+              className="mt-1 w-full resize-none rounded-md border border-black/10 px-3 py-2 text-sm text-[color:var(--ink)] outline-none placeholder:text-black/30 focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
+            />
           </div>
         </div>
       )}

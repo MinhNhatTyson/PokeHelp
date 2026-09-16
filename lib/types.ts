@@ -114,6 +114,13 @@ export interface TeamSlot {
   pokemon: PokemonDetail | null;
   itemName: string | null;
   abilityName: string | null;
+  roleNotes: string | null;
+}
+
+export interface StrategyResult {
+  narrative: string;        
+  comboIndices: [number, number, number, number];
+  generatedAt: number;
 }
 
 

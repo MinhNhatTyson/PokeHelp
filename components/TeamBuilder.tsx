@@ -22,6 +22,9 @@ export default function TeamBuilder() {
   const defenseMatrix = useMemo(() => (isComplete ? getTeamDefenseMatrix(slots) : null), [slots, isComplete]);
   const offense = useMemo(() => (isComplete ? getTeamOffenseReport(slots) : null), [slots, isComplete]);
 
+  const teamStrategy = useTeamStore((s) => s.teamStrategy);
+  const setTeamStrategy = useTeamStore((s) => s.setTeamStrategy);
+
   function handleSave() {
     if (!isComplete) return;
     saveTeam(saveName, slots);
@@ -91,6 +94,20 @@ export default function TeamBuilder() {
           {slots.map((_, i) => (
             <TeamSlotPicker key={i} index={i} />
           ))}
+        </div>
+
+        <div className="mt-4">
+          <label htmlFor="team-strategy" className="text-xs font-medium uppercase text-[color:var(--ink)]/40">
+            Overall game plan
+          </label>
+          <textarea
+            id="team-strategy"
+            value={teamStrategy}
+            onChange={(e) => setTeamStrategy(e.target.value)}
+            placeholder="e.g. Weather-based offense — Torkoal sets sun turn 1, then Charizard and Sylveon clean up behind Tailwind."
+            rows={2}
+            className="mt-1 w-full resize-none rounded-md border border-black/10 bg-white px-3 py-2 text-sm text-[color:var(--ink)] outline-none placeholder:text-black/30 focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
+          />
         </div>
 
         {isComplete && defenseMatrix && offense ? (

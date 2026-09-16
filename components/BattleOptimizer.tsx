@@ -14,6 +14,9 @@ export default function BattleOptimizer() {
   const opponentSlots = useOpponentTeamStore((s) => s.slots);
   const clearOpponentTeam = useOpponentTeamStore((s) => s.clearTeam);
   const [showAll, setShowAll] = useState(false);
+  const teamStrategy = useTeamStore((s) => s.teamStrategy);
+  const [strategyNarrative, setStrategyNarrative] = useState<string | null>(null);
+  const [strategyStatus, setStrategyStatus] = useState<"idle" | "loading" | "error">("idle");
 
   const userReady = userSlots.every((s) => s.pokemon && s.abilityName);
   const opponentReady = opponentSlots.every((s) => s.pokemon);
@@ -44,6 +47,36 @@ export default function BattleOptimizer() {
     if (!userReady || !opponentReady) return null;
     return rankBringFourCombos(userCoverage, opponentCoverage);
   }, [userReady, opponentReady, userCoverage, opponentCoverage]);
+
+  async function handleGetStrategy() {
+    if (!results || results.length === 0) return;
+    setStrategyStatus("loading");
+    setStrategyNarrative(null);
+
+    try {
+      const res = await fetch("/api/strategy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamStrategy,
+          slotNotes: userSlots
+            .filter((s) => s.pokemon)
+            .map((s) => ({ name: s.pokemon!.name, roleNotes: s.roleNotes })),
+          opponentPreview: opponentSlots
+            .filter((s) => s.pokemon)
+            .map((s) => ({ name: s.pokemon!.name, abilityGuess: s.abilityName })),
+          topCombo: results[0],
+        }),
+      });
+
+      if (!res.ok) throw new Error("request failed");
+      const data = await res.json();
+      setStrategyNarrative(data.narrative);
+      setStrategyStatus("idle");
+    } catch {
+      setStrategyStatus("error");
+    }
+  }
 
   return (
     <div className="w-full max-w-5xl rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
@@ -93,6 +126,26 @@ export default function BattleOptimizer() {
             )}
           </div>
         )}
+
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={handleGetStrategy}
+            disabled={strategyStatus === "loading"}
+            className="rounded-md bg-[color:var(--shell-accent)] px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {strategyStatus === "loading" ? "Thinking…" : "Get AI strategy for top pick"}
+          </button>
+          {strategyStatus === "error" && (
+            <p className="mt-2 text-sm text-red-500">Couldn&apos;t reach the strategy assistant. Try again.</p>
+          )}
+          {strategyNarrative && (
+            <div className="mt-3 rounded-lg border border-[color:var(--accent-gold)]/40 bg-black/5 p-4 text-sm text-[color:var(--ink)]">
+              <p className="mb-1 text-xs font-medium uppercase text-[color:var(--ink)]/40">AI strategy notes</p>
+              <p>{strategyNarrative}</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
