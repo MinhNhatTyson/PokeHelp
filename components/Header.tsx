@@ -14,6 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Items", href: "/items" },
   { label: "Team Builder", href: "/team" },
   { label: "Battle Optimizer", href: "/optimizer" },
+  { label: "Live Battle", href: "/battle" },
   { label: "Trainer Roster", href: "/trainers", comingSoon: true },
 ];
 

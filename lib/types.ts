@@ -157,3 +157,20 @@ export interface SavedTeam {
   savedAt: number;
   slots: TeamSlot[];
 }
+
+export interface FieldState {
+  weather: "none" | "rain" | "sun" | "sand" | "snow";
+  terrain: "none" | "electric" | "grassy" | "misty" | "psychic";
+  trickRoomTurnsLeft: number;
+  tailwindTurnsLeft: { yours: number; opponents: number };
+}
+
+export interface BattleEvent {
+  id: string;
+  sentenceFragment: string; // e.g. "Swampert's Earthquake KO'd Kingambit" — composed by the UI, not typed
+}
+
+export interface BattleConversationTurn {
+  role: "user" | "model";
+  text: string;
+}
