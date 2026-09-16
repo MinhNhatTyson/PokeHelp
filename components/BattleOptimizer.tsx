@@ -114,6 +114,25 @@ export default function BattleOptimizer() {
             <p className="mt-1 text-xs text-[color:var(--ink)]/50">
               Heuristic score from type coverage + ability signals — not a moveset-level simulation. Use it as a starting point, not gospel.
             </p>
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={handleGetStrategy}
+                disabled={strategyStatus === "loading"}
+                className="rounded-md bg-[color:var(--shell-accent)] px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {strategyStatus === "loading" ? "Thinking…" : "Get AI strategy for top pick"}
+              </button>
+              {strategyStatus === "error" && (
+                <p className="mt-2 text-sm text-red-500">Couldn&apos;t reach the strategy assistant. Try again.</p>
+              )}
+              {strategyNarrative && (
+                <div className="mt-3 rounded-lg border border-[color:var(--accent-gold)]/40 bg-black/5 p-4 text-sm text-[color:var(--ink)]">
+                  <p className="mb-1 text-xs font-medium uppercase text-[color:var(--ink)]/40">AI strategy notes</p>
+                  <p>{strategyNarrative}</p>
+                </div>
+              )}
+            </div>
             <div className="mt-4 space-y-3">
               {(showAll ? results : results.slice(0, 3)).map((r, i) => (
                 <ComboResultCard key={r.indices.join("-")} rank={i + 1} result={r} />
@@ -125,27 +144,7 @@ export default function BattleOptimizer() {
               </button>
             )}
           </div>
-        )}
-
-        <div className="mt-3">
-          <button
-            type="button"
-            onClick={handleGetStrategy}
-            disabled={strategyStatus === "loading"}
-            className="rounded-md bg-[color:var(--shell-accent)] px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {strategyStatus === "loading" ? "Thinking…" : "Get AI strategy for top pick"}
-          </button>
-          {strategyStatus === "error" && (
-            <p className="mt-2 text-sm text-red-500">Couldn&apos;t reach the strategy assistant. Try again.</p>
-          )}
-          {strategyNarrative && (
-            <div className="mt-3 rounded-lg border border-[color:var(--accent-gold)]/40 bg-black/5 p-4 text-sm text-[color:var(--ink)]">
-              <p className="mb-1 text-xs font-medium uppercase text-[color:var(--ink)]/40">AI strategy notes</p>
-              <p>{strategyNarrative}</p>
-            </div>
-          )}
-        </div>
+        )}        
       </div>
     </div>
   );

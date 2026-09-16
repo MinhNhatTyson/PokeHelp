@@ -27,22 +27,30 @@ export async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.6, maxOutputTokens: 500 },
+        generationConfig: { temperature: 0.6, maxOutputTokens: 2048 },
       }),
     });
 
     if (!res.ok) {
-      return NextResponse.json({ error: "Gemini request failed" }, { status: 502 });
+      const errorBody = await res.text();
+      console.error("Gemini request failed:", res.status, errorBody);
+      return NextResponse.json({ error: "Gemini request failed", detail: errorBody }, { status: 502 });
     }
 
     const data = await res.json();
-    const narrative: string | undefined = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const narrative = data.candidates?.[0]?.content?.parts
+      ?.map((p: { text?: string }) => p.text ?? "")
+      .join("")
+      .trim();
+
     if (!narrative) {
-      return NextResponse.json({ error: "Empty response from Gemini" }, { status: 502 });
+      console.error("Empty response from Gemini:", JSON.stringify(data));
+      return NextResponse.json({ error: "Empty response from Gemini", detail: data }, { status: 502 });
     }
 
     return NextResponse.json({ narrative });
-  } catch {
+  } catch (err) {
+    console.error("Gemini request threw:", err);
     return NextResponse.json({ error: "Gemini request threw" }, { status: 502 });
   }
 }
