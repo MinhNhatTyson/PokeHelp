@@ -25,6 +25,7 @@ export default function BattleOptimizer() {
     () => userSlots.map((s) => ({
       name: s.pokemon?.name ?? "", types: s.pokemon?.types ?? [], abilityName: s.abilityName,
       stats: s.pokemon ? statsFromEntries(s.pokemon.stats) : undefined,
+      moves: s.moves.filter((m): m is string => m !== null), // NEW — real picks, not curated guesses
     })),
     [userSlots]
   );

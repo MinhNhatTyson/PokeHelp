@@ -38,21 +38,36 @@ function buildPokemon(mon: CoverageMon, commonSet: CommonSetEntry | null) {
  */
 export function checkLeadDamage(attacker: CoverageMon, defender: CoverageMon): LeadDamageCheck | null {
   const attackerSet = getCommonSet(attacker.name);
-  if (!attackerSet || attackerSet.commonMoves.length === 0) return null;
+  const userMove = pickCheckableMove(attacker.moves);
+  const moveName = userMove ? formatMoveForCalc(userMove) : attackerSet?.commonMoves[0];
+  if (!moveName) return null; // no real move chosen and no curated fallback — nothing to check
 
   try {
     const attackerPoke = buildPokemon(attacker, attackerSet);
     const defenderPoke = buildPokemon(defender, getCommonSet(defender.name));
-    const move = new Move(GEN, attackerSet.commonMoves[0]);
+    const move = new Move(GEN, moveName);
     const result = calculate(GEN, attackerPoke, defenderPoke, move);
 
-    return {
-      attacker: attacker.name,
-      defender: defender.name,
-      move: attackerSet.commonMoves[0],
-      description: result.desc(),
-    };
+    return { attacker: attacker.name, defender: defender.name, move: moveName, description: result.desc() };
   } catch {
     return null;
   }
+}
+
+// Common non-damaging VGC moves — skipped when picking which of the user's
+// actual moves to run through the damage calc, so we don't end up "checking"
+// Protect/Tailwind/etc. We don't have real move-category data, so this is a
+// hand-maintained exclude-list, not a guarantee — fails soft either way.
+const SUPPORT_MOVE_SLUGS = new Set([
+  "protect", "detect", "wide-guard", "quick-guard", "follow-me", "rage-powder",
+  "tailwind", "trick-room", "helping-hand", "light-screen", "reflect", "aurora-veil",
+]);
+
+function formatMoveForCalc(slug: string): string {
+  return slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
+function pickCheckableMove(moves: string[] | undefined): string | null {
+  if (!moves) return null;
+  return moves.find((m) => !SUPPORT_MOVE_SLUGS.has(m)) ?? null;
 }

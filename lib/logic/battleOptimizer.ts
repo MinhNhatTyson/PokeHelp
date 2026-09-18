@@ -14,7 +14,10 @@ interface LeadSignals {
 }
 
 function getLeadSignals(mon: CoverageMon): LeadSignals {
-  const moves = getCommonSet(mon.name)?.commonMoves.map((m) => m.toLowerCase()) ?? [];
+  const actualMoves = mon.moves?.map((m) => m.replace(/-/g, " ").toLowerCase());
+  const moves = actualMoves && actualMoves.length > 0
+    ? actualMoves
+    : getCommonSet(mon.name)?.commonMoves.map((m) => m.toLowerCase()) ?? [];
   const abilitySignal = getAbilitySignal(mon.abilityName);
   return {
     hasFakeOut: moves.includes("fake out"),
@@ -95,6 +98,7 @@ export interface CoverageMon {
   types: PokemonTypeName[];
   abilityName: string | null;
   stats?: { hp: number; attack: number; defense: number; spAttack: number; spDefense: number; speed: number };
+  moves?: string[];
 }
 
 export function statsFromEntries(entries: { name: string; baseStat: number }[]) {

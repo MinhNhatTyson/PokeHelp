@@ -1,10 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { PokemonMoveEntry } from "@/lib/types";
 
 const MAX_MOVE_SUGGESTIONS = 8;
+interface MoveSuggestion {
+  move: string;
+  reasoning: string;
+}
 
 function formatMoveName(slug: string) {
   return slug.replace(/-/g, " ");
@@ -77,8 +81,54 @@ function MoveSlot({
 }
 
 export default function MovesetPicker({ slotIndex }: { slotIndex: number }) {
-  const slot = useTeamStore((s) => s.slots[slotIndex]);
+  const slots = useTeamStore((s) => s.slots);
+  const slot = slots[slotIndex];
   const setSlotMove = useTeamStore((s) => s.setSlotMove);
+  const teamStrategy = useTeamStore((s) => s.teamStrategy);
+
+  const [suggestion, setSuggestion] = useState<MoveSuggestion | null>(null);
+  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+
+  const chosenMoves = slot.moves.filter((m): m is string => m !== null);
+  const emptyIndex = slot.moves.findIndex((m) => m === null);
+  const shouldSuggest = !!slot.pokemon && chosenMoves.length === 3 && emptyIndex !== -1;
+  const chosenKey = [...chosenMoves].sort().join("|"); // re-fires only when the actual 3 moves change
+
+  useEffect(() => {
+    if (!shouldSuggest || !slot.pokemon) {
+      setSuggestion(null);
+      setStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+    setStatus("loading");
+    setSuggestion(null);
+
+    const teammates = slots
+      .filter((s, i) => i !== slotIndex && s.pokemon)
+      .map((s) => ({ name: s.pokemon!.name, roleNotes: s.roleNotes }));
+
+    fetch("/api/moveset-suggestion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        species: slot.pokemon.name,
+        chosenMoves,
+        legalMovepool: slot.pokemon.moves.map((m) => m.name),
+        abilityName: slot.abilityName,
+        itemName: slot.itemName,
+        teammates,
+        teamStrategy,
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("failed"))))
+      .then((data) => { if (!cancelled) { setSuggestion(data); setStatus("idle"); } })
+      .catch(() => { if (!cancelled) setStatus("error"); });
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldSuggest, chosenKey, slotIndex]);
 
   if (!slot.pokemon) return null;
 
@@ -98,7 +148,26 @@ export default function MovesetPicker({ slotIndex }: { slotIndex: number }) {
           />
         ))}
       </div>
-      {/* Suggestion trigger slots into here in Milestone 3 */}
+
+      {shouldSuggest && (
+        <div className="mt-2 rounded-md border border-[color:var(--accent-gold)]/40 bg-black/5 p-2.5 text-xs">
+          <p className="font-medium uppercase text-[color:var(--ink)]/40">PokeHelp suggests</p>
+          {status === "loading" && <p className="mt-1 text-[color:var(--ink)]/60">Thinking…</p>}
+          {status === "error" && <p className="mt-1 text-red-500">Couldn&apos;t get a suggestion — pick manually.</p>}
+          {status === "idle" && suggestion && (
+            <div className="mt-1">
+              <button
+                type="button"
+                onClick={() => emptyIndex !== -1 && setSlotMove(slotIndex, emptyIndex, suggestion.move)}
+                className="rounded-full bg-[color:var(--accent-gold)] px-2.5 py-1 font-medium capitalize text-black"
+              >
+                {suggestion.move.replace(/-/g, " ")}
+              </button>
+              <p className="mt-1.5 text-[color:var(--ink)]/70">{suggestion.reasoning}</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

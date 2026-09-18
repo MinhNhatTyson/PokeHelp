@@ -69,6 +69,20 @@ export const useTeamStore = create<TeamState>()(
         }),
       setTeamStrategy: (text) => set({ teamStrategy: text }),      
     }),
-    { name: "pokehelp-active-team" }
+    {
+      name: "pokehelp-active-team",
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<TeamState> | undefined;
+        if (!persisted?.slots) return { ...currentState, ...persisted };
+        return {
+          ...currentState,
+          ...persisted,
+          slots: persisted.slots.map((s) => ({
+            ...s,
+            moves: s.moves ?? [null, null, null, null],
+          })),
+        };
+      },
+    }
   )
 );
