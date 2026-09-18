@@ -48,6 +48,7 @@ interface PokeApiPokemonResponse {
   types: PokeApiTypeSlot[];
   abilities: { ability: { name: string }; is_hidden: boolean }[];
   stats: { base_stat: number; stat: { name: string } }[];
+  moves: { move: { name: string } }[]; // NEW
 }
 
 interface PokeApiSpeciesResponse {
@@ -154,7 +155,7 @@ export async function fetchPokemonDetail(nameOrId: string): Promise<PokemonDetai
       description: await fetchAbilityDescription(a.ability.name),
     }))
   );
-  const detail: PokemonDetail = {
+    const detail: PokemonDetail = {
     id: pokeData.id,
     dexNumber: pokeData.id,
     name: pokeData.name,
@@ -169,6 +170,7 @@ export async function fetchPokemonDetail(nameOrId: string): Promise<PokemonDetai
     eggGroups: speciesData.egg_groups.map((g) => g.name),
     forms: speciesData.varieties.map((v) => ({ name: v.pokemon.name, isDefault: v.is_default })),
     evolutionChain,
+    moves: pokeData.moves.map((m) => ({ name: m.move.name })), // NEW
   };
 
   detailCache.set(key, detail);
@@ -268,6 +270,7 @@ interface PokeApiItemCategoryResponse {
 // battle. "holdable" alone also covers non-battle items like Poké Balls
 // (technically holdable, does nothing), so we need the more specific pair.
 const HOLDABLE_ATTRIBUTES = ["holdable-active", "holdable-passive"] as const;
+const TRANSFORM_ITEM_CATEGORIES = ["mega-stones", "z-crystals", "dynamax-crystals", "jewels"] as const;
 
 interface PokeApiItemAttributeResponse {
   items: { name: string; url: string }[];
@@ -277,14 +280,20 @@ let competitiveItemListPromise: Promise<ItemNameEntry[]> | null = null;
 
 export async function fetchCompetitiveItemNameList(): Promise<ItemNameEntry[]> {
   if (!competitiveItemListPromise) {
-    competitiveItemListPromise = Promise.all(
-      HOLDABLE_ATTRIBUTES.map((attribute) =>
+    competitiveItemListPromise = Promise.all([
+      ...HOLDABLE_ATTRIBUTES.map((attribute) =>
         fetch(`${POKEAPI_BASE}/item-attribute/${attribute}`)
           .then((res) => (res.ok ? res.json() : { items: [] }))
           .then((data: PokeApiItemAttributeResponse) => data.items)
           .catch(() => [])
-      )
-    ).then((lists) => {
+      ),
+      ...TRANSFORM_ITEM_CATEGORIES.map((category) =>
+        fetch(`${POKEAPI_BASE}/item-category/${category}`)
+          .then((res) => (res.ok ? res.json() : { items: [] }))
+          .then((data: PokeApiItemCategoryResponse) => data.items)
+          .catch(() => [])
+      ),
+    ]).then((lists) => {
       const seen = new Map<string, ItemNameEntry>();
       for (const item of lists.flat()) seen.set(item.name, item);
       return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));

@@ -5,6 +5,7 @@ import { useTeamStore } from "@/lib/store/teamStore";
 import { fetchPokemonNameList, fetchPokemonDetail, fetchCompetitiveItemNameList } from "@/lib/data/fetchAndCache";
 import { ItemNameEntry, PokemonNameEntry } from "@/lib/types";
 import TypeBadge from "@/components/TypeBadge";
+import MovesetPicker from "./MovesetPicker";
 
 const MAX_SUGGESTIONS = 8;
 
@@ -162,6 +163,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
                 </option>
               ))}
             </select>
+            <MovesetPicker slotIndex={index} />
           </div>
           <div className="mt-3">
             <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Role on team</label>

@@ -77,6 +77,7 @@ export interface PokemonDetail extends Pokemon {
   forms: PokemonFormLink[];
   evolutionChain: EvolutionStage[];
   artworkUrl: string | null;
+  moves: PokemonMoveEntry[]; // NEW — full legal movepool for this form
 }
 
 export interface PokemonAbility {
@@ -115,6 +116,11 @@ export interface TeamSlot {
   itemName: string | null;
   abilityName: string | null;
   roleNotes: string | null;
+  moves: (string | null)[];
+}
+
+export interface PokemonMoveEntry {
+  name: string; // PokeAPI slug, e.g. "close-combat"
 }
 
 export interface StrategyResult {
