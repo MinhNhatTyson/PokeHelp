@@ -6,6 +6,7 @@ import { useSavedTeamsStore } from "@/lib/store/savedTeamsStore";
 import { getTeamDefenseMatrix, getTeamOffenseReport } from "@/lib/logic/teamAnalysis";
 import TeamSlotPicker from "@/components/TeamSlotPicker";
 import TeamCoverageReport from "@/components/TeamCoverageReport";
+import TeamSuggestionPanel from "./TeamSuggestionPanel";
 
 export default function TeamBuilder() {
   const slots = useTeamStore((s) => s.slots);
@@ -109,8 +110,8 @@ export default function TeamBuilder() {
             <TeamSlotPicker key={i} index={i} />
           ))}
         </div>
-
-        
+          
+        <TeamSuggestionPanel />
 
         {isComplete && defenseMatrix && offense ? (
           <TeamCoverageReport defenseMatrix={defenseMatrix} offense={offense} />

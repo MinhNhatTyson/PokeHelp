@@ -270,7 +270,7 @@ interface PokeApiItemCategoryResponse {
 // battle. "holdable" alone also covers non-battle items like Poké Balls
 // (technically holdable, does nothing), so we need the more specific pair.
 const HOLDABLE_ATTRIBUTES = ["holdable-active", "holdable-passive"] as const;
-const TRANSFORM_ITEM_CATEGORIES = ["mega-stones", "z-crystals", "dynamax-crystals", "jewels"] as const;
+const TRANSFORM_ITEM_CATEGORIES = ["held-items", "mega-stones", "z-crystals", "dynamax-crystals", "jewels"] as const;
 
 interface PokeApiItemAttributeResponse {
   items: { name: string; url: string }[];

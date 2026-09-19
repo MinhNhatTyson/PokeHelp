@@ -60,7 +60,15 @@ export const useTeamStore = create<TeamState>()(
           return { slots };
         }),
       clearTeam: () => set({ slots: Array.from({ length: TEAM_SIZE }, () => ({ ...EMPTY_SLOT, moves: [null, null, null, null] })), teamStrategy: "" }),
-      loadSlots: (slots) => set({ slots: slots.map((s) => ({ ...s, roleNotes: s.roleNotes ?? null, moves: s.moves ?? [null, null, null, null] })) }),
+      loadSlots: (slots) =>
+        set({
+          slots: slots.map((s) => ({
+            ...s,
+            roleNotes: s.roleNotes ?? null,
+            moves: s.moves ?? [null, null, null, null],
+            pokemon: s.pokemon ? { ...s.pokemon, moves: s.pokemon.moves ?? [] } : s.pokemon,
+          })),
+        }),
       setSlotNotes: (index, roleNotes) =>
         set((state) => {
           const slots = [...state.slots];
@@ -80,6 +88,7 @@ export const useTeamStore = create<TeamState>()(
           slots: persisted.slots.map((s) => ({
             ...s,
             moves: s.moves ?? [null, null, null, null],
+            pokemon: s.pokemon ? { ...s.pokemon, moves: s.pokemon.moves ?? [] } : s.pokemon,
           })),
         };
       },
