@@ -151,9 +151,7 @@ export interface TeamDefenseMatrix {
 export interface OpponentSlot {
   pokemon: PokemonDetail | null;
   abilityName: string | null;
-  /** Resolved Mega-form detail when this species has a curated Mega Stone in
-   *  commonSets — fetched once on selection, null if not applicable or the
-   *  form isn't in PokeAPI yet. Used for scoring in place of the base form. */
+  itemName: string | null;
   megaFormDetail?: PokemonDetail | null;
 }
 

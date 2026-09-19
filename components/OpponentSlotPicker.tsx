@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
-import { fetchPokemonNameList, fetchPokemonDetail } from "@/lib/data/fetchAndCache";
-import { PokemonNameEntry } from "@/lib/types";
+import { fetchPokemonNameList, fetchPokemonDetail, fetchCompetitiveItemNameList } from "@/lib/data/fetchAndCache";
+import { ItemNameEntry, PokemonNameEntry } from "@/lib/types";
 import TypeBadge from "@/components/TypeBadge";
 import { getCommonSet } from "@/lib/data/commonSets";
+
 
 const MAX_SUGGESTIONS = 8;
 
@@ -22,9 +23,21 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const setSlotMegaFormDetail = useOpponentTeamStore((s) => s.setSlotMegaFormDetail);
 
+  const [itemQuery, setItemQuery] = useState("");
+  const [itemNames, setItemNames] = useState<ItemNameEntry[]>([]);
+  const [showItemDropdown, setShowItemDropdown] = useState(false);
+  const setSlotItem = useOpponentTeamStore((s) => s.setSlotItem);
+
+  const itemMatches = useMemo(() => {
+  const q = itemQuery.trim().toLowerCase();
+  if (!q) return [];
+  return itemNames.filter((i) => i.name.startsWith(q)).slice(0, MAX_SUGGESTIONS);
+}, [itemQuery, itemNames]);
+
   useEffect(() => {
-    fetchPokemonNameList().then(setPokeNames);
-  }, []);
+  fetchPokemonNameList().then(setPokeNames);
+  fetchCompetitiveItemNameList().then(setItemNames);
+}, []);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -43,26 +56,47 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
   }, [pokeQuery, pokeNames]);
 
   async function handleSelectPokemon(name: string) {
-    setPokeQuery("");
-    setShowPokeDropdown(false);
-    setPokeLoading(true);
-    const detail = await fetchPokemonDetail(name);
-    setSlotPokemon(index, detail);
+  setPokeQuery("");
+  setShowPokeDropdown(false);
+  setPokeLoading(true);
+  const detail = await fetchPokemonDetail(name);
+  setSlotPokemon(index, detail);
 
-    if (detail) {
-      const commonSet = getCommonSet(detail.name);
-      if (commonSet?.megaForm) {
-        // Commonly holds a Mega Stone — we assume an immediate turn-1 Mega
-        // Evolution for scoring (see battleOptimizer design notes), so the
-        // pre-Mega ability dropdown below is mostly informational here.
+  if (detail) {
+    const commonSet = getCommonSet(detail.name);
+    if (commonSet) {
+      const guessedItemSlug = commonSet.topItem.toLowerCase().replace(/\s+/g, "-");
+      setSlotItem(index, guessedItemSlug);
+
+      if (commonSet.megaForm) {
+        // Guessed item IS the Mega Stone — assume turn-1 Mega Evolution by default.
         const megaDetail = await fetchPokemonDetail(commonSet.megaForm.formSpecies);
-        setSlotMegaFormDetail(index, megaDetail); // null if PokeAPI doesn't have this form yet — fails soft
-      } else if (commonSet && detail.abilities.some((a) => a.name === commonSet.likelyAbility)) {
+        setSlotMegaFormDetail(index, megaDetail);
+      } else if (detail.abilities.some((a) => a.name === commonSet.likelyAbility)) {
         setSlotAbility(index, commonSet.likelyAbility);
       }
     }
-    setPokeLoading(false);
   }
+  setPokeLoading(false);
+}
+
+async function handleSelectItem(name: string) {
+  setItemQuery("");
+  setShowItemDropdown(false);
+  setSlotItem(index, name);
+
+  // Re-check the Mega assumption against the CONFIRMED item, not the guess.
+  const commonSet = slot.pokemon ? getCommonSet(slot.pokemon.name) : null;
+  if (commonSet?.megaForm) {
+    const isMegaStone = name === commonSet.topItem.toLowerCase().replace(/\s+/g, "-");
+    if (isMegaStone) {
+      const megaDetail = await fetchPokemonDetail(commonSet.megaForm.formSpecies);
+      setSlotMegaFormDetail(index, megaDetail);
+    } else {
+      setSlotMegaFormDetail(index, null); // holding something else — no Mega assumed
+    }
+  }
+}
 
   return (
     <div ref={containerRef} className="rounded-lg border border-black/10 bg-white p-4">
@@ -138,6 +172,32 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
                 </p>
               ) : null;
             })()}
+          </div>
+
+          <div className="relative mt-3">
+            <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Guessed item (optional)</label>
+            <input
+              value={slot.itemName ? slot.itemName.replace(/-/g, " ") : itemQuery}
+              onChange={(e) => { setItemQuery(e.target.value); setSlotItem(index, null); setShowItemDropdown(true); }}
+              onFocus={() => setShowItemDropdown(true)}
+              placeholder="Search item…"
+              autoComplete="off"
+              className="mt-1 w-full rounded-md border border-black/10 px-3 py-2 text-sm capitalize text-[color:var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
+            />
+            {showItemDropdown && itemMatches.length > 0 && (
+              <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-black/10 bg-white p-1 shadow-lg">
+                {itemMatches.map((i) => (
+                  <button
+                    key={i.name}
+                    type="button"
+                    onClick={() => handleSelectItem(i.name)}
+                    className="block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/5"
+                  >
+                    {i.name.replace(/-/g, " ")}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

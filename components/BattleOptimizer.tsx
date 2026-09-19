@@ -24,8 +24,9 @@ export default function BattleOptimizer() {
   const userCoverage: CoverageMon[] = useMemo(
     () => userSlots.map((s) => ({
       name: s.pokemon?.name ?? "", types: s.pokemon?.types ?? [], abilityName: s.abilityName,
+      itemName: s.itemName,
       stats: s.pokemon ? statsFromEntries(s.pokemon.stats) : undefined,
-      moves: s.moves.filter((m): m is string => m !== null), // NEW — real picks, not curated guesses
+      moves: s.moves.filter((m): m is string => m !== null),
     })),
     [userSlots]
   );
@@ -35,9 +36,10 @@ export default function BattleOptimizer() {
       const effective = s.megaFormDetail ?? s.pokemon;
       const abilityName = s.megaFormDetail ? commonSet?.megaForm?.formAbility ?? null : s.abilityName;
       return {
-        name: s.pokemon?.name ?? "", // keep displaying the base/preview species name
+        name: s.pokemon?.name ?? "",
         types: effective?.types ?? [],
         abilityName,
+        itemName: s.itemName,
         stats: effective ? statsFromEntries(effective.stats) : undefined,
       };
     }),

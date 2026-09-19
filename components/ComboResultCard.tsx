@@ -26,10 +26,11 @@ export default function ComboResultCard({ rank, result }: { rank: number; result
         <span className="text-[color:var(--ink)]/50">back: <span className="capitalize">{backLine.map((m) => m.name).join(" + ")}</span></span>
       </div>
 
-      <div className="mt-3 grid gap-2 text-xs text-[color:var(--ink)]/70 sm:grid-cols-4">
+      <div className="mt-3 grid gap-2 text-xs text-[color:var(--ink)]/70 sm:grid-cols-5">
         <p>Defense: {breakdown.defenseScore.toFixed(1)}</p>
         <p>Offense: {breakdown.offenseScore.toFixed(1)}</p>
         <p>Ability signals: {breakdown.abilityScore.toFixed(1)}</p>
+        <p>Item signals: {breakdown.itemScore.toFixed(1)}</p>
         <p>Speed: {breakdown.speedScore.toFixed(1)}</p>
       </div>
 

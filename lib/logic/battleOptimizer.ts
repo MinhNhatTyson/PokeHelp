@@ -3,6 +3,7 @@ import { getSingleMultiplier } from "@/lib/logic/effectiveness";
 import { getAbilitySignal } from "@/lib/logic/abilitySignals";
 import { getCommonSet } from "@/lib/data/commonSets";
 import { checkLeadDamage, LeadDamageCheck } from "@/lib/logic/damageCheck";
+import { getItemSignal } from "@/lib/logic/itemSignals";
 
 interface LeadSignals {
   hasFakeOut: boolean;
@@ -11,6 +12,11 @@ interface LeadSignals {
   isWeatherSetter: boolean;
   isTrickRoomSetter: boolean;
   isTailwindSetter: boolean;
+}
+
+function effectiveSpeed(mon: CoverageMon): number {
+  const item = getItemSignal(mon.itemName);
+  return (mon.stats?.speed ?? 0) * (item?.speedMultiplier ?? 1);
 }
 
 function getLeadSignals(mon: CoverageMon): LeadSignals {
@@ -38,7 +44,7 @@ function leadScore(mon: CoverageMon): number {
   if (s.isWeatherSetter) score += 2;
   if (s.isTailwindSetter) score += 1;
   if (s.isTrickRoomSetter) score += 1;
-  score += (mon.stats?.speed ?? 0) / 100; // mild tiebreak, not a real speed calc
+  score += effectiveSpeed(mon) / 100; // mild tiebreak, now item-aware (Scarf counts as faster)
   return score;
 }
 
@@ -58,6 +64,7 @@ function buildStrategyNotes(
 
   const leadTags = lead.flatMap((m) => {
     const s = getLeadSignals(m);
+    const itemSignal = getItemSignal(m.itemName);
     const tags: string[] = [];
     if (s.hasFakeOut) tags.push(`${m.name}'s Fake Out`);
     if (s.isIntimidate) tags.push(`${m.name}'s Intimidate`);
@@ -65,6 +72,8 @@ function buildStrategyNotes(
     if (s.isWeatherSetter) tags.push(`${m.name}'s weather`);
     if (s.isTailwindSetter) tags.push(`${m.name}'s Tailwind`);
     if (s.isTrickRoomSetter) tags.push(`${m.name}'s Trick Room`);
+    if (itemSignal?.speedMultiplier) tags.push(`${m.name}'s Choice Scarf speed`);
+    if (itemSignal?.guaranteesSurvival) tags.push(`${m.name}'s Focus Sash`);
     return tags;
   });
 
@@ -90,6 +99,10 @@ function buildStrategyNotes(
     notes.push(`Ability synergy (Intimidate/weather) is actively contributing to this combo's score.`);
   }
 
+  if (breakdown.itemScore > 0) {
+    notes.push(`Held-item tools (Scarf speed control, Sash survivability, or a safe pivot) are actively contributing to this combo's score.`);
+  }
+
   return notes;
 }
 
@@ -97,6 +110,7 @@ export interface CoverageMon {
   name: string;
   types: PokemonTypeName[];
   abilityName: string | null;
+  itemName?: string | null;
   stats?: { hp: number; attack: number; defense: number; spAttack: number; spDefense: number; speed: number };
   moves?: string[];
 }
@@ -120,11 +134,10 @@ export interface ComboScoreBreakdown {
   defenseScore: number;
   offenseScore: number;
   abilityScore: number;
+  itemScore: number;
   speedScore: number;
   total: number;
-  /** Types where 2+ combo members are weak, weighted by how many opponents carry that type */
   sharedWeaknesses: PokemonTypeName[];
-  /** Opponent mons no combo member can hit super-effectively */
   offensiveGaps: string[];
 }
 
@@ -138,6 +151,14 @@ export interface ComboResult {
   leadDamageChecks: LeadDamageCheck[];
 }
 
+function itemWeaknessMitigation(mon: CoverageMon): number {
+  const signal = getItemSignal(mon.itemName);
+  if (!signal) return 1;
+  if (signal.guaranteesSurvival) return 0.5; // Focus Sash softens OHKO risk, doesn't remove the pressure
+  if (signal.isWeaknessPolicy) return 0.6;   // real risk, but the punish-back potential is real too
+  if (signal.isBulkBoost) return 0.85;       // Assault Vest-style bulk, modest softening
+  return 1;
+}
 
 // All C(6,4) = 15 ways to choose 4 of 6 team slots.
 function fourOfSixCombinations(): [number, number, number, number][] {
@@ -187,14 +208,17 @@ function scoreCombo(members: CoverageMon[], opponents: CoverageMon[]): ComboScor
     const powerFactor = avgPower / BASELINE_ATTACKING_STAT; // >1 = hits harder than average
 
     let membersWeak = 0;
+    let weakPenalty = 0;
     for (const member of members) {
       const m = defenseMultiplier(attackType, member);
-      if (m >= 2) membersWeak += 1;
-      else if (m === 0) defenseScore += 1 * weight;
+      if (m >= 2) {
+        membersWeak += 1;
+        weakPenalty += weight * powerFactor * itemWeaknessMitigation(member);
+      } else if (m === 0) defenseScore += 1 * weight;
       else if (m <= 0.5) defenseScore += 0.5 * weight;
     }
     if (membersWeak > 0) {
-      defenseScore -= membersWeak * weight * powerFactor;
+      defenseScore -= weakPenalty;
       weaknessWeight.set(attackType, membersWeak * weight);
     }
   }
@@ -221,16 +245,23 @@ function scoreCombo(members: CoverageMon[], opponents: CoverageMon[]): ComboScor
     abilityScore += beneficiaries * 2; // weather + payoff on the same 4 is a real combo
   }
 
-    // --- Speed: rough proxy for who's more likely to act first as a team ---
+  // --- Item signals: Scarf speed control, Sash survivability, safe pivot tools ---
+  let itemScore = 0;
+  const itemSignals = members.map((m) => getItemSignal(m.itemName));
+  if (itemSignals.some((s) => s?.speedMultiplier)) itemScore += 1;
+  if (itemSignals.some((s) => s?.guaranteesSurvival)) itemScore += 1;
+  if (itemSignals.some((s) => s?.isEjectTool)) itemScore += 0.5;
+
+  // --- Speed: rough proxy for who's more likely to act first as a team ---
   let speedScore = 0;
-  const yourFastest = Math.max(0, ...members.map((m) => m.stats?.speed ?? 0));
-  const oppFastest = Math.max(0, ...opponents.map((o) => o.stats?.speed ?? 0));
+  const yourFastest = Math.max(0, ...members.map(effectiveSpeed));
+  const oppFastest = Math.max(0, ...opponents.map(effectiveSpeed));
   if (yourFastest > oppFastest) speedScore += 1;
   else if (yourFastest < oppFastest) speedScore -= 1;
 
   return {
-    defenseScore, offenseScore, abilityScore, speedScore,
-    total: defenseScore + offenseScore + abilityScore + speedScore,
+    defenseScore, offenseScore, abilityScore, itemScore, speedScore,
+    total: defenseScore + offenseScore + abilityScore + itemScore + speedScore,
     sharedWeaknesses, offensiveGaps,
   };
 }

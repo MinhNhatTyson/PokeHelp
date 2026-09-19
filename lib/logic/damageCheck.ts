@@ -25,9 +25,10 @@ function assumedSpread(mon: CoverageMon) {
 function buildPokemon(mon: CoverageMon, commonSet: CommonSetEntry | null) {
   const showdownName = commonSet?.megaForm?.formShowdownName ?? commonSet?.showdownName ?? mon.name;
   const ability = mon.abilityName ?? commonSet?.megaForm?.formAbility ?? commonSet?.likelyAbility;
+  const item = mon.itemName ? formatItemForCalc(mon.itemName) : commonSet?.topItem;
   const { nature, evs } = assumedSpread(mon);
 
-  return new Pokemon(GEN, showdownName, { level: VGC_LEVEL, ability, item: commonSet?.topItem, nature, evs });
+  return new Pokemon(GEN, showdownName, { level: VGC_LEVEL, ability, item, nature, evs });
 }
 
 /**
@@ -64,6 +65,10 @@ const SUPPORT_MOVE_SLUGS = new Set([
 ]);
 
 function formatMoveForCalc(slug: string): string {
+  return slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
+function formatItemForCalc(slug: string): string {
   return slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
 
