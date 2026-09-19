@@ -20,6 +20,7 @@ export default function BattleOptimizer() {
 
   const userReady = userSlots.every((s) => s.pokemon && s.abilityName);
   const opponentReady = opponentSlots.every((s) => s.pokemon);
+  const [strategyErrorDetail, setStrategyErrorDetail] = useState<string | null>(null);
 
   const userCoverage: CoverageMon[] = useMemo(
     () => userSlots.map((s) => ({
@@ -55,6 +56,7 @@ export default function BattleOptimizer() {
     if (!results || results.length === 0) return;
     setStrategyStatus("loading");
     setStrategyNarrative(null);
+    setStrategyErrorDetail(null);
 
     try {
       const res = await fetch("/api/strategy", {
@@ -71,15 +73,24 @@ export default function BattleOptimizer() {
           topCombo: results[0],
         }),
       });
-
-      if (!res.ok) throw new Error("request failed");
       const data = await res.json();
+      if (!res.ok) {
+        setStrategyErrorDetail(
+          data.error === "rate_limit"
+            ? `Gemini ${data.rateLimitInfo.limitType} limit hit${
+                data.rateLimitInfo.retryAfterSeconds ? ` — retry in ~${data.rateLimitInfo.retryAfterSeconds}s` : ""
+              }.`
+            : "Couldn't reach the strategy assistant. Try again."
+        );
+        setStrategyStatus("error");
+        return;
+      }
       setStrategyNarrative(data.narrative);
       setStrategyStatus("idle");
     } catch {
       setStrategyStatus("error");
     }
-  }
+  } 
 
   return (
     <div className="w-full max-w-5xl rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
@@ -127,7 +138,7 @@ export default function BattleOptimizer() {
                 {strategyStatus === "loading" ? "Thinking…" : "Get AI strategy for top pick"}
               </button>
               {strategyStatus === "error" && (
-                <p className="mt-2 text-sm text-red-500">Couldn&apos;t reach the strategy assistant. Try again.</p>
+                <p className="mt-2 text-sm text-red-500">{strategyErrorDetail ?? "Couldn't reach the strategy assistant. Try again."}</p>
               )}
               {strategyNarrative && (
                 <div className="mt-3 rounded-lg border border-[color:var(--accent-gold)]/40 bg-black/5 p-4 text-sm text-[color:var(--ink)]">

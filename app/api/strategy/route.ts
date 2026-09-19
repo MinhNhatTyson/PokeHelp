@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ComboResult } from "@/lib/logic/battleOptimizer";
+import { parseGeminiError } from "@/lib/server/geminiError";
 
 const GEMINI_MODEL = "gemini-3.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -33,6 +34,11 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       const errorBody = await res.text();
+      const rateLimitInfo = parseGeminiError(res.status, errorBody);
+      if (rateLimitInfo.isRateLimit) {
+        console.error("Gemini rate limit hit:", rateLimitInfo);
+        return NextResponse.json({ error: "rate_limit", rateLimitInfo }, { status: 429 });
+      }
       console.error("Gemini request failed:", res.status, errorBody);
       return NextResponse.json({ error: "Gemini request failed", detail: errorBody }, { status: 502 });
     }

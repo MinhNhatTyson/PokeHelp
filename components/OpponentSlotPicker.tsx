@@ -43,6 +43,7 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
     function handleClick(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setShowPokeDropdown(false);
+        setShowItemDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
