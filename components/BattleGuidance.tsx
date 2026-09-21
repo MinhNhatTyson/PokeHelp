@@ -6,21 +6,27 @@ import { useTeamStore } from "@/lib/store/teamStore";
 import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
 import { useBattleSessionStore } from "@/lib/store/battleSessionStore";
 import EventComposer from "@/components/EventComposer";
+import FieldStatusPanel from "@/components/FieldStatusPanel";
 
-const WEATHER_OPTIONS = ["none", "rain", "sun", "sand", "snow"] as const;
-const TERRAIN_OPTIONS = ["none", "electric", "grassy", "misty", "psychic"] as const;
+function toggleSelection(list: string[], setList: (v: string[]) => void, name: string, max: number) {
+  if (list.includes(name)) setList(list.filter((n) => n !== name));
+  else if (list.length < max) setList([...list, name]);
+}
 
 export default function BattleGuidance() {
   const teamSlots = useTeamStore((s) => s.slots);
   const opponentSlots = useOpponentTeamStore((s) => s.slots);
 
   const {
-    started, yourTeamNames, opponentTeamNames, fieldState, currentTurnEvents,
+    started, activeBattlers, yourTeamNames, opponentTeamNames, currentTurnEvents,
     conversation, turnNumber, adviceStatus,
-    startSession, resetSession, setFieldState, addEvent, removeEvent, submitTurn,
+    startSession, resetSession, addEvent, removeEvent, switchActiveBattler, submitTurn,
   } = useBattleSessionStore();
 
   const [showComposer, setShowComposer] = useState(false);
+  const [yourBringFour, setYourBringFour] = useState<string[]>([]);
+  const [yourLeads, setYourLeads] = useState<string[]>([]);
+  const [opponentLeads, setOpponentLeads] = useState<string[]>([]);
 
   // Auto-reset when leaving this page, per design — a session doesn't
   // survive navigating to another tab of the app.
@@ -28,18 +34,25 @@ export default function BattleGuidance() {
     return () => { resetSession(); };
   }, [resetSession]);
 
-  const yourReadyNames = teamSlots.filter((s) => s.pokemon).map((s) => s.pokemon!.name);
-  const opponentReadyNames = opponentSlots.filter((s) => s.pokemon).map((s) => s.pokemon!.name);
+  const yourBuiltNames = teamSlots.filter((s) => s.pokemon).map((s) => s.pokemon!.name);
+  // Team Preview reveals the opponent's full roster by species — but never
+  // which 4 they'll actually bring, so we only ever ask "who are they
+  // leading with", not "which 4 did they bring" (that's their call, and it
+  // only becomes known turn by turn via Switch events).
+  const opponentPreviewNames = opponentSlots.filter((s) => s.pokemon).map((s) => s.pokemon!.name);
 
   if (!started) {
-    const canStart = yourReadyNames.length > 0 && opponentReadyNames.length > 0;
+    const canStart = yourBuiltNames.length > 0 && opponentPreviewNames.length > 0;
+    const bringFourDone = yourBringFour.length === 4;
+    const readyToConfirm = bringFourDone && yourLeads.length === 2 && opponentLeads.length === 2;
+
     return (
       <div className="w-full max-w-lg rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
         <div className="h-2 rounded-t-lg bg-[color:var(--shell-accent)]" />
         <div className="rounded-b-lg bg-[color:var(--screen)] p-6 sm:p-8">
           <h1 className="font-display text-2xl text-[color:var(--ink)]">Live battle guidance</h1>
           <p className="mt-1 text-sm text-[color:var(--ink)]/70">
-            Log what happens each turn and get quick advice for the next one. Session resets when you leave this page.
+            Pick who you&apos;re bringing, set your leads, and log each turn for quick advice on the next one.
           </p>
 
           {!canStart ? (
@@ -49,14 +62,65 @@ export default function BattleGuidance() {
             </p>
           ) : (
             <div className="mt-4">
-              <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Your team</p>
-              <p className="mt-1 text-sm capitalize text-[color:var(--ink)]">{yourReadyNames.join(", ")}</p>
-              <p className="mt-3 text-xs font-medium uppercase text-[color:var(--ink)]/40">Opponent preview</p>
-              <p className="mt-1 text-sm capitalize text-[color:var(--ink)]">{opponentReadyNames.join(", ")}</p>
+              <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">
+                Your bring-4 (pick 4 of your {yourBuiltNames.length})
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {yourBuiltNames.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => {
+                      const willRemove = yourBringFour.includes(name);
+                      toggleSelection(yourBringFour, setYourBringFour, name, 4);
+                      if (willRemove) setYourLeads((prev) => prev.filter((n) => n !== name));
+                    }}
+                    className={`rounded-full px-3 py-1 text-sm capitalize ${yourBringFour.includes(name) ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+
+              {bringFourDone && (
+                <>
+                  <p className="mt-3 text-xs font-medium uppercase text-[color:var(--ink)]/40">Your leads (pick 2 of your bring-4)</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {yourBringFour.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => toggleSelection(yourLeads, setYourLeads, name, 2)}
+                        className={`rounded-full px-3 py-1 text-sm capitalize ${yourLeads.includes(name) ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <p className="mt-3 text-xs font-medium uppercase text-[color:var(--ink)]/40">
+                Opponent&apos;s leads (pick 2 — you don&apos;t know their bring-4, only who they send out)
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {opponentPreviewNames.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => toggleSelection(opponentLeads, setOpponentLeads, name, 2)}
+                    className={`rounded-full px-3 py-1 text-sm capitalize ${opponentLeads.includes(name) ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+
               <button
                 type="button"
-                onClick={() => startSession(yourReadyNames, opponentReadyNames)}
-                className="mt-5 w-full rounded-md bg-[color:var(--shell-accent)] px-3 py-2.5 text-sm font-medium text-white"
+                disabled={!readyToConfirm}
+                onClick={() => startSession(yourBringFour, opponentPreviewNames, { yours: yourLeads, opponent: opponentLeads })}
+                className="mt-5 w-full rounded-md bg-[color:var(--shell-accent)] px-3 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Start battle session
               </button>
@@ -67,9 +131,10 @@ export default function BattleGuidance() {
     );
   }
 
+  // Only what's actually on the field right now — not the full brought/previewed rosters.
   const participants = [
-    ...yourTeamNames.map((name) => ({ name, side: "yours" as const })),
-    ...opponentTeamNames.map((name) => ({ name, side: "opponent" as const })),
+    ...activeBattlers.yours.filter((n): n is string => n !== null).map((name) => ({ name, side: "yours" as const })),
+    ...activeBattlers.opponent.filter((n): n is string => n !== null).map((name) => ({ name, side: "opponent" as const })),
   ];
 
   return (
@@ -83,40 +148,7 @@ export default function BattleGuidance() {
           </button>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-black/5 p-2.5 text-xs">
-          <button
-            type="button"
-            onClick={() => setFieldState({ weather: WEATHER_OPTIONS[(WEATHER_OPTIONS.indexOf(fieldState.weather) + 1) % WEATHER_OPTIONS.length] })}
-            className="rounded-full bg-white px-2.5 py-1 capitalize text-[color:var(--ink)]"
-          >
-            🌤 {fieldState.weather}
-          </button>
-          <button
-            type="button"
-            onClick={() => setFieldState({ terrain: TERRAIN_OPTIONS[(TERRAIN_OPTIONS.indexOf(fieldState.terrain) + 1) % TERRAIN_OPTIONS.length] })}
-            className="rounded-full bg-white px-2.5 py-1 capitalize text-[color:var(--ink)]"
-          >
-            🌱 {fieldState.terrain}
-          </button>
-          <div className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[color:var(--ink)]">
-            <span>TR</span>
-            <button type="button" onClick={() => setFieldState({ trickRoomTurnsLeft: Math.max(0, fieldState.trickRoomTurnsLeft - 1) })}>−</button>
-            <span className="w-4 text-center">{fieldState.trickRoomTurnsLeft}</span>
-            <button type="button" onClick={() => setFieldState({ trickRoomTurnsLeft: fieldState.trickRoomTurnsLeft + 1 })}>+</button>
-          </div>
-          <div className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[color:var(--ink)]">
-            <span>TW (you)</span>
-            <button type="button" onClick={() => setFieldState({ tailwindTurnsLeft: { ...fieldState.tailwindTurnsLeft, yours: Math.max(0, fieldState.tailwindTurnsLeft.yours - 1) } })}>−</button>
-            <span className="w-4 text-center">{fieldState.tailwindTurnsLeft.yours}</span>
-            <button type="button" onClick={() => setFieldState({ tailwindTurnsLeft: { ...fieldState.tailwindTurnsLeft, yours: fieldState.tailwindTurnsLeft.yours + 1 } })}>+</button>
-          </div>
-          <div className="flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[color:var(--ink)]">
-            <span>TW (opp)</span>
-            <button type="button" onClick={() => setFieldState({ tailwindTurnsLeft: { ...fieldState.tailwindTurnsLeft, opponents: Math.max(0, fieldState.tailwindTurnsLeft.opponents - 1) } })}>−</button>
-            <span className="w-4 text-center">{fieldState.tailwindTurnsLeft.opponents}</span>
-            <button type="button" onClick={() => setFieldState({ tailwindTurnsLeft: { ...fieldState.tailwindTurnsLeft, opponents: fieldState.tailwindTurnsLeft.opponents + 1 } })}>+</button>
-          </div>
-        </div>
+        <FieldStatusPanel />
 
         {conversation.length > 0 && (
           <div className="mt-4 rounded-lg border border-[color:var(--accent-gold)]/40 bg-black/5 p-3 text-sm text-[color:var(--ink)]">
@@ -124,6 +156,20 @@ export default function BattleGuidance() {
             <p>{conversation[conversation.length - 1].text}</p>
           </div>
         )}
+
+        <div className="mt-4">
+          <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Currently on the field</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5 text-xs">
+            {participants.map((p) => (
+              <span
+                key={`${p.side}-${p.name}`}
+                className={`rounded-full px-2.5 py-1 capitalize ${p.side === "yours" ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"}`}
+              >
+                {p.name}
+              </span>
+            ))}
+          </div>
+        </div>
 
         <div className="mt-4">
           <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">This turn</p>
@@ -162,7 +208,10 @@ export default function BattleGuidance() {
         {showComposer && (
           <EventComposer
             participants={participants}
+            yourTeamNames={yourTeamNames}
+            opponentTeamNames={opponentTeamNames}
             onConfirm={(fragment) => { addEvent(fragment); setShowComposer(false); }}
+            onSwitch={switchActiveBattler}
             onCancel={() => setShowComposer(false)}
           />
         )}

@@ -1,28 +1,34 @@
 import { create } from "zustand";
-import { FieldState, BattleEvent, BattleConversationTurn } from "@/lib/types";
+import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers } from "@/lib/types";
 
 const EMPTY_FIELD_STATE: FieldState = {
   weather: "none",
+  weatherTurnsLeft: 0,
   terrain: "none",
+  terrainTurnsLeft: 0,
   trickRoomTurnsLeft: 0,
   tailwindTurnsLeft: { yours: 0, opponents: 0 },
 };
+
+const EMPTY_ACTIVE_BATTLERS: ActiveBattlers = { yours: [null, null], opponent: [null, null] };
 
 interface BattleSessionState {
   started: boolean;
   yourTeamNames: string[];
   opponentTeamNames: string[];
+  activeBattlers: ActiveBattlers;
   fieldState: FieldState;
   currentTurnEvents: BattleEvent[];
   conversation: BattleConversationTurn[];
   turnNumber: number;
   adviceStatus: "idle" | "loading" | "error";
 
-  startSession: (yourTeamNames: string[], opponentTeamNames: string[]) => void;
+  startSession: (yourTeamNames: string[], opponentTeamNames: string[], activeBattlers: ActiveBattlers) => void;
   resetSession: () => void;
   setFieldState: (updates: Partial<FieldState>) => void;
   addEvent: (fragment: string) => void;
   removeEvent: (id: string) => void;
+  switchActiveBattler: (side: "yours" | "opponent", outgoingName: string, incomingName: string) => void;
   submitTurn: () => Promise<void>;
 }
 
@@ -30,6 +36,7 @@ const initialState = {
   started: false,
   yourTeamNames: [] as string[],
   opponentTeamNames: [] as string[],
+  activeBattlers: EMPTY_ACTIVE_BATTLERS,
   fieldState: EMPTY_FIELD_STATE,
   currentTurnEvents: [] as BattleEvent[],
   conversation: [] as BattleConversationTurn[],
@@ -37,13 +44,11 @@ const initialState = {
   adviceStatus: "idle" as const,
 };
 
-// Deliberately NOT persisted — battle sessions are meant to reset when you
-// navigate away (see BattleGuidance's unmount cleanup), unlike teamStore.
 export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
   ...initialState,
 
-  startSession: (yourTeamNames, opponentTeamNames) =>
-    set({ ...initialState, started: true, yourTeamNames, opponentTeamNames }),
+  startSession: (yourTeamNames, opponentTeamNames, activeBattlers) =>
+    set({ ...initialState, started: true, yourTeamNames, opponentTeamNames, activeBattlers }),
 
   resetSession: () => set({ ...initialState }),
 
@@ -57,6 +62,18 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
 
   removeEvent: (id) =>
     set((state) => ({ currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id) })),
+
+  // Called when a Switch event is confirmed — swaps the outgoing mon for the
+  // incoming one in that side's active pair. No-op if outgoingName isn't
+  // currently active (shouldn't happen via the UI, but fails soft).
+  switchActiveBattler: (side, outgoingName, incomingName) =>
+    set((state) => {
+      const list = [...state.activeBattlers[side]];
+      const idx = list.indexOf(outgoingName);
+      if (idx === -1) return state;
+      list[idx] = incomingName;
+      return { activeBattlers: { ...state.activeBattlers, [side]: list } };
+    }),
 
   submitTurn: async () => {
     const state = get();
@@ -102,18 +119,19 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
 
 function describeFieldState(f: FieldState): string {
   const parts: string[] = [];
-  if (f.weather !== "none") parts.push(`Weather is ${f.weather}`);
-  if (f.terrain !== "none") parts.push(`${f.terrain} terrain is active`);
+  if (f.weather !== "none") parts.push(`Weather is ${f.weather}${f.weatherTurnsLeft > 0 ? ` (${f.weatherTurnsLeft} turns left)` : ""}`);
+  if (f.terrain !== "none") parts.push(`${f.terrain} terrain is active${f.terrainTurnsLeft > 0 ? ` (${f.terrainTurnsLeft} turns left)` : ""}`);
   if (f.trickRoomTurnsLeft > 0) parts.push(`Trick Room has ${f.trickRoomTurnsLeft} turns left`);
   if (f.tailwindTurnsLeft.yours > 0) parts.push(`Your Tailwind has ${f.tailwindTurnsLeft.yours} turns left`);
   if (f.tailwindTurnsLeft.opponents > 0) parts.push(`Opponent's Tailwind has ${f.tailwindTurnsLeft.opponents} turns left`);
   return parts.join(", ");
 }
 
-// Auto-decrement each submitted turn, per the "only tap when it changes" design.
 function decrementCounters(f: FieldState): FieldState {
   return {
     ...f,
+    weatherTurnsLeft: Math.max(0, f.weatherTurnsLeft - 1),
+    terrainTurnsLeft: Math.max(0, f.terrainTurnsLeft - 1),
     trickRoomTurnsLeft: Math.max(0, f.trickRoomTurnsLeft - 1),
     tailwindTurnsLeft: {
       yours: Math.max(0, f.tailwindTurnsLeft.yours - 1),

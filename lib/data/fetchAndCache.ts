@@ -1,4 +1,4 @@
-import { Pokemon, PokemonTypeName, PokemonNameEntry, PokemonDetail, EvolutionStage, ItemDetail, ItemNameEntry } from "@/lib/types";
+import { Pokemon, PokemonTypeName, PokemonNameEntry, PokemonDetail, EvolutionStage, ItemDetail, ItemNameEntry, MoveDetail, MoveNameEntry } from "@/lib/types";
 
 const POKEAPI_BASE = "https://pokeapi.co/api/v2";
 
@@ -7,6 +7,56 @@ const detailCache = new Map<string, PokemonDetail>();
 let nameListPromise: Promise<PokemonNameEntry[]> | null = null;
 
 const abilityDescCache = new Map<string, string | null>();
+
+const moveDetailCache = new Map<string, MoveDetail | null>();
+
+interface PokeApiMoveResponse {
+  name: string;
+  target: { name: string };
+  damage_class: { name: string } | null;
+  meta: { ailment: { name: string }; category: { name: string } } | null;
+}
+
+export async function fetchMoveDetail(nameOrSlug: string): Promise<MoveDetail | null> {
+  const key = nameOrSlug.trim().toLowerCase().replace(/\s+/g, "-");
+  if (!key) return null;
+
+  const cached = moveDetailCache.get(key);
+  if (cached !== undefined) return cached;
+
+  try {
+    const res = await fetch(`${POKEAPI_BASE}/move/${key}`);
+    if (!res.ok) throw new Error("move fetch failed");
+    const data: PokeApiMoveResponse = await res.json();
+    const ailment = data.meta?.ailment.name ?? null;
+    const detail: MoveDetail = {
+      name: data.name,
+      target: data.target.name,
+      damageClass: (data.damage_class?.name as MoveDetail["damageClass"]) ?? "status",
+      ailment: ailment && ailment !== "none" ? ailment : null,
+    };
+    moveDetailCache.set(key, detail);
+    return detail;
+  } catch {
+    moveDetailCache.set(key, null);
+    return null;
+  }
+}
+
+let moveNameListPromise: Promise<MoveNameEntry[]> | null = null;
+
+export async function fetchMoveNameList(): Promise<MoveNameEntry[]> {
+  if (!moveNameListPromise) {
+    moveNameListPromise = fetch(`${POKEAPI_BASE}/move?limit=100000`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("move list fetch failed"))))
+      .then((data: PokeApiListResponse) => data.results)
+      .catch(() => {
+        moveNameListPromise = null;
+        return [];
+      });
+  }
+  return moveNameListPromise;
+}
 
 interface PokeApiAbilityResponse {
   effect_entries: { effect: string; short_effect: string; language: { name: string } }[];

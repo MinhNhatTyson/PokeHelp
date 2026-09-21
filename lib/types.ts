@@ -178,3 +178,29 @@ export interface BattleConversationTurn {
   role: "user" | "model";
   text: string;
 }
+
+export interface FieldState {
+  weather: "none" | "rain" | "sun" | "sand" | "snow";
+  weatherTurnsLeft: number;
+  terrain: "none" | "electric" | "grassy" | "misty" | "psychic";
+  terrainTurnsLeft: number;
+  trickRoomTurnsLeft: number;
+  tailwindTurnsLeft: { yours: number; opponents: number };
+}
+
+export interface ActiveBattlers {
+  yours: (string | null)[];    // length 2 — your current leads
+  opponent: (string | null)[]; // length 2 — opponent's current leads
+}
+
+export interface MoveDetail {
+  name: string;
+  target: string; // PokeAPI target.name, e.g. "selected-pokemon", "all-opponents", "user"
+  damageClass: "physical" | "special" | "status";
+  ailment: string | null; // meta.ailment.name, "none" normalized to null
+}
+
+export interface MoveNameEntry {
+  name: string;
+  url: string;
+}
