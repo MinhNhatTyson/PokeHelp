@@ -30,7 +30,7 @@ export default function ItemSearchExplorer() {
   }, []);
 
   const nameMatches = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = query.trim().toLowerCase().replace(/ /g, "-");
     if (!q) return [];
     return nameList.filter((i) => i.name.startsWith(q)).slice(0, MAX_NAME_SUGGESTIONS);
   }, [query, nameList]);

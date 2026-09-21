@@ -51,7 +51,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
   }, [pokeQuery, pokeNames]);
 
   const itemMatches = useMemo(() => {
-    const q = itemQuery.trim().toLowerCase();
+    const q = itemQuery.trim().toLowerCase().replace(/ /g, "-");
     if (!q) return [];
     return itemNames.filter((i) => i.name.startsWith(q)).slice(0, MAX_SUGGESTIONS);
   }, [itemQuery, itemNames]);
