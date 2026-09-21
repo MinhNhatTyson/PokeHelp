@@ -58,6 +58,10 @@ export async function POST(req: NextRequest) {
         console.error("Gemini rate limit hit:", rateLimitInfo);
         return NextResponse.json({ error: "rate_limit", rateLimitInfo }, { status: 429 });
       }
+      if (res.status === 503) {
+        console.error("Gemini overloaded after retries:", errorBody);
+        return NextResponse.json({ error: "overloaded" }, { status: 503 });
+      }
       console.error("Gemini request failed:", res.status, errorBody);
       return NextResponse.json({ error: "Gemini request failed", detail: errorBody }, { status: 502 });
     }
