@@ -48,9 +48,26 @@ function leadScore(mon: CoverageMon): number {
   return score;
 }
 
-function pickLead(members: CoverageMon[]): { lead: CoverageMon[]; backLine: CoverageMon[] } {
-  const sorted = [...members].sort((a, b) => leadScore(b) - leadScore(a));
-  return { lead: sorted.slice(0, 2), backLine: sorted.slice(2) };
+function pickLead(
+  members: CoverageMon[],
+  opposingLeads: CoverageMon[] = []
+): { lead: CoverageMon[]; backLine: CoverageMon[] } {
+  let bestPair: CoverageMon[] = members.slice(0, 2);
+  let bestTotal = -Infinity;
+
+  for (let i = 0; i < members.length; i++) {
+    for (let j = i + 1; j < members.length; j++) {
+      const pair = [members[i], members[j]];
+      const total = leadScore(pair[0]) + leadScore(pair[1]) + leadMatchupScore(pair, opposingLeads);
+      if (total > bestTotal) {
+        bestTotal = total;
+        bestPair = pair;
+      }
+    }
+  }
+
+  const backLine = members.filter((m) => !bestPair.includes(m));
+  return { lead: bestPair, backLine };
 }
 
 function buildStrategyNotes(
@@ -269,12 +286,12 @@ function scoreCombo(members: CoverageMon[], opponents: CoverageMon[]): ComboScor
 export function rankBringFourCombos(userTeam: CoverageMon[], opponentTeam: CoverageMon[]): ComboResult[] {
   if (userTeam.length !== 6) throw new Error("rankBringFourCombos expects exactly 6 user team members");
 
-  const { lead: opponentLead } = pickLead(opponentTeam);
+  const { lead: opponentLead } = pickLead(opponentTeam); // signal-only guess — opponent side of a simultaneous lead-pick has no matchup target of its own
 
   const results = fourOfSixCombinations().map((indices) => {
     const members = indices.map((i) => userTeam[i]);
     const breakdown = scoreCombo(members, opponentTeam);
-    const { lead, backLine } = pickLead(members);
+    const { lead, backLine } = pickLead(members, opponentLead); // now matchup-aware
     const strategyNotes = buildStrategyNotes(lead, backLine, breakdown, opponentTeam);
 
     // Paired matchup checks (lead[0] vs opponentLead[0], lead[1] vs opponentLead[1])
@@ -317,4 +334,28 @@ function detectWeatherContests(members: CoverageMon[], opponents: CoverageMon[])
   }
 
   return notes;
+}
+
+// Score how safe/threatening a candidate 2-mon lead pair is specifically
+// against the opponent's projected leads. This closes the actual gap that
+// let bad leads through: pickLead used to rank purely on internal signals
+// (Fake Out, Intimidate, weather, speed) with zero awareness of who it was
+// about to face — a Fake Out lead into two bulky walls that shrug it off
+// scored identically to one into two frail sweepers it can 2HKO.
+function leadMatchupScore(pair: CoverageMon[], opposingLeads: CoverageMon[]): number {
+  if (opposingLeads.length === 0) return 0; // no opponent context yet (guessing the opponent's own lead)
+
+  let score = 0;
+  for (const mon of pair) {
+    const bestVsOpp = Math.max(0, ...opposingLeads.map((opp) => bestOffenseMultiplier(mon, opp)));
+    if (bestVsOpp >= 2) score += 2;
+    else if (bestVsOpp === 0) score -= 1.5; // walled outright by both projected leads
+
+    for (const opp of opposingLeads) {
+      const incoming = Math.max(...opp.types.map((t) => defenseMultiplier(t, mon)));
+      if (incoming >= 4) score -= 3;
+      else if (incoming >= 2) score -= 1.5 * itemWeaknessMitigation(mon);
+    }
+  }
+  return score;
 }

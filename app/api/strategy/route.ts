@@ -77,9 +77,14 @@ ${slotNotes.map((s) => `- ${s.name}: ${s.roleNotes ?? "(no notes given)"}`).join
 
 Opponent's team preview: ${opponentPreview.map((o) => `${o.name}${o.abilityGuess ? ` (${o.abilityGuess})` : ""}`).join(", ")}
 
+Your job is ONLY to write grounded, specific strategic narration for it — do not re-rank the combos or invent numbers, but you should flag real risk when the damage-check data shows it, rather than only narrating positively.
+
 Top-ranked combo (already computed, score ${topCombo.breakdown.total.toFixed(1)}): ${topCombo.members.map((m) => m.name).join(", ")}
 Suggested lead: ${topCombo.recommendedLead.map((m) => m.name).join(" + ")}
 Existing heuristic notes: ${topCombo.strategyNotes.join(" ")}
+${topCombo.leadDamageChecks.length > 0
+  ? `Computed opening damage checks for the suggested lead (from @smogon/calc — ground truth, do not contradict these numbers):\n${topCombo.leadDamageChecks.map((c) => `- ${c.description}`).join("\n")}`
+  : "No opening damage check data available for this lead."}
 
-Write 3-5 sentences of concrete, game-plan-aware strategy narration. Reference the player's stated roles/game plan directly where relevant. Do not invent movesets or abilities not implied by the data given.`;
+Write 3-5 sentences of concrete, game-plan-aware strategy narration. Reference the player's stated roles/game plan directly where relevant. Do not invent movesets or abilities not implied by the data given. If the damage-check data above shows the suggested lead facing a 2HKO-or-worse with no clear answer, say so plainly rather than narrating around it — a confident recommendation that hides real risk is worse than one that's honest about it.`;
 }

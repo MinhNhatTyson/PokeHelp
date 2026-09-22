@@ -88,6 +88,38 @@ export const COMMON_SETS: Record<string, CommonSetEntry> = {
     topItem: "Tyranitarite", regulation: "VGC 2026 Reg M-B",
     megaForm: { formSpecies: "tyranitar-mega", formShowdownName: "Tyranitar-Mega", formAbility: "sand-stream" },
   },
+    milotic: {
+    species: "milotic", showdownName: "Milotic", likelyAbility: "competitive",
+    commonMoves: ["Protect", "Scald", "Ice Beam", "Icy Wind"],
+    topItem: "Leftovers", regulation: "VGC 2026 Reg M-C",
+  },
+  corviknight: {
+    species: "corviknight", showdownName: "Corviknight", likelyAbility: "mirror-armor",
+    commonMoves: ["Brave Bird", "Roost", "Tailwind", "Bulk Up"],
+    topItem: "Leftovers", regulation: "VGC 2026 Reg M-C",
+  },
+  rillaboom: {
+    species: "rillaboom", showdownName: "Rillaboom", likelyAbility: "grassy-surge",
+    commonMoves: ["Fake Out", "Grassy Glide", "Wood Hammer", "U-turn"],
+    topItem: "Life Orb", regulation: "VGC 2026 Reg M-C",
+  },
+  "indeedee-female": {
+    species: "indeedee-female", showdownName: "Indeedee-F", likelyAbility: "psychic-surge",
+    commonMoves: ["Follow Me", "Helping Hand", "Trick Room", "Psychic"],
+    topItem: "Psychic Seed", regulation: "VGC 2026 Reg M-C",
+  },
+  golisopod: {
+    species: "golisopod", showdownName: "Golisopod", likelyAbility: "water-bubble",
+    commonMoves: ["Iron Head", "Leech Life", "Protect", "First Impression"],
+    topItem: "Golisopite", regulation: "VGC 2026 Reg M-C",
+    megaForm: { formSpecies: "golisopod-mega", formShowdownName: "Golisopod-Mega", formAbility: "emergency-exit" },
+  },
+  salamence: {
+    species: "salamence", showdownName: "Salamence", likelyAbility: "intimidate",
+    commonMoves: ["Hyper Voice", "Protect", "Double-Edge", "Tailwind"],
+    topItem: "Salamencite", regulation: "VGC 2026 Reg M-C",
+    megaForm: { formSpecies: "salamence-mega", formShowdownName: "Salamence-Mega", formAbility: "aerilate" },
+  },
 };
 
 export function getCommonSet(speciesName: string): CommonSetEntry | null {
