@@ -22,6 +22,7 @@ export const ITEM_SIGNALS: Record<string, ItemSignal> = {
   "weakness-policy": { name: "weakness-policy", isWeaknessPolicy: true },
   "eject-button": { name: "eject-button", isEjectTool: true },
   "eject-pack": { name: "eject-pack", isEjectTool: true },
+  "iron-ball": { name: "iron-ball", speedMultiplier: 0.5 },
 };
 
 export function getItemSignal(itemName: string | null | undefined): ItemSignal | null {

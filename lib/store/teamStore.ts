@@ -1,9 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { PokemonDetail, TeamSlot } from "@/lib/types";
+import { NatureName } from "../logic/statCalc";
 
 export const TEAM_SIZE = 6;
-const EMPTY_SLOT: TeamSlot = { pokemon: null, itemName: null, abilityName: null, roleNotes: null, moves: [null, null, null, null] };
+const EMPTY_SLOT: TeamSlot = {
+  pokemon: null, itemName: null, abilityName: null, roleNotes: null,
+  moves: [null, null, null, null], nature: null, speedEv: 0,
+};
 
 interface TeamState {
   slots: TeamSlot[];
@@ -17,6 +21,8 @@ interface TeamState {
   clearSlot: (index: number) => void;
   clearTeam: () => void;
   loadSlots: (slots: TeamSlot[]) => void;
+  setSlotNature: (index: number, nature: NatureName | null) => void;
+  setSlotSpeedEv: (index: number, speedEv: number) => void;
 }
 
 export const useTeamStore = create<TeamState>()(
@@ -29,8 +35,7 @@ export const useTeamStore = create<TeamState>()(
           const slots = [...state.slots];
           const isDuplicate = pokemon && slots.some((s, i) => i !== index && s.pokemon?.name === pokemon.name);
           if (isDuplicate) return state;
-          // Reset moves too — a new species invalidates the old movepool selections
-          slots[index] = { pokemon, itemName: slots[index].itemName, abilityName: null, roleNotes: slots[index].roleNotes, moves: [null, null, null, null] };
+          slots[index] = { pokemon, itemName: slots[index].itemName, abilityName: null, roleNotes: slots[index].roleNotes, moves: [null, null, null, null], nature: null, speedEv: 0 };
           return { slots };
         }),
       setSlotMove: (index, moveIndex, moveName) =>
@@ -66,6 +71,8 @@ export const useTeamStore = create<TeamState>()(
             ...s,
             roleNotes: s.roleNotes ?? null,
             moves: s.moves ?? [null, null, null, null],
+            nature: s.nature ?? null,
+            speedEv: s.speedEv ?? 0,
             pokemon: s.pokemon ? { ...s.pokemon, moves: s.pokemon.moves ?? [] } : s.pokemon,
           })),
         }),
@@ -75,7 +82,19 @@ export const useTeamStore = create<TeamState>()(
           slots[index] = { ...slots[index], roleNotes };
           return { slots };
         }),
-      setTeamStrategy: (text) => set({ teamStrategy: text }),      
+      setTeamStrategy: (text) => set({ teamStrategy: text }),     
+      setSlotNature: (index, nature) =>
+        set((state) => {
+          const slots = [...state.slots];
+          slots[index] = { ...slots[index], nature };
+          return { slots };
+        }),
+      setSlotSpeedEv: (index, speedEv) =>
+        set((state) => {
+          const slots = [...state.slots];
+          slots[index] = { ...slots[index], speedEv: Math.max(0, Math.min(252, speedEv)) };
+          return { slots };
+        }), 
     }),
     {
       name: "pokehelp-active-team",
@@ -88,6 +107,8 @@ export const useTeamStore = create<TeamState>()(
           slots: persisted.slots.map((s) => ({
             ...s,
             moves: s.moves ?? [null, null, null, null],
+            nature: s.nature ?? null,
+            speedEv: s.speedEv ?? 0,
             pokemon: s.pokemon ? { ...s.pokemon, moves: s.pokemon.moves ?? [] } : s.pokemon,
           })),
         };

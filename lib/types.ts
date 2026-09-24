@@ -1,3 +1,5 @@
+import { NatureName } from "./logic/statCalc";
+
 export const POKEMON_TYPES = [
   "normal", "fire", "water", "electric", "grass", "ice", "fighting", "poison",
   "ground", "flying", "psychic", "bug", "rock", "ghost", "dragon", "dark",
@@ -117,6 +119,8 @@ export interface TeamSlot {
   abilityName: string | null;
   roleNotes: string | null;
   moves: (string | null)[];
+  nature: NatureName | null;  
+  speedEv: number;             
 }
 
 export interface PokemonMoveEntry {

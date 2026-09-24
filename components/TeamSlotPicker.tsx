@@ -6,6 +6,7 @@ import { fetchPokemonNameList, fetchPokemonDetail, fetchCompetitiveItemNameList 
 import { ItemNameEntry, PokemonNameEntry } from "@/lib/types";
 import TypeBadge from "@/components/TypeBadge";
 import MovesetPicker from "./MovesetPicker";
+import { NATURE_LABEL, NatureName, calculateEffectiveSpeed } from "@/lib/logic/statCalc";
 
 const MAX_SUGGESTIONS = 8;
 
@@ -27,6 +28,8 @@ export default function TeamSlotPicker({ index }: { index: number }) {
   const [showItemDropdown, setShowItemDropdown] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const setSlotNature = useTeamStore((s) => s.setSlotNature);
+  const setSlotSpeedEv = useTeamStore((s) => s.setSlotSpeedEv);
 
   useEffect(() => {
     fetchPokemonNameList().then(setPokeNames);
@@ -165,6 +168,42 @@ export default function TeamSlotPicker({ index }: { index: number }) {
             </select>
             <MovesetPicker slotIndex={index} />
           </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Nature</label>
+              <select
+                value={slot.nature ?? ""}
+                onChange={(e) => setSlotNature(index, (e.target.value || null) as NatureName | null)}
+                className="mt-1 w-full rounded-md border border-black/10 bg-white px-2 py-2 text-sm text-[color:var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
+              >
+                <option value="">Neutral / unset</option>
+                {Object.entries(NATURE_LABEL).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Speed EVs</label>
+              <input
+                type="number"
+                min={0}
+                max={252}
+                step={4}
+                value={slot.speedEv}
+                onChange={(e) => setSlotSpeedEv(index, Number(e.target.value) || 0)}
+                className="mt-1 w-full rounded-md border border-black/10 bg-white px-2 py-2 text-sm text-[color:var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
+              />
+            </div>
+          </div>
+          <p className="mt-1.5 text-xs text-[color:var(--ink)]/50">
+            Effective Speed:{" "}
+            <span className="font-medium text-[color:var(--ink)]">
+              {calculateEffectiveSpeed(
+                slot.pokemon.stats.find((s) => s.name === "speed")?.baseStat ?? 0,
+                slot.speedEv, slot.nature, slot.itemName
+              )}
+            </span>
+          </p>
           <div className="mt-3">
             <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Role on team</label>
             <textarea
