@@ -8,6 +8,8 @@ import { rankBringFourCombos, statsFromEntries, CoverageMon } from "@/lib/logic/
 import OpponentSlotPicker from "@/components/OpponentSlotPicker";
 import ComboResultCard from "@/components/ComboResultCard";
 import { getCommonSet } from "@/lib/data/commonSets";
+import { useBattleHistoryStore } from "@/lib/store/battleHistoryStore";
+import BattleHistoryLogger from "@/components/BattleHistoryLogger";
 
 export default function BattleOptimizer() {
   const userSlots = useTeamStore((s) => s.slots);
@@ -21,6 +23,7 @@ export default function BattleOptimizer() {
   const userReady = userSlots.every((s) => s.pokemon && s.abilityName);
   const opponentReady = opponentSlots.every((s) => s.pokemon);
   const [strategyErrorDetail, setStrategyErrorDetail] = useState<string | null>(null);
+  const recentHistory = useBattleHistoryStore((s) => s.entries);
 
   const userCoverage: CoverageMon[] = useMemo(
     () => userSlots.map((s) => ({
@@ -71,6 +74,7 @@ export default function BattleOptimizer() {
             .filter((s) => s.pokemon)
             .map((s) => ({ name: s.pokemon!.name, abilityGuess: s.abilityName })),
           topCombo: results[0],
+          recentHistory,
         }),
       });
       const data = await res.json();
@@ -157,6 +161,10 @@ export default function BattleOptimizer() {
                 Show all {results.length} combinations
               </button>
             )}
+            <BattleHistoryLogger
+              opponentTeamNames={opponentSlots.filter((s) => s.pokemon).map((s) => s.pokemon!.name)}
+              combo={results[0]}
+            />
           </div>
         )}        
       </div>

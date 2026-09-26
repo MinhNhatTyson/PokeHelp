@@ -16,6 +16,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Speed Check", href: "/speed" },
   { label: "Battle Optimizer", href: "/optimizer" },
   { label: "Live Battle", href: "/battle" },
+  { label: "Battle History", href: "/history" },
   { label: "Trainer Roster", href: "/trainers", comingSoon: true },
 ];
 

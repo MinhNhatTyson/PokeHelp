@@ -208,3 +208,13 @@ export interface MoveNameEntry {
   name: string;
   url: string;
 }
+
+export interface BattleHistoryEntry {
+  id: string;
+  loggedAt: number;
+  yourTeamNames: string[];       // the bring-4 actually used
+  opponentTeamNames: string[];   // opponent's revealed team preview
+  recommendedLead: string[];     // what Battle Optimizer suggested as lead, for reference
+  outcome: "win" | "loss";
+  reason: string;                // free text — what went right/wrong
+}

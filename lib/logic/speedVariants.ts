@@ -21,10 +21,6 @@ function getWeights(hasCurated: boolean, curatedIsScarf: boolean) {
   return { maxSpeed: 35, scarf: 20, bulky: 30, trickRoom: 15, curated: 0 };
 }
 
-// We never know an opponent's real spread, so instead of one guess we surface
-// the handful of archetypes that actually show up in tournament play. Not
-// exhaustive — a deliberately cheap, deterministic stand-in for a real
-// usage-stats lookup (see commonSets.ts's own curation caveat).
 export function getSpeedVariants(pokemon: PokemonDetail): SpeedVariant[] {
   const base = baseSpeedOf(pokemon);
   const commonSet = getCommonSet(pokemon.name);

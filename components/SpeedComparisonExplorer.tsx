@@ -56,6 +56,18 @@ export default function SpeedComparisonExplorer() {
     : null;
 
   const variants = opponent ? getSpeedVariants(opponent) : [];
+  // Weighted sum: full credit for variants you outspeed, half credit for
+  // ties (speed ties resolve 50/50), zero for variants that outspeed you.
+  const chanceFaster =
+    ownSpeed !== null && variants.length > 0
+      ? Math.round(
+          variants.reduce((sum, v) => {
+            if (ownSpeed > v.speed) return sum + v.likelihood;
+            if (ownSpeed === v.speed) return sum + v.likelihood / 2;
+            return sum;
+          }, 0)
+        )
+      : null;
 
   return (
     <div className="w-full max-w-3xl rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
@@ -135,12 +147,25 @@ export default function SpeedComparisonExplorer() {
               </div>
             </div>
 
-            <p className="mt-4 text-xs text-[color:var(--ink)]/50">
-              Real spread unknown — here&apos;s how you match up against the common archetypes:
+            {chanceFaster !== null && (
+              <div
+                className={`mt-4 rounded-lg px-4 py-3 text-sm font-medium ${
+                  chanceFaster >= 60
+                    ? "bg-emerald-100 text-emerald-900"
+                    : chanceFaster <= 40
+                    ? "bg-red-100 text-red-900"
+                    : "bg-[color:var(--accent-gold)]/30 text-[color:var(--ink)]"
+                }`}
+              >
+                ~{chanceFaster}% chance you move first this matchup
+              </div>
+            )}
+            <p className="mt-3 text-xs text-[color:var(--ink)]/50">
+              Real spread unknown — weighted toward more commonly-run archetypes, not real usage stats:
             </p>
             <div className="mt-2 space-y-1.5">
               {variants.map((v) => {
-                const verdict = ownSpeed > v.speed ? "faster" : ownSpeed < v.speed ? "slower" : "tie";
+                const verdict = ownSpeed! > v.speed ? "faster" : ownSpeed! < v.speed ? "slower" : "tie";
                 const style =
                   verdict === "faster" ? "bg-emerald-100 text-emerald-900"
                   : verdict === "slower" ? "bg-red-100 text-red-900"
@@ -151,7 +176,9 @@ export default function SpeedComparisonExplorer() {
                   : `Speed tie (${ownSpeed} vs ${v.speed}) — 50/50`;
                 return (
                   <div key={v.label} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-black/5 px-3 py-2 text-sm">
-                    <span className="text-[color:var(--ink)]/80">{v.label}</span>
+                    <span className="text-[color:var(--ink)]/80">
+                      {v.label} <span className="text-[color:var(--ink)]/40">· ~{v.likelihood}% likely</span>
+                    </span>
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${style}`}>{verdictLabel}</span>
                   </div>
                 );
