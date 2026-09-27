@@ -1,6 +1,9 @@
 import { PokemonDetail } from "@/lib/types";
 import { getDualAttackProfile, getDualDefenseProfile } from "@/lib/logic/effectiveness";
 import TypeBadge from "@/components/TypeBadge";
+import { TYPE_COLOR } from "@/lib/typeMeta";
+import TypePip from "./TypePip";
+import TypeChip from "./TypeChip";
 
 const STAT_LABEL: Record<string, string> = {
   hp: "HP",
@@ -31,25 +34,36 @@ export default function PokemonResultCard({
   const defense = getDualDefenseProfile(pokemon.types[0], pokemon.types[1]);
   const offense = getDualAttackProfile(pokemon.types[0], pokemon.types[1]);
   const image = pokemon.artworkUrl ?? pokemon.spriteUrl;
+  const frameColor = TYPE_COLOR[pokemon.types[0]];
 
   return (
-    <div className="rounded-lg bg-[color:var(--shell)] p-5 text-[color:var(--foreground)]">
-      <div className="flex flex-wrap items-center gap-4">
-        {image && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt={pokemon.name} className="h-24 w-24 object-contain" />
-        )}
+    <div className="pokecard" style={{ borderColor: frameColor }}>
+      <div className="flex items-center justify-between gap-2 px-4 pt-3">
         <div>
           <p className="text-xs uppercase opacity-50">#{String(pokemon.dexNumber).padStart(4, "0")}</p>
-          <h2 className="font-display text-2xl capitalize">{pokemon.name}</h2>
-          {pokemon.genus && <p className="text-sm opacity-70">{pokemon.genus}</p>}
-          <div className="mt-1.5 flex gap-1.5">
-            {pokemon.types.map((t) => (
-              <TypeBadge key={t} type={t} size="sm" />
-            ))}
-          </div>
+          <h2 className="font-display text-xl capitalize text-[color:var(--ink)]">{pokemon.name}</h2>
         </div>
-      </div>
+        <div className="flex gap-1">
+          {pokemon.types.map((t) => <TypeBadge key={t} type={t} size="sm" />)}
+        </div>
+    </div>
+
+    <div
+      className="relative mx-4 mt-3 flex h-40 items-center justify-center overflow-hidden rounded-lg"
+      style={{ background: `linear-gradient(180deg, ${frameColor}22, ${frameColor}05)` }}
+    >
+      {image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={image} alt={pokemon.name} className="h-32 w-32 object-contain drop-shadow-[0_10px_8px_rgba(0,0,0,0.35)]" />
+      )}
+      <span className="pokecard__sheen" aria-hidden="true" />
+    </div>
+
+    {pokemon.genus && (
+      <p className="mx-4 mt-2 text-center text-xs italic text-[color:var(--ink)]/60">{pokemon.genus}</p>
+    )}
+
+    <div className="p-5 pt-3 text-[color:var(--foreground)]">
 
       {pokemon.forms.length > 1 && (
         <div className="mt-4 flex flex-wrap gap-1.5 border-b border-black/10 pb-3">
@@ -127,24 +141,37 @@ export default function PokemonResultCard({
         </div>
       </div>
 
-      <div className="mt-6">
-        <h3 className="font-display text-base">Type defenses</h3>
-        <div className="mt-2 space-y-2">
-          {DEFENSE_GROUPS.map(({ key, label }) => {
-            const types = defense[key];
-            if (types.length === 0) return null;
-            return (
-              <div key={key} className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="w-32 shrink-0 opacity-70">{label}</span>
-                <div className="flex flex-wrap gap-1">
-                  {types.map((t) => (
-                    <TypeBadge key={t} type={t} size="sm" />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div className="mt-6 space-y-2">
+        <h3 className="font-display text-base text-[color:var(--ink)]">Type defenses</h3>
+        {defense.quad.length > 0 && (
+          <div className="overflow-hidden rounded-lg border border-black/10">
+            <div className="effect-banner effect-banner--weak"><span>4× Weak</span><span className="opacity-90">×4</span></div>
+            <div className="flex flex-wrap gap-2 bg-black/5 p-3">{defense.quad.map((t) => <TypeChip key={t} type={t} />)}</div>
+          </div>
+        )}
+        {defense.double.length > 0 && (
+          <div className="overflow-hidden rounded-lg border border-black/10">
+            <div className="effect-banner effect-banner--not-very" style={{ background: "linear-gradient(90deg,#dc2626,#f87171)" }}>
+              <span>2× Weak</span><span className="opacity-90">×2</span>
+            </div>
+            <div className="flex flex-wrap gap-2 bg-black/5 p-3">{defense.double.map((t) => <TypeChip key={t} type={t} />)}</div>
+          </div>
+        )}
+        {[...defense.half, ...defense.quarter].length > 0 && (
+          <div className="overflow-hidden rounded-lg border border-black/10">
+            <div className="effect-banner effect-banner--resist"><span>Resists</span></div>
+            <div className="flex flex-wrap gap-2 bg-black/5 p-3">
+              {defense.half.map((t) => <TypeChip key={t} type={t} multiplier="×½" />)}
+              {defense.quarter.map((t) => <TypeChip key={t} type={t} multiplier="×¼" />)}
+            </div>
+          </div>
+        )}
+        {defense.immune.length > 0 && (
+          <div className="overflow-hidden rounded-lg border border-black/10">
+            <div className="effect-banner effect-banner--none"><span>Immune</span></div>
+            <div className="flex flex-wrap gap-2 bg-black/5 p-3">{defense.immune.map((t) => <TypeChip key={t} type={t} />)}</div>
+          </div>
+        )}
       </div>
 
       <div className="mt-6">
@@ -199,5 +226,6 @@ export default function PokemonResultCard({
       )}
 
     </div>
+  </div>
   );
 }

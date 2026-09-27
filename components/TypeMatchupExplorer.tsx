@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { POKEMON_TYPES, PokemonTypeName, PokemonNameEntry, PokemonDetail } from "@/lib/types";
-import { TYPE_LABEL } from "@/lib/typeMeta";
+import { TYPE_COLOR, TYPE_LABEL } from "@/lib/typeMeta";
 import { getTypeMatchup } from "@/lib/logic/effectiveness";
 import { fetchPokemonNameList, fetchPokemonDetail } from "@/lib/data/fetchAndCache";
 import TypeBadge from "@/components/TypeBadge";
 import PokemonResultCard from "@/components/PokemonResultCard";
+import TypePip from "./TypePip";
+import TypeChip from "./TypeChip";
 
 function BadgeRow({
   types,
@@ -37,6 +39,33 @@ function BadgeRow({
 
 const MAX_TYPE_SUGGESTIONS = 5;
 const MAX_NAME_SUGGESTIONS = 8;
+const TONE_CLASS = {
+  super: "effect-banner--super",
+  weak: "effect-banner--weak",
+  "not-very": "effect-banner--not-very",
+  resist: "effect-banner--resist",
+  none: "effect-banner--none",
+} as const;
+
+function EffectGroup({
+  tone, title, mult, types, onPick,
+}: {
+  tone: keyof typeof TONE_CLASS; title: string; mult: string;
+  types: PokemonTypeName[]; onPick: (t: PokemonTypeName) => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-black/10">
+      <div className={`effect-banner ${TONE_CLASS[tone]}`}>
+        <span>{title}</span><span className="opacity-90">{mult}</span>
+      </div>
+      <div className="flex flex-wrap gap-2 bg-black/5 p-3">
+        {types.length > 0
+          ? types.map((t) => <TypeChip key={t} type={t} onClick={onPick} />)
+          : <span className="text-sm italic text-[color:var(--ink)]/40">None</span>}
+      </div>
+    </div>
+  );
+}
 
 export default function TypeMatchupExplorer() {
   const [query, setQuery] = useState("");
@@ -212,54 +241,25 @@ export default function TypeMatchupExplorer() {
               <TypeBadge type={selectedType} size="lg" />
             </div>
 
-            <div className="mt-6 grid gap-8 sm:grid-cols-2">
-              <section>
-                <h2 className="font-display text-lg text-[color:var(--ink)]">Attacking</h2>
-                <div className="mt-3 space-y-4">
-                  <div>
-                    <p className="text-sm font-medium text-[color:var(--ink)]/70">Super effective against</p>
-                    <div className="mt-1.5">
-                      <BadgeRow types={matchup.attack.superEffectiveAgainst} onSelect={handleSelectType} />
-                    </div>
+            <div className="pokecard mt-6 overflow-hidden" style={{ borderColor: TYPE_COLOR[selectedType] }}>
+              <div className="grid divide-y divide-black/10 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+                <section>
+                  <h2 className="px-4 pt-3 font-display text-base text-[color:var(--ink)]">Attacking</h2>
+                  <div className="space-y-3 p-4">
+                    <EffectGroup tone="super" title="Super effective" mult="×2" types={matchup.attack.superEffectiveAgainst} onPick={handleSelectType} />
+                    <EffectGroup tone="not-very" title="Not very effective" mult="×½" types={matchup.attack.notVeryEffectiveAgainst} onPick={handleSelectType} />
+                    <EffectGroup tone="none" title="No effect" mult="×0" types={matchup.attack.noEffectAgainst} onPick={handleSelectType} />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-[color:var(--ink)]/70">Not very effective against</p>
-                    <div className="mt-1.5">
-                      <BadgeRow types={matchup.attack.notVeryEffectiveAgainst} onSelect={handleSelectType} />
-                    </div>
+                </section>
+                <section>
+                  <h2 className="px-4 pt-3 font-display text-base text-[color:var(--ink)]">Defending</h2>
+                  <div className="space-y-3 p-4">
+                    <EffectGroup tone="weak" title="Weak to" mult="×2" types={matchup.defense.weakTo} onPick={handleSelectType} />
+                    <EffectGroup tone="resist" title="Resists" mult="×½" types={matchup.defense.resists} onPick={handleSelectType} />
+                    <EffectGroup tone="none" title="Immune" mult="×0" types={matchup.defense.immuneTo} onPick={handleSelectType} />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-[color:var(--ink)]/70">No effect on</p>
-                    <div className="mt-1.5">
-                      <BadgeRow types={matchup.attack.noEffectAgainst} onSelect={handleSelectType} />
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section>
-                <h2 className="font-display text-lg text-[color:var(--ink)]">Defending</h2>
-                <div className="mt-3 space-y-4">
-                  <div>
-                    <p className="text-sm font-medium text-[color:var(--ink)]/70">Weak to</p>
-                    <div className="mt-1.5">
-                      <BadgeRow types={matchup.defense.weakTo} onSelect={handleSelectType} />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-[color:var(--ink)]/70">Resists</p>
-                    <div className="mt-1.5">
-                      <BadgeRow types={matchup.defense.resists} onSelect={handleSelectType} />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-[color:var(--ink)]/70">Immune to</p>
-                    <div className="mt-1.5">
-                      <BadgeRow types={matchup.defense.immuneTo} onSelect={handleSelectType} />
-                    </div>
-                  </div>
-                </div>
-              </section>
+                </section>
+              </div>
             </div>
           </>
         )}

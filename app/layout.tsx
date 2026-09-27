@@ -24,9 +24,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
         className={`${spaceGrotesk.variable} ${inter.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex w-full flex-col">
         <Header />
-        {children}
+        <main className="flex w-full flex-1 flex-col pb-20 lg:pb-0">{children}</main>
       </body>
     </html>
   );
