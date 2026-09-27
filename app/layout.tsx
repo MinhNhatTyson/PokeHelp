@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
+import PageTransition from "@/components/PageTransition";
 
 const spaceGrotesk = Space_Grotesk({
   variable: "--font-display",
@@ -26,7 +27,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex w-full flex-col">
         <Header />
-        <main className="flex w-full flex-1 flex-col pb-20 lg:pb-0">{children}</main>
+        <main className="flex w-full flex-1 flex-col pb-20 lg:pb-0">
+          <PageTransition>{children}</PageTransition>
+        </main>
       </body>
     </html>
   );

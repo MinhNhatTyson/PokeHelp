@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PokemonTypeName } from "@/lib/types";
 import { TYPE_COLOR } from "@/lib/typeMeta";
+import { AnimatePresence, motion } from "motion/react";
 
 // Add near the top, alongside NAV_ITEMS
 const MOBILE_TAB_HREFS = ["/", "/team", "/optimizer", "/battle"];
@@ -132,7 +133,8 @@ function NavIconBadge({
   const color = TYPE_COLOR[themeType];
   const dims = size === "sm" ? "h-7 w-7" : "h-10 w-10";
   return (
-    <span
+    <motion.span
+      whileTap={{ scale: 0.88 }}
       className={`flex shrink-0 items-center justify-center rounded-full ${dims} transition-all duration-200`}
       style={{
         background: active
@@ -144,7 +146,7 @@ function NavIconBadge({
       }}
     >
       <TabIcon href={href} />
-    </span>
+    </motion.span>
   );
 }
 
@@ -224,49 +226,68 @@ export default function Header() {
       </div>
 
       {/* Mobile/tablet dropdown */}
-      {menuOpen && (
-        <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 lg:hidden"
-          onClick={() => setMenuOpen(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md overflow-hidden rounded-t-2xl border-4 border-b-0 border-[color:var(--shell)] bg-[color:var(--shell)] pb-[env(safe-area-inset-bottom)]"
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            key="more-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm lg:hidden"
+            onClick={() => setMenuOpen(false)}
           >
-            <div className="h-2 bg-gradient-to-r from-[color:var(--shell-accent)] via-[color:var(--accent-gold)] to-[color:var(--shell-accent)]" />
-            <div className="pattern-pokeball bg-[color:var(--screen)] p-4">
-              <p className="px-1 pb-2 text-xs font-medium uppercase tracking-wide text-[color:var(--ink)]/40">
-                More
-              </p>
-              <ul className="space-y-1.5">
-                {NAV_ITEMS.filter((item) => !MOBILE_TAB_HREFS.includes(item.href)).map((item) => (
-                  <li key={item.href}>
-                    {item.comingSoon ? (
-                      <span
-                        className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[color:var(--ink)]/30"
-                        title="Coming soon"
-                      >
-                        <NavIconBadge href={item.href} themeType={item.themeType} active={false} />
-                        {item.label}
-                        <span className="ml-auto text-[10px] uppercase tracking-wide">Soon</span>
-                      </span>
-                    ) : (
-                      <Link
-                        href={item.href}
-                        onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[color:var(--ink)] hover:bg-black/5"
-                      >
-                        <NavIconBadge href={item.href} themeType={item.themeType} active={pathname === item.href} />
-                        {item.label}
-                      </Link>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 12 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              onClick={(e) => e.stopPropagation()}
+              className="pokecard w-full max-w-sm overflow-hidden"
+              style={{ borderColor: "var(--accent-gold)" }}
+            >
+              <div className="h-2 bg-gradient-to-r from-[color:var(--shell-accent)] via-[color:var(--accent-gold)] to-[color:var(--shell-accent)]" />
+              <div className="pattern-pokeball-dark bg-[color:var(--screen)] p-5">
+                <div className="mb-3 flex items-center gap-2.5">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[color:var(--accent-gold)] to-[color:var(--shell-accent)]">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                      <circle cx="10" cy="10" r="8" stroke="#1f2124" strokeWidth="2" />
+                      <path d="M2 10h16" stroke="#1f2124" strokeWidth="2" />
+                      <circle cx="10" cy="10" r="2.5" fill="#1f2124" />
+                    </svg>
+                  </span>
+                  <p className="font-display text-base text-[color:var(--ink)]">More features</p>
+                </div>
+                <ul className="space-y-1.5">
+                  {NAV_ITEMS.filter((item) => !MOBILE_TAB_HREFS.includes(item.href)).map((item) => (
+                    <li key={item.href}>
+                      {item.comingSoon ? (
+                        <span
+                          className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[color:var(--ink)]/30"
+                          title="Coming soon"
+                        >
+                          <NavIconBadge href={item.href} themeType={item.themeType} active={false} />
+                          {item.label}
+                          <span className="ml-auto text-[10px] uppercase tracking-wide">Soon</span>
+                        </span>
+                      ) : (
+                        <Link
+                          href={item.href}
+                          onClick={() => setMenuOpen(false)}
+                          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[color:var(--ink)] transition-colors hover:bg-black/5"
+                        >
+                          <NavIconBadge href={item.href} themeType={item.themeType} active={pathname === item.href} />
+                          {item.label}
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Mobile bottom tab bar — replaces top-right hamburger on phones/tablets */}
         <nav
@@ -283,12 +304,8 @@ export default function Header() {
                     className="flex flex-col items-center gap-1 py-2.5"
                   >
                     <NavIconBadge href={item.href} themeType={item.themeType} active={isActive} />
-                    <span
-                      className={`text-[10px] font-medium uppercase tracking-wide ${
-                        isActive ? "text-[color:var(--screen)]" : "text-[color:var(--screen)]/50"
-                      }`}
-                    >
-                      {item.label.split(" ")[0]}
+                    <span className={`text-[10px] font-medium uppercase tracking-wide ${isActive ? "text-[color:var(--screen)]" : "text-[color:var(--screen)]/50"}`}>
+                      {item.mobileLabel ?? item.label}
                     </span>
                   </Link>
                 </li>
@@ -299,10 +316,25 @@ export default function Header() {
                 type="button"
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-expanded={menuOpen}
-                className="flex w-full flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium uppercase tracking-wide text-[color:var(--screen)]/60"
+                className="flex w-full flex-col items-center gap-1 py-2.5"
               >
-                <MoreIcon />
-                More
+                <motion.span
+                  whileTap={{ scale: 0.88 }}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-all duration-200"
+                  style={{
+                    background: menuOpen
+                      ? "radial-gradient(circle at 32% 28%, var(--accent-gold), #d9a300)"
+                      : "rgba(255,255,255,0.06)",
+                    boxShadow: menuOpen ? "0 0 0 2px rgba(255,199,44,0.35), 0 3px 10px rgba(255,199,44,0.4)" : "none",
+                    color: menuOpen ? "#1f2124" : "var(--screen)",
+                    opacity: menuOpen ? 1 : 0.55,
+                  }}
+                >
+                  <MoreIcon />
+                </motion.span>
+                <span className={`text-[10px] font-medium uppercase tracking-wide ${menuOpen ? "text-[color:var(--screen)]" : "text-[color:var(--screen)]/50"}`}>
+                  More
+                </span>
               </button>
             </li>
           </ul>
