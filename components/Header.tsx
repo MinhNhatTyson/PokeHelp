@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { PokemonTypeName } from "@/lib/types";
+import { TYPE_COLOR } from "@/lib/typeMeta";
 
 // Add near the top, alongside NAV_ITEMS
 const MOBILE_TAB_HREFS = ["/", "/team", "/optimizer", "/battle"];
@@ -34,6 +36,37 @@ function TabIcon({ href }: { href: string }) {
         </svg>
       );
     case "/battle": // Live Battle — bolt
+    case "/items":
+      return (
+        <svg {...common}>
+          <path d="M6 7h8l1 10a1 1 0 01-1 1H6a1 1 0 01-1-1L6 7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+          <path d="M8 7a2 2 0 114 0" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      );
+    case "/speed":
+      return (
+        <svg {...common}>
+          <circle cx="10" cy="11.5" r="6.5" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M10 11.5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M8 2.5h4M10 2.5v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M15 4l1 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      );
+    case "/history":
+      return (
+        <svg {...common}>
+          <path d="M3 10a7 7 0 1 1 2 4.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+          <path d="M3 6v4h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <path d="M10 6v4l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </svg>
+      );
+    case "/trainers":
+      return (
+        <svg {...common}>
+          <circle cx="10" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M7 11l-1.5 6 4.5-2.5 4.5 2.5L13 11" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+        </svg>
+      );
       return (
         <svg {...common}>
           <path d="M11 2 4 11h5l-1 7 7-9h-5l1-7z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
@@ -42,6 +75,20 @@ function TabIcon({ href }: { href: string }) {
     default:
       return null;
   }
+}
+
+function HeaderEmblem() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 200 200"
+      className="pointer-events-none absolute -right-12 -top-20 h-56 w-56 opacity-[0.06] sm:h-64 sm:w-64"
+    >
+      <circle cx="100" cy="100" r="90" fill="none" stroke="var(--screen)" strokeWidth="14" />
+      <path d="M10 100h180" stroke="var(--screen)" strokeWidth="14" />
+      <circle cx="100" cy="100" r="28" fill="var(--shell)" stroke="var(--screen)" strokeWidth="14" />
+    </svg>
+  );
 }
 
 function MoreIcon() {
@@ -55,19 +102,51 @@ function MoreIcon() {
 interface NavItem {
   label: string;
   href: string;
+  themeType: PokemonTypeName;
+  mobileLabel?: string; // shorter/clearer label for the bottom tab bar
   comingSoon?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Type & Pokédex", href: "/" },
-  { label: "Items", href: "/items" },
-  { label: "Team Builder", href: "/team" },
-  { label: "Speed Check", href: "/speed" },
-  { label: "Battle Optimizer", href: "/optimizer" },
-  { label: "Live Battle", href: "/battle" },
-  { label: "Battle History", href: "/history" },
-  { label: "Trainer Roster", href: "/trainers", comingSoon: true },
+  { label: "Type & Pokédex", href: "/", themeType: "grass", mobileLabel: "Dex" },
+  { label: "Items", href: "/items", themeType: "poison" },
+  { label: "Team Builder", href: "/team", themeType: "water", mobileLabel: "Team" },
+  { label: "Speed Check", href: "/speed", themeType: "electric" },
+  { label: "Battle Optimizer", href: "/optimizer", themeType: "fighting", mobileLabel: "Matchups" },
+  { label: "Live Battle", href: "/battle", themeType: "fire", mobileLabel: "Live" },
+  { label: "Battle History", href: "/history", themeType: "psychic" },
+  { label: "Trainer Roster", href: "/trainers", themeType: "dragon", comingSoon: true },
 ];
+
+function NavIconBadge({
+  href,
+  themeType,
+  active,
+  size = "md",
+}: {
+  href: string;
+  themeType: PokemonTypeName;
+  active: boolean;
+  size?: "sm" | "md";
+}) {
+  const color = TYPE_COLOR[themeType];
+  const dims = size === "sm" ? "h-7 w-7" : "h-10 w-10";
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center rounded-full ${dims} transition-all duration-200`}
+      style={{
+        background: active
+          ? `radial-gradient(circle at 32% 28%, ${color}, ${color}bb)`
+          : "rgba(255,255,255,0.06)",
+        boxShadow: active ? `0 0 0 2px ${color}40, 0 3px 10px ${color}55` : "none",
+        color: active ? "#fff" : "var(--screen)",
+        opacity: active ? 1 : 0.55,
+      }}
+    >
+      <TabIcon href={href} />
+    </span>
+  );
+}
 
 function NavLink({
   item,
@@ -78,12 +157,15 @@ function NavLink({
   isActive: boolean;
   onClick?: () => void;
 }) {
+  const color = TYPE_COLOR[item.themeType];
+
   if (item.comingSoon) {
     return (
       <span
-        className="block cursor-not-allowed rounded-md px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-[color:var(--screen)]/30 sm:text-xs"
+        className="flex cursor-not-allowed items-center gap-2 rounded-full px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-[color:var(--screen)]/30 sm:text-xs"
         title="Coming soon"
       >
+        <NavIconBadge href={item.href} themeType={item.themeType} active={false} size="sm" />
         {item.label}
       </span>
     );
@@ -93,12 +175,13 @@ function NavLink({
       href={item.href}
       onClick={onClick}
       aria-current={isActive ? "page" : undefined}
-      className={`block rounded-md px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide transition-colors sm:text-xs ${
-        isActive
-          ? "bg-[color:var(--shell-accent)] text-white"
-          : "text-[color:var(--screen)]/70 hover:bg-white/10 hover:text-[color:var(--screen)]"
-      }`}
+      className="flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-[11px] font-medium uppercase tracking-wide transition-colors sm:text-xs"
+      style={{
+        background: isActive ? `${color}26` : "transparent",
+        color: isActive ? "var(--screen)" : "var(--screen)aa",
+      }}
     >
+      <NavIconBadge href={item.href} themeType={item.themeType} active={isActive} size="sm" />
       {item.label}
     </Link>
   );
@@ -109,14 +192,22 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-20 border-b border-black/20 bg-[color:var(--shell)]">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+    <header className="sticky top-0 z-20 overflow-hidden bg-gradient-to-b from-[#26282c] to-[color:var(--shell)]">
+      <HeaderEmblem />
+      <div className="relative z-10 mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <Link
           href="/"
           onClick={() => setMenuOpen(false)}
-          className="shrink-0 font-display text-lg font-semibold tracking-tight text-[color:var(--screen)]"
+          className="flex shrink-0 items-center gap-2.5 font-display text-lg font-semibold tracking-tight text-[color:var(--screen)]"
         >
-          Poké<span className="text-[color:var(--shell-accent)]">Help</span>
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[color:var(--accent-gold)] to-[color:var(--shell-accent)] shadow-[0_0_14px_rgba(255,199,44,0.45)]">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="8" stroke="#1f2124" strokeWidth="2" />
+              <path d="M2 10h16" stroke="#1f2124" strokeWidth="2" />
+              <circle cx="10" cy="10" r="2.5" fill="#1f2124" />
+            </svg>
+          </span>
+          Poké<span className="text-[color:var(--accent-gold)]">Help</span>
         </Link>
 
         {/* Desktop nav — wraps onto a second line if needed instead of scrolling */}
@@ -128,20 +219,53 @@ export default function Header() {
               </li>
             ))}
           </ul>
-        </nav>        
+        </nav>      
+        <div className="relative z-10 h-[3px] bg-gradient-to-r from-[color:var(--shell-accent)] via-[color:var(--accent-gold)] to-[color:var(--shell-accent)]" />
       </div>
 
       {/* Mobile/tablet dropdown */}
       {menuOpen && (
-        <nav aria-label="Main navigation (mobile)" className="border-t border-black/20 lg:hidden">
-          <ul className="mx-auto max-w-5xl space-y-1 px-4 py-3 sm:px-6">
-            {NAV_ITEMS.map((item) => (
-              <li key={item.href}>
-                <NavLink item={item} isActive={pathname === item.href} onClick={() => setMenuOpen(false)} />
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 lg:hidden"
+          onClick={() => setMenuOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md overflow-hidden rounded-t-2xl border-4 border-b-0 border-[color:var(--shell)] bg-[color:var(--shell)] pb-[env(safe-area-inset-bottom)]"
+          >
+            <div className="h-2 bg-gradient-to-r from-[color:var(--shell-accent)] via-[color:var(--accent-gold)] to-[color:var(--shell-accent)]" />
+            <div className="pattern-pokeball bg-[color:var(--screen)] p-4">
+              <p className="px-1 pb-2 text-xs font-medium uppercase tracking-wide text-[color:var(--ink)]/40">
+                More
+              </p>
+              <ul className="space-y-1.5">
+                {NAV_ITEMS.filter((item) => !MOBILE_TAB_HREFS.includes(item.href)).map((item) => (
+                  <li key={item.href}>
+                    {item.comingSoon ? (
+                      <span
+                        className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[color:var(--ink)]/30"
+                        title="Coming soon"
+                      >
+                        <NavIconBadge href={item.href} themeType={item.themeType} active={false} />
+                        {item.label}
+                        <span className="ml-auto text-[10px] uppercase tracking-wide">Soon</span>
+                      </span>
+                    ) : (
+                      <Link
+                        href={item.href}
+                        onClick={() => setMenuOpen(false)}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[color:var(--ink)] hover:bg-black/5"
+                      >
+                        <NavIconBadge href={item.href} themeType={item.themeType} active={pathname === item.href} />
+                        {item.label}
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Mobile bottom tab bar — replaces top-right hamburger on phones/tablets */}
@@ -156,12 +280,16 @@ export default function Header() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className={`flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium uppercase tracking-wide ${
-                      isActive ? "text-[color:var(--accent-gold)]" : "text-[color:var(--screen)]/60"
-                    }`}
+                    className="flex flex-col items-center gap-1 py-2.5"
                   >
-                    <TabIcon href={item.href} />
-                    {item.label.split(" ")[0]}
+                    <NavIconBadge href={item.href} themeType={item.themeType} active={isActive} />
+                    <span
+                      className={`text-[10px] font-medium uppercase tracking-wide ${
+                        isActive ? "text-[color:var(--screen)]" : "text-[color:var(--screen)]/50"
+                      }`}
+                    >
+                      {item.label.split(" ")[0]}
+                    </span>
                   </Link>
                 </li>
               );
