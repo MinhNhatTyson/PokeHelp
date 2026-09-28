@@ -10,6 +10,7 @@ import ComboResultCard from "@/components/ComboResultCard";
 import { getCommonSet } from "@/lib/data/commonSets";
 import { useBattleHistoryStore } from "@/lib/store/battleHistoryStore";
 import BattleHistoryLogger from "@/components/BattleHistoryLogger";
+import { TYPE_COLOR } from "@/lib/typeMeta";
 
 export default function BattleOptimizer() {
   const userSlots = useTeamStore((s) => s.slots);
@@ -101,11 +102,28 @@ export default function BattleOptimizer() {
       <div className="h-2 rounded-t-lg bg-[color:var(--shell-accent)]" />
 
       <div className="rounded-b-lg bg-[color:var(--screen)] p-6 sm:p-8">
-        <h1 className="font-display text-2xl sm:text-3xl text-[color:var(--ink)]">Battle optimizer</h1>
+        <h1 className="font-logo text-2xl sm:text-3xl text-[color:var(--ink)]">Battle optimizer</h1>
         <p className="mt-1 text-sm text-[color:var(--ink)]/70">
           Set your opponent&apos;s team preview, and we&apos;ll rank which 4 of your 6 to bring — based on
           type coverage and a curated set of ability signals (weather, Intimidate, key immunities).
         </p>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href="/speed"
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-white"
+            style={{ background: TYPE_COLOR.electric, color: "#1f2124" }}
+          >
+            ⚡ Speed Check
+          </Link>
+          <Link
+            href="/battle"
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-white"
+            style={{ background: TYPE_COLOR.fire }}
+          >
+            🔥 Live Battle
+          </Link>
+        </div>
 
         {!userReady && (
           <p className="mt-4 rounded-md bg-black/5 px-4 py-3 text-sm text-[color:var(--ink)]/70">
@@ -116,7 +134,7 @@ export default function BattleOptimizer() {
 
         <div className="mt-6">
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-lg text-[color:var(--ink)]">Opponent&apos;s team preview</h2>
+            <h2 className="font-heading text-lg text-[color:var(--ink)]">Opponent&apos;s team preview</h2>
             <button type="button" onClick={clearOpponentTeam} className="text-sm text-[color:var(--ink)]/50 hover:underline">
               Reset opponent
             </button>
@@ -128,7 +146,7 @@ export default function BattleOptimizer() {
 
         {results && (
           <div className="mt-8 border-t border-black/10 pt-6">
-            <h2 className="font-display text-lg text-[color:var(--ink)]">Recommended lineups</h2>
+            <h2 className="font-heading text-lg text-[color:var(--ink)]">Recommended lineups</h2>
             <p className="mt-1 text-xs text-[color:var(--ink)]/50">
               Heuristic score from type coverage + ability signals — not a moveset-level simulation. Use it as a starting point, not gospel.
             </p>

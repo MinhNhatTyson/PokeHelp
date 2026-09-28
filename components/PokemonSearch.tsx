@@ -68,7 +68,7 @@ export default function PokemonSearch() {
               <img src={pokemon.spriteUrl} alt={pokemon.name} className="h-16 w-16" />
             )}
             <div>
-              <p className="font-display capitalize">{pokemon.name}</p>
+              <p className="font-heading capitalize">{pokemon.name}</p>
               <div className="mt-1 flex gap-1">
                 {pokemon.types.map((t) => (
                   <TypeBadge key={t} type={t} size="sm" />

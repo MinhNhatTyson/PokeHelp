@@ -13,7 +13,7 @@ export default function ItemResultCard({ item }: { item: ItemDetail }) {
           />
         )}
         <div>
-          <h2 className="font-display text-2xl capitalize">{item.name.replace(/-/g, " ")}</h2>
+          <h2 className="font-heading text-2xl capitalize">{item.name.replace(/-/g, " ")}</h2>
           <span className="inline-block rounded-full bg-black/20 px-2.5 py-0.5 text-xs font-medium capitalize opacity-80">
             {item.category.replace(/-/g, " ")}
           </span>

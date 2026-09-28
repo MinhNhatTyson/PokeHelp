@@ -50,7 +50,7 @@ export default function BattleGuidance() {
       <div className="w-full max-w-lg rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
         <div className="h-2 rounded-t-lg bg-[color:var(--shell-accent)]" />
         <div className="rounded-b-lg bg-[color:var(--screen)] p-6 sm:p-8">
-          <h1 className="font-display text-2xl text-[color:var(--ink)]">Live battle guidance</h1>
+          <h1 className="font-logo text-2xl text-[color:var(--ink)]">Live battle guidance</h1>
           <p className="mt-1 text-sm text-[color:var(--ink)]/70">
             Pick who you&apos;re bringing, set your leads, and log each turn for quick advice on the next one.
           </p>
@@ -142,7 +142,7 @@ export default function BattleGuidance() {
       <div className="h-2 rounded-t-lg bg-[color:var(--shell-accent)]" />
       <div className="rounded-b-lg bg-[color:var(--screen)] p-5 sm:p-6">
         <div className="flex items-center justify-between">
-          <h1 className="font-display text-xl text-[color:var(--ink)]">Turn {turnNumber}</h1>
+          <h1 className="font-heading text-xl text-[color:var(--ink)]">Turn {turnNumber}</h1>
           <button type="button" onClick={resetSession} className="text-xs text-[color:var(--ink)]/50 hover:underline">
             End session
           </button>

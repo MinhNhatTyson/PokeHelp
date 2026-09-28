@@ -1,13 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --background: #16181b;
+  --background: #1c1e22;
   --foreground: #ededed;
   --shell: #1f2124;
   --shell-accent: #d6362b;
   --screen: #edebe2;
   --ink: #22262b;
   --accent-gold: #ffc72c;
+}
+
+.app-backdrop {
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(214, 54, 43, 0.14), transparent 60%),
+    radial-gradient(900px 500px at 100% 110%, rgba(255, 199, 44, 0.08), transparent 55%),
+    var(--background);
 }
 
 @theme inline {
@@ -28,11 +35,34 @@
 .font-display {
   font-family: var(--font-display);
 }
+.font-logo {
+  font-family: var(--font-logo), var(--font-display), sans-serif;
+}
+.font-heading {
+  font-family: var(--font-heading), var(--font-display), sans-serif;
+}
+.font-pixel {
+  font-family: var(--font-pixel), monospace;
+  letter-spacing: 0.02em;
+}
+.font-dex {
+  font-family: var(--font-dex), var(--font-pixel), monospace;
+}
+.font-unown {
+  font-family: var(--font-unown), sans-serif;
+}
+
+.font-pixelmon-decorative {
+  font-family: var(--font-pixelmon-a), var(--font-pixelmon-b);
+  user-select: none;
+}
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(214, 54, 43, 0.14), transparent 60%),
+    radial-gradient(900px 500px at 100% 110%, rgba(255, 199, 44, 0.08), transparent 55%),
+    var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
 
 .card-holo {

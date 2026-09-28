@@ -7,8 +7,6 @@ import { PokemonTypeName } from "@/lib/types";
 import { TYPE_COLOR } from "@/lib/typeMeta";
 import { AnimatePresence, motion } from "motion/react";
 
-// Add near the top, alongside NAV_ITEMS
-const MOBILE_TAB_HREFS = ["/", "/team", "/optimizer", "/battle"];
 
 function TabIcon({ href }: { href: string }) {
   const common = { width: 20, height: 20, viewBox: "0 0 20 20", fill: "none" as const };
@@ -112,12 +110,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Type & Pokédex", href: "/", themeType: "grass", mobileLabel: "Dex" },
   { label: "Items", href: "/items", themeType: "poison" },
   { label: "Team Builder", href: "/team", themeType: "water", mobileLabel: "Team" },
-  { label: "Speed Check", href: "/speed", themeType: "electric" },
   { label: "Battle Optimizer", href: "/optimizer", themeType: "fighting", mobileLabel: "Matchups" },
-  { label: "Live Battle", href: "/battle", themeType: "fire", mobileLabel: "Live" },
-  { label: "Battle History", href: "/history", themeType: "psychic" },
+  { label: "Battle History", href: "/history", themeType: "psychic", mobileLabel: "History" },
   { label: "Trainer Roster", href: "/trainers", themeType: "dragon", comingSoon: true },
 ];
+
+const MOBILE_TAB_HREFS = ["/", "/items", "/team", "/optimizer", "/history"];
 
 function NavIconBadge({
   href,
@@ -200,7 +198,7 @@ export default function Header() {
         <Link
           href="/"
           onClick={() => setMenuOpen(false)}
-          className="flex shrink-0 items-center gap-2.5 font-display text-lg font-semibold tracking-tight text-[color:var(--screen)]"
+          className="flex shrink-0 items-center gap-2.5 font-logo text-lg font-semibold tracking-tight text-[color:var(--screen)]"
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[color:var(--accent-gold)] to-[color:var(--shell-accent)] shadow-[0_0_14px_rgba(255,199,44,0.45)]">
             <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
@@ -256,7 +254,7 @@ export default function Header() {
                       <circle cx="10" cy="10" r="2.5" fill="#1f2124" />
                     </svg>
                   </span>
-                  <p className="font-display text-base text-[color:var(--ink)]">More features</p>
+                  <p className="font-heading text-base text-[color:var(--ink)]">More features</p>
                 </div>
                 <ul className="space-y-1.5">
                   {NAV_ITEMS.filter((item) => !MOBILE_TAB_HREFS.includes(item.href)).map((item) => (
@@ -294,7 +292,7 @@ export default function Header() {
           aria-label="Primary navigation (mobile)"
           className="fixed inset-x-0 bottom-0 z-30 border-t border-black/20 bg-[color:var(--shell)] pb-[env(safe-area-inset-bottom)] lg:hidden"
         >
-          <ul className="grid grid-cols-5">
+          <ul className="grid grid-cols-6">
             {NAV_ITEMS.filter((item) => MOBILE_TAB_HREFS.includes(item.href)).map((item) => {
               const isActive = pathname === item.href;
               return (

@@ -57,7 +57,7 @@ export default function ItemSearchExplorer() {
       <div className="h-2 rounded-t-lg bg-[color:var(--shell-accent)]" />
 
       <div className="rounded-b-lg bg-[color:var(--screen)] p-6 sm:p-8">
-        <h1 className="font-display text-2xl sm:text-3xl text-[color:var(--ink)]">Item lookup</h1>
+        <h1 className="font-logo text-2xl sm:text-3xl text-[color:var(--ink)]">Item lookup</h1>
         <p className="mt-1 text-sm text-[color:var(--ink)]/70">Search for a held item, Poké Ball, medicine, or key item.</p>
 
         <div className="relative mt-5">

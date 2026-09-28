@@ -56,7 +56,7 @@ function EffectGroup({
   return (
     <div className="overflow-hidden rounded-lg border border-black/10">
       <div className={`effect-banner ${TONE_CLASS[tone]}`}>
-        <span>{title}</span><span className="opacity-90">{mult}</span>
+        <span>{title}</span><span className="font-pixel opacity-90">{mult}</span>
       </div>
       <div className="flex flex-wrap gap-2 bg-black/5 p-3">
         {types.length > 0
@@ -135,7 +135,7 @@ export default function TypeMatchupExplorer() {
       <div className="h-2 rounded-t-lg bg-[color:var(--shell-accent)]" />
 
       <div className="rounded-b-lg bg-[color:var(--screen)] p-6 sm:p-8">
-        <h1 className="font-display text-2xl sm:text-3xl text-[color:var(--ink)]">
+        <h1 className="font-logo text-2xl sm:text-3xl text-[color:var(--ink)]">
           Type &amp; Pokémon lookup
         </h1>
         <p className="mt-1 text-sm text-[color:var(--ink)]/70">
@@ -244,7 +244,7 @@ export default function TypeMatchupExplorer() {
             <div className="pokecard mt-6 overflow-hidden" style={{ borderColor: TYPE_COLOR[selectedType] }}>
               <div className="grid divide-y divide-black/10 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
                 <section>
-                  <h2 className="px-4 pt-3 font-display text-base text-[color:var(--ink)]">Attacking</h2>
+                  <h2 className="px-4 pt-3 font-heading text-base text-[color:var(--ink)]">Attacking</h2>
                   <div className="space-y-3 p-4">
                     <EffectGroup tone="super" title="Super effective" mult="×2" types={matchup.attack.superEffectiveAgainst} onPick={handleSelectType} />
                     <EffectGroup tone="not-very" title="Not very effective" mult="×½" types={matchup.attack.notVeryEffectiveAgainst} onPick={handleSelectType} />
@@ -252,7 +252,7 @@ export default function TypeMatchupExplorer() {
                   </div>
                 </section>
                 <section>
-                  <h2 className="px-4 pt-3 font-display text-base text-[color:var(--ink)]">Defending</h2>
+                  <h2 className="px-4 pt-3 font-heading text-base text-[color:var(--ink)]">Defending</h2>
                   <div className="space-y-3 p-4">
                     <EffectGroup tone="weak" title="Weak to" mult="×2" types={matchup.defense.weakTo} onPick={handleSelectType} />
                     <EffectGroup tone="resist" title="Resists" mult="×½" types={matchup.defense.resists} onPick={handleSelectType} />

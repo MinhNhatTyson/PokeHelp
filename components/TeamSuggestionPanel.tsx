@@ -85,7 +85,7 @@ export default function TeamSuggestionPanel() {
             disabled={adopting}
             className="flex flex-wrap items-center gap-2 rounded-lg border border-[color:var(--accent-gold)] bg-white px-3 py-2 text-left hover:bg-black/5 disabled:opacity-50"
           >
-            <span className="font-display text-base capitalize text-[color:var(--ink)]">
+            <span className="font-heading text-base capitalize text-[color:var(--ink)]">
               {adopting ? "Adding…" : suggestion.species}
             </span>
             {suggestion.itemName && (

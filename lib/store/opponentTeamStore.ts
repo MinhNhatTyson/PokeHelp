@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { PokemonDetail, OpponentSlot } from "@/lib/types";
+import { persist } from "zustand/middleware";
 
 export const OPPONENT_TEAM_SIZE = 6;
 const EMPTY_SLOT: OpponentSlot = { pokemon: null, abilityName: null, itemName: null };
@@ -14,39 +15,46 @@ interface OpponentTeamState {
   clearTeam: () => void;
 }
 
-export const useOpponentTeamStore = create<OpponentTeamState>((set) => ({
-  slots: Array.from({ length: OPPONENT_TEAM_SIZE }, () => ({ ...EMPTY_SLOT })),
-  setSlotPokemon: (index, pokemon) =>
-    set((state) => {
-      const slots = [...state.slots];
-      slots[index] = { pokemon, abilityName: null, itemName: null, megaFormDetail: null };
-      return { slots };
-    }), 
-  setSlotItem: (index, itemName) =>
-    set((state) => {
-      const slots = [...state.slots];
-      slots[index] = { ...slots[index], itemName };
-      return { slots };
+export const useOpponentTeamStore = create<OpponentTeamState>()(
+  persist(
+    (set) => ({
+      slots: Array.from({ length: OPPONENT_TEAM_SIZE }, () => ({ ...EMPTY_SLOT })),
+      setSlotPokemon: (index, pokemon) =>
+        set((state) => {
+          const slots = [...state.slots];
+          slots[index] = { pokemon, abilityName: null, itemName: null, megaFormDetail: null };
+          return { slots };
+        }), 
+      setSlotItem: (index, itemName) =>
+        set((state) => {
+          const slots = [...state.slots];
+          slots[index] = { ...slots[index], itemName };
+          return { slots };
+        }),
+      setSlotMegaFormDetail: (index, detail) =>
+        set((state) => {
+          const slots = [...state.slots];
+          slots[index] = { ...slots[index], megaFormDetail: detail };
+          return { slots };
+        }),
+      setSlotAbility: (index, abilityName) =>
+        set((state) => {
+          const slots = [...state.slots];
+          slots[index] = { ...slots[index], abilityName };
+          return { slots };
+        }),
+      clearSlot: (index) =>
+        set((state) => {
+          const slots = [...state.slots];
+          slots[index] = { ...EMPTY_SLOT };
+          return { slots };
+        }),
+      clearTeam: () =>
+        set({ slots: Array.from({ length: OPPONENT_TEAM_SIZE }, () => ({ ...EMPTY_SLOT })) }),
     }),
-  setSlotMegaFormDetail: (index, detail) =>
-    set((state) => {
-      const slots = [...state.slots];
-      slots[index] = { ...slots[index], megaFormDetail: detail };
-      return { slots };
-    }),
-  setSlotAbility: (index, abilityName) =>
-    set((state) => {
-      const slots = [...state.slots];
-      slots[index] = { ...slots[index], abilityName };
-      return { slots };
-    }),
-  clearSlot: (index) =>
-    set((state) => {
-      const slots = [...state.slots];
-      slots[index] = { ...EMPTY_SLOT };
-      return { slots };
-    }),
-  clearTeam: () =>
-    set({ slots: Array.from({ length: OPPONENT_TEAM_SIZE }, () => ({ ...EMPTY_SLOT })) }),
-}));
+    {
+      name: "pokehelp-opponent-team" 
+    }
+  )
+);
 

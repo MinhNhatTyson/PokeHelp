@@ -39,7 +39,7 @@ export default function TeamBuilder() {
       <div className="rounded-b-lg bg-[color:var(--screen)] p-6 sm:p-8">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="font-display text-2xl sm:text-3xl text-[color:var(--ink)]">Team builder</h1>
+            <h1 className="font-logo text-2xl sm:text-3xl text-[color:var(--ink)]">Team builder</h1>
             <p className="mt-1 text-sm text-[color:var(--ink)]/70">Fill all 6 slots — Pokémon, item, ability — to see your team&apos;s coverage.</p>
           </div>
           <button type="button" onClick={clearTeam} className="shrink-0 text-sm text-[color:var(--ink)]/50 hover:underline">

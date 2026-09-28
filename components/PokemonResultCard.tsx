@@ -40,8 +40,8 @@ export default function PokemonResultCard({
     <div className="pokecard" style={{ borderColor: frameColor }}>
       <div className="flex items-center justify-between gap-2 px-4 pt-3">
         <div>
-          <p className="text-xs uppercase opacity-50">#{String(pokemon.dexNumber).padStart(4, "0")}</p>
-          <h2 className="font-display text-xl capitalize text-[color:var(--ink)]">{pokemon.name}</h2>
+          <p className="font-dex text-xs uppercase opacity-50">#{String(pokemon.dexNumber).padStart(4, "0")}</p>
+          <h2 className="font-heading text-xl capitalize text-[color:var(--ink)]">{pokemon.name}</h2>
         </div>
         <div className="flex gap-1">
           {pokemon.types.map((t) => <TypeBadge key={t} type={t} size="sm" />)}
@@ -124,7 +124,7 @@ export default function PokemonResultCard({
       )}
 
       <div className="mt-6">
-        <h3 className="font-display text-base">Base stats</h3>
+        <h3 className="font-heading text-base">Base stats</h3>
         <div className="mt-2 space-y-1.5">
           {pokemon.stats.map((s) => (
             <div key={s.name} className="flex items-center gap-2 text-xs">
@@ -142,7 +142,7 @@ export default function PokemonResultCard({
       </div>
 
       <div className="mt-6 space-y-2">
-        <h3 className="font-display text-base text-[color:var(--ink)]">Type defenses</h3>
+        <h3 className="font-heading text-base text-[color:var(--ink)]">Type defenses</h3>
         {defense.quad.length > 0 && (
           <div className="overflow-hidden rounded-lg border border-black/10">
             <div className="effect-banner effect-banner--weak"><span>4× Weak</span><span className="opacity-90">×4</span></div>
@@ -175,7 +175,7 @@ export default function PokemonResultCard({
       </div>
 
       <div className="mt-6">
-        <h3 className="font-display text-base">Offensive coverage</h3>
+        <h3 className="font-heading text-base">Offensive coverage</h3>
         <p className="text-xs opacity-50">Best-case effectiveness using either of this Pokémon&apos;s types</p>
         <div className="mt-2 space-y-2">
           {[
@@ -201,7 +201,7 @@ export default function PokemonResultCard({
 
       {pokemon.evolutionChain.length > 1 && (
         <div className="mt-6">
-          <h3 className="font-display text-base">Evolution chain</h3>
+          <h3 className="font-heading text-base">Evolution chain</h3>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm capitalize">
             {pokemon.evolutionChain.map((stage, i) => (
               <span key={i} className="flex items-center gap-2">

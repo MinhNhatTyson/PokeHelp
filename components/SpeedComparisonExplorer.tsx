@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { fetchPokemonNameList, fetchPokemonDetail } from "@/lib/data/fetchAndCache";
-import { PokemonDetail, PokemonNameEntry } from "@/lib/types";
+import { OpponentSlot, PokemonDetail, PokemonNameEntry } from "@/lib/types";
 import { calculateEffectiveSpeed } from "@/lib/logic/statCalc";
 import { getSpeedVariants } from "@/lib/logic/speedVariants";
 import TypeBadge from "@/components/TypeBadge";
+import Link from "next/link";
+import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
 
 const MAX_SUGGESTIONS = 8;
 
@@ -22,6 +24,18 @@ export default function SpeedComparisonExplorer() {
   const [opponent, setOpponent] = useState<PokemonDetail | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  const opponentSlots = useOpponentTeamStore((s) => s.slots);
+  const scoutedOpponents = opponentSlots.filter((s) => s.pokemon);
+
+  function handleSelectScouted(slot: OpponentSlot) {
+    if (!slot.pokemon) return;
+    // If a Mega is assumed, use its stats and types. The base name stays so the
+    // curated common-set lookup in getSpeedVariants still matches.
+    const effective = slot.megaFormDetail ?? slot.pokemon;
+    setOpponent({ ...slot.pokemon, stats: effective.stats, types: effective.types });
+    setStatus("idle");
+  }
 
   useEffect(() => { fetchPokemonNameList().then(setNameList); }, []);
 
@@ -73,7 +87,7 @@ export default function SpeedComparisonExplorer() {
     <div className="w-full max-w-3xl rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
       <div className="h-2 rounded-t-lg bg-[color:var(--shell-accent)]" />
       <div className="rounded-b-lg bg-[color:var(--screen)] p-6 sm:p-8">
-        <h1 className="font-display text-2xl sm:text-3xl text-[color:var(--ink)]">Speed check</h1>
+        <h1 className="font-logo text-2xl sm:text-3xl text-[color:var(--ink)]">Speed check</h1>
         <p className="mt-1 text-sm text-[color:var(--ink)]/70">
           Compare one of your built mons against likely Speed spreads for any Pokémon.
         </p>
@@ -102,6 +116,37 @@ export default function SpeedComparisonExplorer() {
           </div>
         )}
 
+        <div className="mt-5">
+          <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Opponent&apos;s team</p>
+          {scoutedOpponents.length === 0 ? (
+            <p className="mt-1.5 rounded-md bg-black/5 px-4 py-3 text-sm text-[color:var(--ink)]/70">
+              No opponent scouted yet. Set their team preview in{" "}
+              <Link href="/optimizer" className="underline underline-offset-2">Battle Optimizer</Link>, or search any Pokémon below.
+            </p>
+          ) : (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {scoutedOpponents.map((s) => (
+                <button
+                  key={s.pokemon!.name}
+                  type="button"
+                  onClick={() => handleSelectScouted(s)}
+                  className={`flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-sm capitalize ${
+                    opponent?.name === s.pokemon!.name
+                      ? "bg-[color:var(--shell-accent)] text-white"
+                      : "bg-black/10 text-[color:var(--ink)]"
+                  }`}
+                >
+                  {s.pokemon!.spriteUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={s.pokemon!.spriteUrl} alt="" className="h-6 w-6" />
+                  )}
+                  {s.pokemon!.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div ref={containerRef} className="relative mt-5">
           <label htmlFor="speed-search" className="sr-only">Search opponent Pokémon</label>
           <input
@@ -109,7 +154,7 @@ export default function SpeedComparisonExplorer() {
             value={query}
             onChange={(e) => { setQuery(e.target.value); setShowDropdown(true); }}
             onFocus={() => setShowDropdown(true)}
-            placeholder="Search opponent's Pokémon…"
+            placeholder="Or search any other Pokémon…"
             autoComplete="off"
             className="w-full rounded-lg border border-black/10 bg-white px-4 py-2.5 text-[color:var(--ink)] outline-none placeholder:text-black/40 focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
           />
