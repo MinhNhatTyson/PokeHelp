@@ -97,7 +97,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
           />
           {pokeLoading && <p className="mt-1 text-xs opacity-60">Loading…</p>}
           {showPokeDropdown && pokeMatches.length > 0 && (
-            <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-black/10 bg-white p-1 shadow-lg">
+            <div className="absolute z-10 mt-1 max-h-[40vh] w-full overflow-y-auto rounded-md border border-black/10 bg-white p-1 shadow-lg">
               {pokeMatches.map((p) => (
                 <button
                   key={p.name}
@@ -137,7 +137,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
               className="mt-1 w-full rounded-md border border-black/10 px-3 py-2 text-sm capitalize text-[color:var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
             />
             {showItemDropdown && itemMatches.length > 0 && (
-              <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-black/10 bg-white p-1 shadow-lg">
+              <div className="absolute z-10 mt-1 max-h-[40vh] w-full overflow-y-auto rounded-md border border-black/10 bg-white p-1 shadow-lg">
                 {itemMatches.map((i) => (
                   <button
                     key={i.name}

@@ -57,7 +57,7 @@ function EffectGroup({
   return (
     <div className="overflow-hidden rounded-lg border border-black/10">
       <div className={`effect-banner ${TONE_CLASS[tone]}`}>
-        <span>{title}</span><span className="font-pixel opacity-90">{mult}</span>
+        <span>{title}</span><span className="font-dex opacity-90">{mult}</span>
       </div>
       <div className="flex flex-wrap gap-2 bg-black/5 p-3">
         {types.length > 0

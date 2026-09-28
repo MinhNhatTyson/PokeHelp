@@ -12,6 +12,8 @@ const EMPTY_SLOT: TeamSlot = {
 interface TeamState {
   slots: TeamSlot[];
   teamStrategy: string;
+  activeTeamId: string | null;
+  setActiveTeamId: (id: string | null) => void;
   setSlotPokemon: (index: number, pokemon: PokemonDetail | null) => void;
   setSlotItem: (index: number, itemName: string | null) => void;
   setSlotAbility: (index: number, abilityName: string | null) => void;
@@ -29,6 +31,8 @@ export const useTeamStore = create<TeamState>()(
   persist(
     (set) => ({
       slots: Array.from({ length: TEAM_SIZE }, () => ({ ...EMPTY_SLOT })),
+      activeTeamId: null,
+      setActiveTeamId: (activeTeamId) => set({ activeTeamId }),
       teamStrategy: "",
       setSlotPokemon: (index, pokemon) =>
         set((state) => {
@@ -64,7 +68,7 @@ export const useTeamStore = create<TeamState>()(
           slots[index] = { ...EMPTY_SLOT, moves: [null, null, null, null] };
           return { slots };
         }),
-      clearTeam: () => set({ slots: Array.from({ length: TEAM_SIZE }, () => ({ ...EMPTY_SLOT, moves: [null, null, null, null] })), teamStrategy: "" }),
+      clearTeam: () => set({ slots: Array.from({ length: TEAM_SIZE }, () => ({ ...EMPTY_SLOT, moves: [null, null, null, null] })), teamStrategy: "", activeTeamId: null }),
       loadSlots: (slots) =>
         set({
           slots: slots.map((s) => ({
