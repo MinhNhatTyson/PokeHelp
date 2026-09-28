@@ -1,8 +1,8 @@
-import SpeedComparisonExplorer from "@/components/SpeedComparisonExplorer";
+﻿import SpeedComparisonExplorer from "@/components/SpeedComparisonExplorer";
 
 export default function SpeedPage() {
   return (
-    <div className="flex flex-1 items-center justify-center app-backdrop px-4 py-16">
+    <div className="flex flex-1 items-center justify-center px-4 py-16">
       <SpeedComparisonExplorer />
     </div>
   );

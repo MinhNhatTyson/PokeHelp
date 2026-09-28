@@ -219,9 +219,9 @@ export default function Header() {
               </li>
             ))}
           </ul>
-        </nav>      
-        <div className="relative z-10 h-[3px] bg-gradient-to-r from-[color:var(--shell-accent)] via-[color:var(--accent-gold)] to-[color:var(--shell-accent)]" />
+        </nav>              
       </div>
+      <div className="relative z-10 h-[3px] bg-gradient-to-r from-[color:var(--shell-accent)] via-[color:var(--accent-gold)] to-[color:var(--shell-accent)]" />
 
       {/* Mobile/tablet dropdown */}
       <AnimatePresence>

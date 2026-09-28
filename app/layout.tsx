@@ -4,6 +4,7 @@ import "./globals.css";
 import Header from "@/components/Header";
 import PageTransition from "@/components/PageTransition";
 import localFont from "next/font/local";
+import AppBackground from "@/components/AppBackground";
 
 const pokemonSolid = localFont({
   src: "../fonts/pokemon-solid-font/PokemonSolidNormal-xyWR.ttf",
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${spaceGrotesk.variable} ${inter.variable} ${pokemonSolid.variable} ${omegaRuby.variable} ${pokemonPixels.variable} ${lmsPokedex.variable} ${unownFont.variable} ${pokemonPixelsSpritesA.variable} ${pokemonPixelsSpritesB.variable} h-full antialiased`}
     >
       <body className="min-h-full flex w-full flex-col">
+        <AppBackground />
         <Header />
         <main className="flex w-full flex-1 flex-col pb-20 lg:pb-0">
           <PageTransition>{children}</PageTransition>

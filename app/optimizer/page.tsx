@@ -1,8 +1,8 @@
-import BattleOptimizer from "@/components/BattleOptimizer";
+﻿import BattleOptimizer from "@/components/BattleOptimizer";
 
 export default function OptimizerPage() {
   return (
-    <div className="flex flex-1 items-center justify-center app-backdrop px-4 py-16">
+    <div className="flex flex-1 items-center justify-center px-4 py-16">
       <BattleOptimizer />
     </div>
   );

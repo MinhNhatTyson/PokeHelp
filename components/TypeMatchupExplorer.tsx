@@ -9,6 +9,7 @@ import TypeBadge from "@/components/TypeBadge";
 import PokemonResultCard from "@/components/PokemonResultCard";
 import TypePip from "./TypePip";
 import TypeChip from "./TypeChip";
+import { useBackdropStore } from "@/lib/store/backdropStore";
 
 function BadgeRow({
   types,
@@ -75,6 +76,12 @@ export default function TypeMatchupExplorer() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [nameList, setNameList] = useState<PokemonNameEntry[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const setBackdrop = useBackdropStore((s) => s.setOverride);
+
+  useEffect(() => {
+    setBackdrop(selectedPokemon ? selectedPokemon.types[0] : selectedType);
+    return () => setBackdrop(null);
+  }, [selectedType, selectedPokemon, setBackdrop]);
 
   useEffect(() => {
     fetchPokemonNameList().then(setNameList);
