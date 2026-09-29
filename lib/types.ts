@@ -164,6 +164,7 @@ export interface SavedTeam {
   name: string;
   savedAt: number;
   slots: TeamSlot[];
+  teamStrategy: string;
 }
 
 export interface FieldState {

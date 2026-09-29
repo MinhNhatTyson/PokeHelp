@@ -26,7 +26,7 @@ export default function TeamBuilder() {
   const [showImport, setShowImport] = useState(false);
 
   function startNewTeam(saveFirst: boolean) {
-    if (saveFirst && isComplete) saveTeam(saveName, slots);
+    if (saveFirst && isComplete) saveTeam(saveName, slots, teamStrategy);
     clearTeam();
     setSaveName("");
     setConfirmNew(false);
@@ -50,9 +50,9 @@ export default function TeamBuilder() {
   function handleSave() {
     if (!isComplete) return;
     if (activeTeamId) {
-      updateTeam(activeTeamId, saveName || activeTeamName || "Untitled team", slots);
+      updateTeam(activeTeamId, saveName || activeTeamName || "Untitled team", slots, teamStrategy);
     } else {
-      saveTeam(saveName, slots);
+      saveTeam(saveName, slots, teamStrategy);
     }
     setSaveName("");
   }
@@ -154,7 +154,7 @@ export default function TeamBuilder() {
                 <div key={t.id} className="flex items-center gap-1 rounded-full border border-black/10 bg-white pl-3 pr-1 py-1 text-sm">
                   <button
                     type="button"
-                    onClick={() => { loadSlots(t.slots); setActiveTeamId(t.id); setSaveName(t.name); }}
+                    onClick={() => { loadSlots(t.slots, t.teamStrategy); setActiveTeamId(t.id); setSaveName(t.name); }}
                     className="text-[color:var(--ink)] hover:underline"
                   >
                     {t.name}

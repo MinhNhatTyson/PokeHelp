@@ -73,11 +73,11 @@ export default function TeamSlotCard({ index, onOpen }: { index: number; onOpen:
           </div>
           <div className="flex justify-between gap-2">
             <dt className="opacity-60">Moves</dt>
-            <dd className="font-dex">{chosenMoves}/4</dd>
+            <dd className="font-semibold tabular-nums text-[color:var(--ink)]">{chosenMoves}/4</dd>
           </div>
           <div className="flex justify-between gap-2">
             <dt className="opacity-60">Speed</dt>
-            <dd className="font-dex">{speed}</dd>
+            <dd className="font-semibold tabular-nums text-[color:var(--ink)]">{speed}</dd>
           </div>
         </dl>
 
@@ -87,6 +87,13 @@ export default function TeamSlotCard({ index, onOpen }: { index: number; onOpen:
           </p>
         )}
       </div>
+
+      <span className="rounded-md bg-[color:var(--shell-accent)] px-2 py-1 font-pixel text-[10px] uppercase tracking-[0.1em] text-white">
+        SLOT {String(index + 1).padStart(2, "0")}
+      </span>
+      <span className="rounded-md border border-black/10 bg-white/70 px-2 py-1 font-pixel text-[10px] tracking-[0.08em] text-[color:var(--ink)]/70">
+        #{String(mon.dexNumber).padStart(4, "0")}
+      </span>
     </button>
   );
 }

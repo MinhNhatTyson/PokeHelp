@@ -22,7 +22,7 @@ interface TeamState {
   setTeamStrategy: (text: string) => void;
   clearSlot: (index: number) => void;
   clearTeam: () => void;
-  loadSlots: (slots: TeamSlot[]) => void;
+  loadSlots: (slots: TeamSlot[], teamStrategy?: string) => void;
   setSlotNature: (index: number, nature: NatureName | null) => void;
   setSlotSpeedEv: (index: number, speedEv: number) => void;
 }
@@ -69,7 +69,7 @@ export const useTeamStore = create<TeamState>()(
           return { slots };
         }),
       clearTeam: () => set({ slots: Array.from({ length: TEAM_SIZE }, () => ({ ...EMPTY_SLOT, moves: [null, null, null, null] })), teamStrategy: "", activeTeamId: null }),
-      loadSlots: (slots) =>
+      loadSlots: (slots, teamStrategy) =>
         set({
           slots: slots.map((s) => ({
             ...s,
@@ -79,6 +79,7 @@ export const useTeamStore = create<TeamState>()(
             speedEv: s.speedEv ?? 0,
             pokemon: s.pokemon ? { ...s.pokemon, moves: s.pokemon.moves ?? [] } : s.pokemon,
           })),
+          teamStrategy: teamStrategy ?? "",
         }),
       setSlotNotes: (index, roleNotes) =>
         set((state) => {
