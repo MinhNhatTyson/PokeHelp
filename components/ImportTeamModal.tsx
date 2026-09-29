@@ -128,14 +128,14 @@ export default function ImportTeamModal({ open, onClose }: { open: boolean; onCl
               )}
             </div>
             <div className="flex shrink-0 gap-2 bg-[color:var(--screen)] p-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <button type="button" onClick={onClose} className="flex-1 rounded-md bg-black/10 px-3 py-2.5 text-sm font-medium text-[color:var(--ink)]">
+              <button type="button" onClick={onClose} className="flex-1 rounded-md bg-black/10 px-3 py-2.5 text-sm font-medium text-[color:var(--ink)] btn-tactile">
                 {report ? "Close" : "Cancel"}
               </button>
               <button
                 type="button"
                 onClick={handleImport}
                 disabled={!text.trim() || status === "loading"}
-                className="flex-1 rounded-md bg-[color:var(--shell-accent)] px-3 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex-1 rounded-md bg-[color:var(--shell-accent)] px-3 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 btn-tactile btn-glow-accent"
               >
                 {status === "loading" ? "Importing…" : "Import team"}
               </button>

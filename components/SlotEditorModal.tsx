@@ -52,7 +52,7 @@ export default function SlotEditorModal({ index, onClose }: { index: number | nu
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full rounded-md bg-[color:var(--shell-accent)] px-3 py-2.5 text-sm font-medium text-white"
+                className="w-full rounded-md bg-[color:var(--shell-accent)] px-3 py-2.5 text-sm font-medium text-white btn-tactile btn-glow-accent"
               >
                 Done
               </button>

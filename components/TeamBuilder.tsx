@@ -71,7 +71,7 @@ export default function TeamBuilder() {
             <button
               type="button"
               onClick={() => setShowImport(true)}
-              className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm font-medium text-[color:var(--ink)] hover:bg-black/5"
+              className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm font-medium text-[color:var(--ink)] hover:bg-black/5 btn-tactile"
             >
               Import
             </button>
@@ -79,7 +79,7 @@ export default function TeamBuilder() {
               type="button"
               onClick={() => setConfirmNew(true)}
               disabled={!hasContent}
-              className="rounded-md bg-[color:var(--shell-accent)] px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-md bg-[color:var(--shell-accent)] px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40 btn-tactile btn-glow-accent"
             >
               + New team
             </button>
@@ -125,7 +125,7 @@ export default function TeamBuilder() {
             type="button"
             onClick={handleSave}
             disabled={!isComplete}
-            className="shrink-0 rounded-md bg-[color:var(--shell-accent)] px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+            className="shrink-0 rounded-md bg-[color:var(--shell-accent)] px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40 btn-tactile btn-glow-accent"
           >
             {activeTeamId ? "Update team" : "Save team"}
           </button>

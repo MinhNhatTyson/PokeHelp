@@ -136,3 +136,29 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Ccircle cx='30' cy='30' r='22' fill='none' stroke='%2322262b' stroke-opacity='0.06' stroke-width='2'/%3E%3Cline x1='8' y1='30' x2='52' y2='30' stroke='%2322262b' stroke-opacity='0.06' stroke-width='2'/%3E%3Ccircle cx='30' cy='30' r='6' fill='none' stroke='%2322262b' stroke-opacity='0.06' stroke-width='2'/%3E%3C/svg%3E");
   background-size: 60px 60px;
 }
+
+.btn-tactile {
+  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+}
+.btn-tactile:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+.btn-tactile:active:not(:disabled) {
+  transform: translateY(0) scale(0.96);
+  filter: brightness(0.95);
+}
+.btn-tactile:disabled {
+  filter: grayscale(0.4);
+}
+
+.btn-glow-accent:hover:not(:disabled) {
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--shell-accent) 55%, transparent);
+}
+.btn-glow-gold:hover:not(:disabled) {
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-gold) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-tactile, .btn-tactile:hover, .btn-tactile:active { transform: none; transition: none; }
+}

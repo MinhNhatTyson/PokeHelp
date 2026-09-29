@@ -44,8 +44,16 @@ export default function TeamSlotCard({ index, onOpen }: { index: number; onOpen:
       style={{ borderColor: frame }}
     >
       <div className="flex items-center justify-between px-3 pt-2">
-        <span className="font-dex text-xs uppercase text-[color:var(--ink)]/50">Slot {index + 1}</span>
-        <span className="font-dex text-xs text-[color:var(--ink)]/50">#{String(mon.dexNumber).padStart(4, "0")}</span>
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[color:var(--ink)]/40">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: frame }} />
+          Slot {index + 1}
+        </span>
+        <span
+          className="font-dex rounded-full px-1.5 py-0.5 text-[10px] leading-none text-white"
+          style={{ backgroundColor: frame }}
+        >
+          #{String(mon.dexNumber).padStart(4, "0")}
+        </span>
       </div>
 
       <div
@@ -87,13 +95,6 @@ export default function TeamSlotCard({ index, onOpen }: { index: number; onOpen:
           </p>
         )}
       </div>
-
-      <span className="rounded-md bg-[color:var(--shell-accent)] px-2 py-1 font-pixel text-[10px] uppercase tracking-[0.1em] text-white">
-        SLOT {String(index + 1).padStart(2, "0")}
-      </span>
-      <span className="rounded-md border border-black/10 bg-white/70 px-2 py-1 font-pixel text-[10px] tracking-[0.08em] text-[color:var(--ink)]/70">
-        #{String(mon.dexNumber).padStart(4, "0")}
-      </span>
     </button>
   );
 }
