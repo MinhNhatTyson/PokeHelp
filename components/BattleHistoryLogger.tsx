@@ -15,6 +15,9 @@ export default function BattleHistoryLogger({
   const [outcome, setOutcome] = useState<"win" | "loss" | null>(null);
   const [reason, setReason] = useState("");
   const [logged, setLogged] = useState(false);
+  const [oppLeads, setOppLeads] = useState<string[]>([]);
+  const toggleLead = (n: string) =>
+    setOppLeads((p) => p.includes(n) ? p.filter((x) => x !== n) : p.length < 2 ? [...p, n] : p);
 
   function handleSubmit() {
     if (!outcome) return;
@@ -24,6 +27,7 @@ export default function BattleHistoryLogger({
       recommendedLead: combo.recommendedLead.map((m) => m.name),
       outcome,
       reason: reason.trim(),
+      opponentLeads: oppLeads.length === 2 ? oppLeads : undefined,
     });
     setLogged(true);
   }
@@ -37,7 +41,7 @@ export default function BattleHistoryLogger({
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-black/10 bg-white p-4">
+    <div className="mt-4 rounded-lg border border-black/10 bg-white p-4">      
       <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">
         How did it go? (logs against the top-ranked combo above)
       </p>
@@ -56,6 +60,15 @@ export default function BattleHistoryLogger({
         >
           Loss
         </button>
+      </div>
+      <p className="mt-3 text-xs font-medium uppercase text-[color:var(--ink)]/40">What did they lead with? (pick 2)</p>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {opponentTeamNames.map((n) => (
+          <button key={n} type="button" onClick={() => toggleLead(n)}
+            className={`rounded-full px-3 py-1 text-sm capitalize btn-tactile ${oppLeads.includes(n) ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}>
+            {n}
+          </button>
+        ))}
       </div>
       <textarea
         value={reason}

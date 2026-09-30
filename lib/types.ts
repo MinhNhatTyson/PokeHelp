@@ -120,7 +120,7 @@ export interface TeamSlot {
   roleNotes: string | null;
   moves: (string | null)[];
   nature: NatureName | null;  
-  speedEv: number;             
+  speedSp: number;           
 }
 
 export interface PokemonMoveEntry {
@@ -218,4 +218,5 @@ export interface BattleHistoryEntry {
   recommendedLead: string[];     // what Battle Optimizer suggested as lead, for reference
   outcome: "win" | "loss";
   reason: string;                // free text — what went right/wrong
+  opponentLeads?: string[];
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseGeminiError } from "@/lib/server/geminiError";
+import { describeMegaForm } from "@/lib/data/commonSets";
 
 const GEMINI_MODEL = "gemini-3.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -14,6 +15,11 @@ interface BattleRequestBody {
   opponentTeam: string[];
   conversation: GeminiTurn[]; // prior turns, NOT including the new one
   newTurnSentence: string;
+}
+
+function buildSystemInstruction(megaLines: string[]) {
+  return `You are a live Pokémon Champions doubles (VGC) in-battle assistant. Rules: Level 50, bring 4 of 6, and Mega Evolution is the ONLY battle gimmick this season. There is NO Terastallization or Dynamax, so never suggest them. Each side may Mega Evolve at most one Pokémon per battle. A Mega Evolution happens before that Pokémon moves; its new typing, ability and Speed apply immediately, so re-evaluate weaknesses, immunities and turn order once a Mega is logged. Before it Mega Evolves, a Pokémon keeps its base typing and ability.
+${megaLines.length ? `Possible Mega forms in this match:\n${megaLines.join("\n")}\n` : ""}After each turn, give SHORT, actionable advice (2-4 sentences max) for next turn: move choices, targeting, switches, Protect timing, and when to Mega Evolve. Be direct and specific. Do not restate the turn log. Do not invent moves/abilities not shown in the log.`;
 }
 
 const SYSTEM_INSTRUCTION = `You are a live VGC (Pokémon doubles) in-battle assistant. You are given a running log of what happened turn-by-turn in an actual match. After each turn, give SHORT, actionable advice (2-4 sentences max) for what to do next turn — move choices, targeting, switches, Protect/Tera timing. Be direct and specific, reference the actual Pokémon and moves involved. Do not restate the turn log back at the player. Do not simulate turns yourself or invent moves/abilities not shown in the log.`;
@@ -37,13 +43,16 @@ export async function POST(req: NextRequest) {
     ...conversation.map((t) => ({ role: t.role, parts: [{ text: t.text }] })),
     { role: "user" as const, parts: [{ text: newTurnSentence }] },
   ];
+  const megaLines = [...yourTeam, ...opponentTeam]
+  .map((n) => { const d = describeMegaForm(n); return d ? `${n} -> ${d}` : null; })
+  .filter((l): l is string => l !== null);
 
   try {
     const res = await fetch(GEMINI_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+        systemInstruction: { parts: [{ text: buildSystemInstruction(megaLines) }] },
         contents,
         generationConfig: { temperature: 0.6, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
       }),

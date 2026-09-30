@@ -8,7 +8,7 @@ export default function HistoryPage() {
         <div className="rounded-b-lg bg-[color:var(--screen)] p-6 sm:p-8">
           <h1 className="font-logo text-2xl sm:text-3xl text-[color:var(--ink)]">Battle history</h1>
           <p className="mt-1 text-sm text-[color:var(--ink)]/70">
-            Your last 10 logged battles â€” PokeHelp uses these to sharpen AI strategy suggestions.
+            Your last 10 logged battles — PokeHelp uses these to sharpen AI strategy suggestions.
           </p>
           <div className="mt-6">
             <BattleHistoryPanel />

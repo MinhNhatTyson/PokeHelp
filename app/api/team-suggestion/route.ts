@@ -137,7 +137,9 @@ export async function POST(req: NextRequest) {
 }
 
 function buildPrompt(members: TeamMemberContext[], teamStrategy: string): string {
-  return `You are a VGC (Pokémon doubles) team-building assistant. A player has 5 of 6 team slots filled and needs a 6th Pokémon that synergizes with the rest of the team.
+  return `Format: Pokémon Champions doubles, Level 50, Mega Evolution is the ONLY gimmick (no Tera/Dynamax). A Mega Evolved Pokémon changes typing/ability (e.g. Golisopod becomes Bug/Steel), so reason about the post-Mega form when the Mega Stone is held. Only one Mega per team.
+  The team may hold only ONE Mega Stone. If a member already holds one, never suggest another Mega Stone.
+  You are a VGC (Pokémon doubles) team-building assistant. A player has 5 of 6 team slots filled and needs a 6th Pokémon that synergizes with the rest of the team.
 
 Current team:
 ${members.map((m) => `- ${m.name}${m.abilityName ? ` (ability: ${m.abilityName})` : ""}${m.itemName ? ` (item: ${m.itemName})` : ""}${m.roleNotes ? ` — role: ${m.roleNotes}` : ""}`).join("\n")}

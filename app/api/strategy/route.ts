@@ -95,7 +95,8 @@ export async function POST(req: NextRequest) {
 function buildPrompt(body: StrategyRequestBody): string {
   const { teamStrategy, slotNotes, opponentPreview, topCombo, recentHistory } = body;
 
-  return `You are a VGC (Pokémon doubles) strategy assistant. A player has already computed a heuristic-ranked bring-4 recommendation. Your job is ONLY to write grounded, specific strategic narration for it — do not re-rank or contradict the math, just explain and contextualize it using the player's own stated intent.
+  return `Format: Pokémon Champions doubles, Level 50, Mega Evolution is the ONLY gimmick (no Tera/Dynamax). A Mega Evolved Pokémon changes typing/ability (e.g. Golisopod becomes Bug/Steel), so reason about the post-Mega form when the Mega Stone is held. Only one Mega per team.
+  You are a VGC (Pokémon doubles) strategy assistant. A player has already computed a heuristic-ranked bring-4 recommendation. Your job is ONLY to write grounded, specific strategic narration for it — do not re-rank or contradict the math, just explain and contextualize it using the player's own stated intent.
 
 Player's overall team game plan: ${teamStrategy || "(not provided)"}
 

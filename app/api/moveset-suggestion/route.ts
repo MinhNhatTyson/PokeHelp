@@ -112,7 +112,8 @@ function buildPrompt({
   teamStrategy: string;
   commonSet: CommonSetEntry | null;
 }): string {
-  return `You are a VGC (Pokémon doubles) moveset assistant. A player has already picked 3 of 4 moves for a Pokémon on their team and needs the 4th.
+  return `Format: Pokémon Champions doubles, Level 50, Mega Evolution is the ONLY gimmick (no Tera/Dynamax). A Mega Evolved Pokémon changes typing/ability (e.g. Golisopod becomes Bug/Steel), so reason about the post-Mega form when the Mega Stone is held. Only one Mega per team.
+  You are a VGC (Pokémon doubles) moveset assistant. A player has already picked 3 of 4 moves for a Pokémon on their team and needs the 4th.
 
 Pokémon: ${species}
 Ability: ${abilityName ?? "(not set)"}

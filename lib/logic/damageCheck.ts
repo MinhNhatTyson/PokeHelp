@@ -12,14 +12,13 @@ export interface LeadDamageCheck {
   description: string; // full readable line from @smogon/calc, e.g. "252 Atk Life Orb Garchomp Earthquake vs. ... 79.8 - 94.1% -- guaranteed 2HKO"
 }
 
-// We don't have real EV/nature data for every curated species yet — this is a
-// generic offense-leaning spread assumption (whichever attacking stat is
-// higher gets full investment), NOT the mon's actual real-world spread.
+const spToEv = (sp: number) => Math.min(252, sp * 8);
+
 function assumedSpread(mon: CoverageMon) {
   const isSpecial = (mon.stats?.spAttack ?? 0) >= (mon.stats?.attack ?? 0);
   return isSpecial
-    ? { nature: "Modest" as const, evs: { hp: 4, spa: 252, spe: 252 } }
-    : { nature: "Adamant" as const, evs: { hp: 4, atk: 252, spe: 252 } };
+    ? { nature: "Modest" as const, evs: { hp: spToEv(2), spa: spToEv(32), spe: spToEv(32) } }
+    : { nature: "Adamant" as const, evs: { hp: spToEv(2), atk: spToEv(32), spe: spToEv(32) } };
 }
 
 function buildPokemon(mon: CoverageMon, commonSet: CommonSetEntry | null) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getCommonSet } from "@/lib/data/commonSets";
+import { getCommonSet, describeMegaForm } from "@/lib/data/commonSets";
 import { fetchMoveDetail, fetchMoveNameList } from "@/lib/data/fetchAndCache";
 import { FieldState, MoveDetail, MoveNameEntry } from "@/lib/types";
 import { useTeamStore } from "@/lib/store/teamStore";
@@ -100,7 +100,7 @@ export default function EventComposer({
   const fieldState = useBattleSessionStore((s) => s.fieldState);
   const setFieldState = useBattleSessionStore((s) => s.setFieldState);
 
-  const [mode, setMode] = useState<"move" | "switch">("move");
+  const [mode, setMode] = useState<"move" | "switch" | "mega">("move");
   const [actor, setActor] = useState<string | null>(null);
   const [moveSlug, setMoveSlug] = useState("");
   const [moveDetail, setMoveDetail] = useState<MoveDetail | null>(null);
@@ -210,6 +210,12 @@ export default function EventComposer({
       return;
     }
 
+    if (mode === "mega") {
+      const form = describeMegaForm(actor);
+      if (form) onConfirm(`${cap(actor)} Mega Evolved into ${form}`);
+      return;
+    }
+
     if (!moveSlug) return;
     const moveLabel = formatMoveName(moveSlug);
 
@@ -263,6 +269,7 @@ export default function EventComposer({
         <div className="flex gap-1 rounded-lg bg-black/5 p-1">
           <button type="button" onClick={() => setMode("move")} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mode === "move" ? "bg-white shadow-sm" : "opacity-50"}`}>Move</button>
           <button type="button" onClick={() => setMode("switch")} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mode === "switch" ? "bg-white shadow-sm" : "opacity-50"}`}>Switch</button>
+          <button type="button" onClick={() => setMode("mega")} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mode === "mega" ? "bg-white shadow-sm" : "opacity-50"}`}>Mega</button>
         </div>
 
         <div className="mt-4">
@@ -396,7 +403,7 @@ export default function EventComposer({
               )}
             </>
           )
-        ) : (
+        ) : mode === "switch" ? (
           actor && actorP && (
             <div className="mt-4">
               <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Switched in</p>
@@ -416,6 +423,12 @@ export default function EventComposer({
               </div>
             </div>
           )
+        ) : (
+          actor && (
+            <p className="mt-4 rounded-md bg-black/5 px-3 py-2 text-sm text-[color:var(--ink)]/70">
+              {describeMegaForm(actor) ?? "No known Mega form for this Pokémon."}
+            </p>
+          )
         )}
 
         <div className="mt-5 flex gap-2">
@@ -423,7 +436,7 @@ export default function EventComposer({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={mode === "switch" ? !switchTo : !canConfirmMove}
+            disabled={mode === "switch" ? !switchTo : mode === "mega" ? !actor || !describeMegaForm(actor) : !canConfirmMove}
             className="flex-1 rounded-md bg-[color:var(--shell-accent)] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Add event

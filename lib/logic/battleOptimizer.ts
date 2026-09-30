@@ -1,9 +1,37 @@
-import { PokemonTypeName, POKEMON_TYPES, EffectivenessMultiplier } from "@/lib/types";
+import { PokemonTypeName, POKEMON_TYPES, EffectivenessMultiplier, BattleHistoryEntry } from "@/lib/types";
 import { getSingleMultiplier } from "@/lib/logic/effectiveness";
 import { getAbilitySignal } from "@/lib/logic/abilitySignals";
 import { getCommonSet } from "@/lib/data/commonSets";
 import { checkLeadDamage, LeadDamageCheck } from "@/lib/logic/damageCheck";
 import { getItemSignal } from "@/lib/logic/itemSignals";
+
+const HISTORY_WEIGHT = 0.6;
+const SIGNAL_WEIGHT = 0.4;
+const PRIOR_STRENGTH = 6; 
+
+export function predictOpponentLead(opponents: CoverageMon[], history: BattleHistoryEntry[] = []): CoverageMon[] {
+  const maxSignal = Math.max(1, ...opponents.map(leadScore));
+  const usable = history.filter((h) => h.opponentLeads?.length === 2);
+
+  const historyRate = (m: CoverageMon) => {
+    const seen = usable.filter((h) => h.opponentTeamNames.includes(m.name)).length;
+    const led = usable.filter((h) => h.opponentLeads!.includes(m.name)).length;
+    return (led + PRIOR_STRENGTH / 3) / (seen + PRIOR_STRENGTH);
+  };
+  const maxRate = Math.max(...opponents.map(historyRate));
+
+  return opponents
+    .map((m) => {
+      const signal = leadScore(m) / maxSignal;
+      const score = usable.length === 0
+        ? signal
+        : HISTORY_WEIGHT * (historyRate(m) / maxRate) + SIGNAL_WEIGHT * signal;
+      return { m, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2)
+    .map((x) => x.m);
+}
 
 interface LeadSignals {
   hasFakeOut: boolean;
@@ -283,10 +311,10 @@ function scoreCombo(members: CoverageMon[], opponents: CoverageMon[]): ComboScor
   };
 }
 
-export function rankBringFourCombos(userTeam: CoverageMon[], opponentTeam: CoverageMon[]): ComboResult[] {
+export function rankBringFourCombos(userTeam: CoverageMon[], opponentTeam: CoverageMon[], history: BattleHistoryEntry[] = []): ComboResult[] {
   if (userTeam.length !== 6) throw new Error("rankBringFourCombos expects exactly 6 user team members");
 
-  const { lead: opponentLead } = pickLead(opponentTeam); // signal-only guess — opponent side of a simultaneous lead-pick has no matchup target of its own
+  const opponentLead = predictOpponentLead(opponentTeam, history); 
 
   const results = fourOfSixCombinations().map((indices) => {
     const members = indices.map((i) => userTeam[i]);

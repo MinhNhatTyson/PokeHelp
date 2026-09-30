@@ -29,7 +29,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const setSlotNature = useTeamStore((s) => s.setSlotNature);
-  const setSlotSpeedEv = useTeamStore((s) => s.setSlotSpeedEv);
+  const setSlotSpeedSp = useTeamStore((s) => s.setSlotSpeedSp);  
 
   useEffect(() => {
     fetchPokemonNameList().then(setPokeNames);
@@ -183,14 +183,9 @@ export default function TeamSlotPicker({ index }: { index: number }) {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Speed EVs</label>
-              <input
-                type="number"
-                min={0}
-                max={252}
-                step={4}
-                value={slot.speedEv}
-                onChange={(e) => setSlotSpeedEv(index, Number(e.target.value) || 0)}
+              <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Speed SP <span className="normal-case opacity-60">(max 32)</span></label>
+              <input type="number" min={0} max={32} step={1} value={slot.speedSp}
+                onChange={(e) => setSlotSpeedSp(index, Number(e.target.value) || 0)}
                 className="mt-1 w-full rounded-md border border-black/10 bg-white px-2 py-2 text-sm text-[color:var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
               />
             </div>
@@ -200,7 +195,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
             <span className="font-medium text-[color:var(--ink)]">
               {calculateEffectiveSpeed(
                 slot.pokemon.stats.find((s) => s.name === "speed")?.baseStat ?? 0,
-                slot.speedEv, slot.nature, slot.itemName
+                slot.speedSp, slot.nature, slot.itemName
               )}
             </span>
           </p>

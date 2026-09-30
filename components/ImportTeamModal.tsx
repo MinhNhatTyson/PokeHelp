@@ -72,7 +72,7 @@ export default function ImportTeamModal({ open, onClose }: { open: boolean; onCl
       [0, 1, 2, 3].forEach((mi) => store.setSlotMove(i, mi, kept[mi] ?? null));
 
       if (set.nature) store.setSlotNature(i, set.nature);
-      store.setSlotSpeedEv(i, set.speedEv);
+      store.setSlotSpeedSp(i, set.speedSp);
       imported.push(detail.name);
     }
 

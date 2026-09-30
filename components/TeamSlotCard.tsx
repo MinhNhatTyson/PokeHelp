@@ -33,7 +33,7 @@ export default function TeamSlotCard({ index, onOpen }: { index: number; onOpen:
   const missing = [!slot.itemName && "item", !slot.abilityName && "ability"].filter(Boolean) as string[];
   const speed = calculateEffectiveSpeed(
     mon.stats.find((s) => s.name === "speed")?.baseStat ?? 0,
-    slot.speedEv, slot.nature, slot.itemName
+    slot.speedSp, slot.nature, slot.itemName
   );
 
   return (

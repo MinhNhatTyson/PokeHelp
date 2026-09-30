@@ -32,7 +32,9 @@ export const NATURE_LABEL: Record<NatureName, string> = {
 };
 
 const VGC_LEVEL = 50;
-const SPEED_IV = 31; // competitive default, not user-exposed
+export const MAX_SP_PER_STAT = 32;
+export const MAX_TOTAL_SP = 66;
+const BASE_IV = 31;
 
 export function getSpeedNatureMultiplier(nature: NatureName | null): number {
   if (!nature) return 1;
@@ -43,19 +45,19 @@ export function getSpeedNatureMultiplier(nature: NatureName | null): number {
 }
 
 /** Base Speed stat at Lv.50, 31 IV, given EV investment + nature — no item applied yet. */
-export function calculateSpeedStat(baseSpeed: number, speedEv: number, nature: NatureName | null): number {
-  const raw = Math.floor((2 * baseSpeed + SPEED_IV + Math.floor(speedEv / 4)) * VGC_LEVEL / 100) + 5;
+export function calculateSpeedStat(baseSpeed: number, speedSp: number, nature: NatureName | null): number {
+  const raw = Math.floor(((2 * baseSpeed + BASE_IV) * VGC_LEVEL) / 100) + 5 + speedSp;
   return Math.floor(raw * getSpeedNatureMultiplier(nature));
 }
 
 /** Full effective Speed: base formula + held-item multiplier (Choice Scarf, Iron Ball, etc.) */
 export function calculateEffectiveSpeed(
-  baseSpeed: number,
-  speedEv: number,
-  nature: NatureName | null,
-  itemName: string | null
+  baseSpeed: number, speedSp: number, nature: NatureName | null, itemName: string | null
 ): number {
-  const stat = calculateSpeedStat(baseSpeed, speedEv, nature);
-  const itemMultiplier = getItemSignal(itemName)?.speedMultiplier ?? 1;
-  return Math.floor(stat * itemMultiplier);
+  const stat = calculateSpeedStat(baseSpeed, speedSp, nature);
+  return Math.floor(stat * (getItemSignal(itemName)?.speedMultiplier ?? 1));
+}
+
+export function evToSp(ev: number): number {
+  return ev < 4 ? 0 : Math.min(MAX_SP_PER_STAT, 1 + Math.floor((ev - 4) / 8));
 }

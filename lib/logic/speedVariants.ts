@@ -5,7 +5,7 @@ import { getCommonSet } from "@/lib/data/commonSets";
 export interface SpeedVariant {
   label: string;
   nature: NatureName | null;
-  speedEv: number;
+  speedSp: number;
   itemName: string | null;
   speed: number;
   likelihood: number;
@@ -29,23 +29,23 @@ export function getSpeedVariants(pokemon: PokemonDetail): SpeedVariant[] {
   const weights = getWeights(!!commonSet, curatedIsScarf);
 
   const variants: Omit<SpeedVariant, "speed">[] = [
-    { label: "Max Speed (Jolly/Timid, 252 Spe)", nature: "jolly", speedEv: 252, itemName: null, likelihood: weights.maxSpeed },
-    { label: "Max Speed + Choice Scarf", nature: "jolly", speedEv: 252, itemName: "choice-scarf", likelihood: weights.scarf },
-    { label: "Bulky / no Speed investment (0 Spe, neutral)", nature: null, speedEv: 0, itemName: null, likelihood: weights.bulky },
-    { label: "Trick Room spread (0 Spe, negative nature)", nature: "brave", speedEv: 0, itemName: null, likelihood: weights.trickRoom },
+    { label: "Max Speed (Jolly/Timid, 32 SP)", nature: "jolly", speedSp: 32, itemName: null, likelihood: weights.maxSpeed },
+    { label: "Max Speed + Choice Scarf", nature: "jolly", speedSp: 32, itemName: "choice-scarf", likelihood: weights.scarf },
+    { label: "Bulky / no Speed investment (0 Spe, neutral)", nature: null, speedSp: 0, itemName: null, likelihood: weights.bulky },
+    { label: "Trick Room spread (0 Spe, negative nature)", nature: "brave", speedSp: 0, itemName: null, likelihood: weights.trickRoom },
   ];
 
   if (commonSet && !curatedIsScarf) {
     variants.push({
       label: `Curated common set (${commonSet.topItem})`,
       nature: "jolly",
-      speedEv: 252,
+      speedSp: 32,
       itemName: curatedItemSlug,
       likelihood: weights.curated,
     });
   }
 
   return variants
-    .map((v) => ({ ...v, speed: calculateEffectiveSpeed(base, v.speedEv, v.nature, v.itemName) }))
+    .map((v) => ({ ...v, speed: calculateEffectiveSpeed(base, v.speedSp, v.nature, v.itemName) }))
     .sort((a, b) => b.likelihood - a.likelihood);
 }

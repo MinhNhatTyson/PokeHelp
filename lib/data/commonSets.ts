@@ -1,9 +1,6 @@
-// Curated, hand-sourced from Pikalytics VGC usage stats (Pokémon Champions
-// VGC 2026 Regulation M-B, pulled September 2026). This is NOT derived from
-// PokeAPI — PokeAPI only knows legal movepools, not what's actually run in
-// the current meta. Usage shifts every regulation/season, so treat this as a
-// living file that needs periodic re-checking against Pikalytics, not a
-// permanent truth. Extend by adding more entries in the same shape.
+import { PokemonDetail, PokemonTypeName } from "@/lib/types";
+
+
 export interface CommonSetEntry {
   species: string;
   showdownName: string;
@@ -12,10 +9,25 @@ export interface CommonSetEntry {
   topItem: string;
   regulation: string;
   megaForm?: {
-    formSpecies: string;       // PokeAPI slug, e.g. "charizard-mega-y"
-    formShowdownName: string;  // e.g. "Charizard-Mega-Y"
-    formAbility: string;       // the ability that actually matters for scoring
+    formSpecies: string;
+    formShowdownName: string;
+    formAbility: string;
+    formTypes?: PokemonTypeName[]; // fallback when PokeAPI has no entry for a brand-new Mega
   };
+}
+
+const stoneSlug = (e: CommonSetEntry) => e.topItem.toLowerCase().replace(/\s+/g, "-");
+export function getActiveMega(name: string, itemName: string | null | undefined) {
+  const e = getCommonSet(name);
+  return e?.megaForm && itemName === stoneSlug(e) ? e.megaForm : null;
+}
+export function describeMegaForm(name: string): string | null {
+  const m = getCommonSet(name)?.megaForm;
+  if (!m) return null;
+  return `${m.formShowdownName} (${m.formTypes?.join("/") ?? "typing per PokeAPI"}, ${m.formAbility.replace(/-/g, " ")})`;
+}
+export function synthesizeMegaDetail(base: PokemonDetail, m: NonNullable<CommonSetEntry["megaForm"]>): PokemonDetail | null {
+  return m.formTypes ? { ...base, name: m.formSpecies, types: m.formTypes } : null;
 }
 
 export const COMMON_SETS: Record<string, CommonSetEntry> = {
@@ -112,13 +124,19 @@ export const COMMON_SETS: Record<string, CommonSetEntry> = {
     species: "golisopod", showdownName: "Golisopod", likelyAbility: "water-bubble",
     commonMoves: ["Iron Head", "Leech Life", "Protect", "First Impression"],
     topItem: "Golisopite", regulation: "VGC 2026 Reg M-C",
-    megaForm: { formSpecies: "golisopod-mega", formShowdownName: "Golisopod-Mega", formAbility: "emergency-exit" },
+    megaForm: { formSpecies: "golisopod-mega", formShowdownName: "Golisopod-Mega", formAbility: "tough-claws", formTypes: ["bug", "steel"] },
   },
   salamence: {
     species: "salamence", showdownName: "Salamence", likelyAbility: "intimidate",
     commonMoves: ["Hyper Voice", "Protect", "Double-Edge", "Tailwind"],
     topItem: "Salamencite", regulation: "VGC 2026 Reg M-C",
-    megaForm: { formSpecies: "salamence-mega", formShowdownName: "Salamence-Mega", formAbility: "aerilate" },
+    megaForm: { formSpecies: "salamence-mega", formShowdownName: "Salamence-Mega", formAbility: "aerilate", formTypes: ["dragon", "flying"] },
+  },
+  baxcalibur: {
+    species: "baxcalibur", showdownName: "Baxcalibur", likelyAbility: "thermal-exchange",
+    commonMoves: ["Glaive Rush", "Ice Shard", "Icicle Crash", "Protect"],
+    topItem: "Baxcalibrite", regulation: "VGC 2026 Reg M-C",
+    megaForm: { formSpecies: "baxcalibur-mega", formShowdownName: "Baxcalibur-Mega", formAbility: "thermal-exchange", formTypes: ["dragon", "ice"] },
   },
 };
 

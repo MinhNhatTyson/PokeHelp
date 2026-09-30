@@ -5,7 +5,7 @@ import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
 import { fetchPokemonNameList, fetchPokemonDetail, fetchCompetitiveItemNameList } from "@/lib/data/fetchAndCache";
 import { ItemNameEntry, PokemonNameEntry } from "@/lib/types";
 import TypeBadge from "@/components/TypeBadge";
-import { getCommonSet } from "@/lib/data/commonSets";
+import { getCommonSet, synthesizeMegaDetail } from "@/lib/data/commonSets";
 
 
 const MAX_SUGGESTIONS = 8;
@@ -71,7 +71,8 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
 
       if (commonSet.megaForm) {
         // Guessed item IS the Mega Stone — assume turn-1 Mega Evolution by default.
-        const megaDetail = await fetchPokemonDetail(commonSet.megaForm.formSpecies);
+        const megaDetail = (await fetchPokemonDetail(commonSet.megaForm.formSpecies))
+        ?? synthesizeMegaDetail(detail, commonSet.megaForm);
         setSlotMegaFormDetail(index, megaDetail);
       } else if (detail.abilities.some((a) => a.name === commonSet.likelyAbility)) {
         setSlotAbility(index, commonSet.likelyAbility);
@@ -86,15 +87,19 @@ async function handleSelectItem(name: string) {
   setShowItemDropdown(false);
   setSlotItem(index, name);
 
+  const mon = slot.pokemon;
+  if (!mon) return;
+
   // Re-check the Mega assumption against the CONFIRMED item, not the guess.
-  const commonSet = slot.pokemon ? getCommonSet(slot.pokemon.name) : null;
+  const commonSet = getCommonSet(mon.name);
   if (commonSet?.megaForm) {
     const isMegaStone = name === commonSet.topItem.toLowerCase().replace(/\s+/g, "-");
     if (isMegaStone) {
-      const megaDetail = await fetchPokemonDetail(commonSet.megaForm.formSpecies);
+      const megaDetail = (await fetchPokemonDetail(commonSet.megaForm.formSpecies))
+        ?? synthesizeMegaDetail(mon, commonSet.megaForm);
       setSlotMegaFormDetail(index, megaDetail);
     } else {
-      setSlotMegaFormDetail(index, null); // holding something else — no Mega assumed
+      setSlotMegaFormDetail(index, null); // holding something else, so no Mega assumed
     }
   }
 }

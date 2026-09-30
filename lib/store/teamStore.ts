@@ -1,13 +1,16 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { PokemonDetail, TeamSlot } from "@/lib/types";
-import { NatureName } from "../logic/statCalc";
+import { evToSp, MAX_SP_PER_STAT, NatureName } from "../logic/statCalc";
 
 export const TEAM_SIZE = 6;
 const EMPTY_SLOT: TeamSlot = {
   pokemon: null, itemName: null, abilityName: null, roleNotes: null,
-  moves: [null, null, null, null], nature: null, speedEv: 0,
+  moves: [null, null, null, null], nature: null, speedSp: 0,
 };
+function migrateSpeedSp(s: Partial<TeamSlot> & { speedEv?: number }): number {
+  return typeof s.speedSp === "number" ? s.speedSp : evToSp(s.speedEv ?? 0);
+}
 
 interface TeamState {
   slots: TeamSlot[];
@@ -24,7 +27,7 @@ interface TeamState {
   clearTeam: () => void;
   loadSlots: (slots: TeamSlot[], teamStrategy?: string) => void;
   setSlotNature: (index: number, nature: NatureName | null) => void;
-  setSlotSpeedEv: (index: number, speedEv: number) => void;
+  setSlotSpeedSp: (index: number, speedSp: number) => void;
 }
 
 export const useTeamStore = create<TeamState>()(
@@ -39,7 +42,7 @@ export const useTeamStore = create<TeamState>()(
           const slots = [...state.slots];
           const isDuplicate = pokemon && slots.some((s, i) => i !== index && s.pokemon?.name === pokemon.name);
           if (isDuplicate) return state;
-          slots[index] = { pokemon, itemName: slots[index].itemName, abilityName: null, roleNotes: slots[index].roleNotes, moves: [null, null, null, null], nature: null, speedEv: 0 };
+          slots[index] = { pokemon, itemName: slots[index].itemName, abilityName: null, roleNotes: slots[index].roleNotes, moves: [null, null, null, null], nature: null, speedSp: 0 };
           return { slots };
         }),
       setSlotMove: (index, moveIndex, moveName) =>
@@ -76,7 +79,7 @@ export const useTeamStore = create<TeamState>()(
             roleNotes: s.roleNotes ?? null,
             moves: s.moves ?? [null, null, null, null],
             nature: s.nature ?? null,
-            speedEv: s.speedEv ?? 0,
+            speedSp: migrateSpeedSp(s),
             pokemon: s.pokemon ? { ...s.pokemon, moves: s.pokemon.moves ?? [] } : s.pokemon,
           })),
           teamStrategy: teamStrategy ?? "",
@@ -94,12 +97,12 @@ export const useTeamStore = create<TeamState>()(
           slots[index] = { ...slots[index], nature };
           return { slots };
         }),
-      setSlotSpeedEv: (index, speedEv) =>
+      setSlotSpeedSp: (index, speedSp) =>
         set((state) => {
           const slots = [...state.slots];
-          slots[index] = { ...slots[index], speedEv: Math.max(0, Math.min(252, speedEv)) };
+          slots[index] = { ...slots[index], speedSp: Math.max(0, Math.min(MAX_SP_PER_STAT, speedSp)) };
           return { slots };
-        }), 
+        }),
     }),
     {
       name: "pokehelp-active-team",
@@ -113,7 +116,7 @@ export const useTeamStore = create<TeamState>()(
             ...s,
             moves: s.moves ?? [null, null, null, null],
             nature: s.nature ?? null,
-            speedEv: s.speedEv ?? 0,
+            speedSp: migrateSpeedSp(s),
             pokemon: s.pokemon ? { ...s.pokemon, moves: s.pokemon.moves ?? [] } : s.pokemon,
           })),
         };

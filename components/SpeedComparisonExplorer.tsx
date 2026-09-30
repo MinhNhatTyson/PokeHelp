@@ -65,7 +65,7 @@ export default function SpeedComparisonExplorer() {
   const ownSpeed = ownSlot?.pokemon
     ? calculateEffectiveSpeed(
         ownSlot.pokemon.stats.find((s) => s.name === "speed")?.baseStat ?? 0,
-        ownSlot.speedEv, ownSlot.nature, ownSlot.itemName
+        ownSlot.speedSp, ownSlot.nature, ownSlot.itemName
       )
     : null;
 

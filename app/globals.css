@@ -162,3 +162,16 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .btn-tactile, .btn-tactile:hover, .btn-tactile:active { transform: none; transition: none; }
 }
+
+@property --holo-angle { syntax: "<angle>"; inherits: false; initial-value: 180deg; }
+@keyframes holo-spin { to { --holo-angle: 540deg; } }
+
+.card-holo-light {
+  border: 3px solid transparent;
+  border-radius: 1.25rem;
+  background:
+    linear-gradient(var(--screen), var(--screen)) padding-box,
+    conic-gradient(from var(--holo-angle), var(--accent-gold), #fff6d6, var(--accent-gold), var(--shell-accent), var(--accent-gold)) border-box;
+  animation: holo-spin 8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .card-holo-light { animation: none; } }

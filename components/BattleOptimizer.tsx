@@ -7,16 +7,22 @@ import { useOpponentTeamStore, OPPONENT_TEAM_SIZE } from "@/lib/store/opponentTe
 import { rankBringFourCombos, statsFromEntries, CoverageMon } from "@/lib/logic/battleOptimizer";
 import OpponentSlotPicker from "@/components/OpponentSlotPicker";
 import ComboResultCard from "@/components/ComboResultCard";
-import { getCommonSet } from "@/lib/data/commonSets";
+import { getCommonSet, getActiveMega } from "@/lib/data/commonSets";
 import { useBattleHistoryStore } from "@/lib/store/battleHistoryStore";
 import BattleHistoryLogger from "@/components/BattleHistoryLogger";
-import { TYPE_COLOR } from "@/lib/typeMeta";
+import TypeIcon from "@/components/TypeIcon";
+import { TYPE_COLOR, TYPE_TEXT_ON_COLOR } from "@/lib/typeMeta";
+import { PokemonTypeName } from "@/lib/types";
 
+const FEATURES: { href: string; label: string; blurb: string; type: PokemonTypeName }[] = [
+    { href: "/speed", label: "Speed Check", blurb: "Will you outspeed it? Compare against likely spreads.", type: "electric" },
+    { href: "/battle", label: "Live Battle", blurb: "Log each turn and get advice for the next.", type: "fire" },
+];
 export default function BattleOptimizer() {
   const userSlots = useTeamStore((s) => s.slots);
   const opponentSlots = useOpponentTeamStore((s) => s.slots);
   const clearOpponentTeam = useOpponentTeamStore((s) => s.clearTeam);
-  const [showAll, setShowAll] = useState(false);
+  const [view, setView] = useState<"top" | "all">("top");
   const teamStrategy = useTeamStore((s) => s.teamStrategy);
   const [strategyNarrative, setStrategyNarrative] = useState<string | null>(null);
   const [strategyStatus, setStrategyStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -24,17 +30,19 @@ export default function BattleOptimizer() {
   const userReady = userSlots.every((s) => s.pokemon && s.abilityName);
   const opponentReady = opponentSlots.every((s) => s.pokemon);
   const [strategyErrorDetail, setStrategyErrorDetail] = useState<string | null>(null);
-  const recentHistory = useBattleHistoryStore((s) => s.entries);
+  const recentHistory = useBattleHistoryStore((s) => s.entries);  
 
-  const userCoverage: CoverageMon[] = useMemo(
-    () => userSlots.map((s) => ({
-      name: s.pokemon?.name ?? "", types: s.pokemon?.types ?? [], abilityName: s.abilityName,
+  const userCoverage = useMemo(() => userSlots.map((s) => {
+    const mega = s.pokemon ? getActiveMega(s.pokemon.name, s.itemName) : null;
+    return {
+      name: s.pokemon?.name ?? "",
+      types: mega?.formTypes ?? s.pokemon?.types ?? [],
+      abilityName: s.abilityName,
       itemName: s.itemName,
       stats: s.pokemon ? statsFromEntries(s.pokemon.stats) : undefined,
       moves: s.moves.filter((m): m is string => m !== null),
-    })),
-    [userSlots]
-  );
+    };
+  }), [userSlots]);
   const opponentCoverage: CoverageMon[] = useMemo(
     () => opponentSlots.map((s) => {
       const commonSet = s.pokemon ? getCommonSet(s.pokemon.name) : null;
@@ -53,8 +61,8 @@ export default function BattleOptimizer() {
 
   const results = useMemo(() => {
     if (!userReady || !opponentReady) return null;
-    return rankBringFourCombos(userCoverage, opponentCoverage);
-  }, [userReady, opponentReady, userCoverage, opponentCoverage]);
+    return rankBringFourCombos(userCoverage, opponentCoverage, recentHistory);
+  }, [userReady, opponentReady, userCoverage, opponentCoverage, recentHistory]);
 
   async function handleGetStrategy() {
     if (!results || results.length === 0) return;
@@ -108,21 +116,21 @@ export default function BattleOptimizer() {
           type coverage and a curated set of ability signals (weather, Intimidate, key immunities).
         </p>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            href="/speed"
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-white"
-            style={{ background: TYPE_COLOR.electric, color: "#1f2124" }}
-          >
-            ⚡ Speed Check
-          </Link>
-          <Link
-            href="/battle"
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-white"
-            style={{ background: TYPE_COLOR.fire }}
-          >
-            🔥 Live Battle
-          </Link>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {FEATURES.map((f) => (
+            <Link key={f.href} href={f.href} className="pokecard btn-tactile flex items-center gap-3 p-3" style={{ borderColor: TYPE_COLOR[f.type] }}>
+              <span
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${TYPE_TEXT_ON_COLOR[f.type] === "light" ? "text-white" : "text-black/80"}`}
+                style={{ backgroundColor: TYPE_COLOR[f.type] }}
+              >
+                <TypeIcon type={f.type} className="h-6 w-6" />
+              </span>
+              <span>
+                <span className="font-heading block text-base text-[color:var(--ink)]">{f.label}</span>
+                <span className="block text-xs text-[color:var(--ink)]/60">{f.blurb}</span>
+              </span>
+            </Link>
+          ))}
         </div>
 
         {!userReady && (
@@ -169,16 +177,26 @@ export default function BattleOptimizer() {
                 </div>
               )}
             </div>
+            <div className="mt-4 flex gap-1 rounded-lg bg-black/5 p-1">
+              {([["top", "Top 3"], ["all", `All ${results.length}`]] as const).map(([k, label]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setView(k)}
+                  className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    view === k ? "bg-white text-[color:var(--ink)] shadow-sm" : "text-[color:var(--ink)]/50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <div className="mt-4 space-y-3">
-              {(showAll ? results : results.slice(0, 3)).map((r, i) => (
+              {(view === "all" ? results : results.slice(0, 3)).map((r, i) => (
                 <ComboResultCard key={r.indices.join("-")} rank={i + 1} result={r} />
               ))}
             </div>
-            {!showAll && results.length > 3 && (
-              <button type="button" onClick={() => setShowAll(true)} className="mt-3 text-sm text-[color:var(--ink)]/60 underline-offset-2 hover:underline">
-                Show all {results.length} combinations
-              </button>
-            )}
             <BattleHistoryLogger
               opponentTeamNames={opponentSlots.filter((s) => s.pokemon).map((s) => s.pokemon!.name)}
               combo={results[0]}

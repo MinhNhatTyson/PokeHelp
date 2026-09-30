@@ -1,4 +1,4 @@
-import { NATURES, NatureName } from "@/lib/logic/statCalc";
+import { NATURES, NatureName, evToSp, MAX_SP_PER_STAT } from "@/lib/logic/statCalc";
 
 export interface ParsedSet {
   displayName: string;
@@ -6,7 +6,7 @@ export interface ParsedSet {
   item: string | null;      // slug
   ability: string | null;   // slug
   nature: NatureName | null;
-  speedEv: number;
+  speedSp: number;
   moves: string[];          // slugs
 }
 
@@ -39,18 +39,19 @@ export function parseShowdownTeam(text: string): ParsedSet[] {
       displayName: speciesRaw.trim(),
       species: SPECIES_ALIASES[speciesSlug] ?? speciesSlug,
       item: itemRaw ? toSlug(itemRaw) : null,
-      ability: null, nature: null, speedEv: 0, moves: [],
+      ability: null, nature: null, speedSp: 0, moves: [],
     };
 
     for (const line of lines.slice(1)) {
       let m: RegExpMatchArray | null;
       if ((m = line.match(/^ability:\s*(.+)$/i))) {
         set.ability = toSlug(m[1]);
-      } else if ((m = line.match(/^evs:\s*(.+)$/i))) {
-        for (const part of m[1].split("/")) {
-          const ev = part.trim().match(/^(\d+)\s*(\w+)$/);
-          if (ev && ev[2].toLowerCase() === "spe") set.speedEv = Math.max(0, Math.min(252, Number(ev[1])));
-        }
+      }  else if ((m = line.match(/^(?:evs|sps?):\s*(.+)$/i))) {
+          const parts = m[1].split("/").map((p) => p.trim().match(/^(\d+)\s*(\w+)$/)).filter(Boolean) as RegExpMatchArray[];
+          // Any value > 32 must be old-style EVs; otherwise treat as SP
+          const isEvs = parts.some((p) => Number(p[1]) > MAX_SP_PER_STAT);
+          const spe = parts.find((p) => p[2].toLowerCase() === "spe");
+          if (spe) set.speedSp = isEvs ? evToSp(Number(spe[1])) : Math.min(MAX_SP_PER_STAT, Number(spe[1]));
       } else if ((m = line.match(/^(\w+)\s+nature$/i))) {
         const n = m[1].toLowerCase();
         if (n in NATURES) set.nature = n as NatureName;
