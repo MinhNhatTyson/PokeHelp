@@ -103,8 +103,7 @@ export default function EventComposer({
   const [mode, setMode] = useState<"move" | "switch" | "mega">("move");
   const [actor, setActor] = useState<string | null>(null);
   const [moveSlug, setMoveSlug] = useState("");
-  const [moveDetail, setMoveDetail] = useState<MoveDetail | null>(null);
-  const [moveDetailStatus, setMoveDetailStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [detailResult, setDetailResult] = useState<{ slug: string; detail: MoveDetail | null } | null>(null);
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
   const [targetResults, setTargetResults] = useState<Record<string, ResultKey>>({});
   const [effectChoice, setEffectChoice] = useState<string | null>(null);
@@ -117,6 +116,11 @@ export default function EventComposer({
   const actorP = participants.find((p) => p.name === actor) ?? null;
   const others = participants.filter((p) => p.name !== actor);
   const fieldSetter = moveSlug ? FIELD_SETTER_MOVES[moveSlug] : undefined;
+  const moveDetail = detailResult && detailResult.slug === moveSlug && !fieldSetter ? detailResult.detail : null;
+  const moveDetailStatus: "idle" | "loading" | "error" =
+    !moveSlug || fieldSetter ? "idle"
+    : !detailResult || detailResult.slug !== moveSlug ? "loading"
+    : detailResult.detail ? "idle" : "error";
 
   // Real movepool for your own mons (Team Builder's chosen 4); curated common
   // moves for the opponent's, since we never know their real moveset.
@@ -135,27 +139,22 @@ export default function EventComposer({
     return moveNames.filter((m) => m.name.startsWith(q)).slice(0, MAX_MOVE_SUGGESTIONS);
   }, [moveText, moveNames]);
 
-  // Reset move-specific state whenever the actor or move changes.
-  useEffect(() => {
+  function resetMoveState() {
     setSelectedTargets([]);
     setTargetResults({});
     setEffectChoice(null);
     setEffectOther("");
-  }, [actor, moveSlug]);
+  }
+  function selectMove(slug: string) { resetMoveState(); setMoveSlug(slug); }
+  function selectActor(name: string) { resetMoveState(); setActor(name); setMoveSlug(""); setMoveText(""); setSwitchTo(null); }
 
   useEffect(() => {
-    if (!moveSlug || FIELD_SETTER_MOVES[moveSlug]) {
-      setMoveDetail(null);
-      setMoveDetailStatus("idle");
-      return;
-    }
+    if (!moveSlug || FIELD_SETTER_MOVES[moveSlug]) return;
     let cancelled = false;
-    setMoveDetailStatus("loading");
     fetchMoveDetail(moveSlug)
       .then((detail) => {
         if (cancelled) return;
-        setMoveDetail(detail);
-        setMoveDetailStatus(detail ? "idle" : "error");
+        setDetailResult({ slug: moveSlug, detail });
         if (detail?.ailment) {
           const match = EFFECT_OPTIONS.find((o) => o.toLowerCase() === detail.ailment);
           setEffectChoice(match ?? cap(detail.ailment));
@@ -169,7 +168,7 @@ export default function EventComposer({
           );
         }
       })
-      .catch(() => { if (!cancelled) setMoveDetailStatus("error"); });
+      .catch(() => { if (!cancelled) setDetailResult({ slug: moveSlug, detail: null }); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moveSlug]);
@@ -178,9 +177,10 @@ export default function EventComposer({
     const trimmed = moveText.trim();
     if (!trimmed) return;
     const handle = setTimeout(() => {
-      setMoveSlug(trimmed.toLowerCase().replace(/\s+/g, "-"));
+      selectMove(trimmed.toLowerCase().replace(/\s+/g, "-"));
     }, 350);
     return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moveText]);
 
   useEffect(() => {
@@ -279,7 +279,7 @@ export default function EventComposer({
               <button
                 key={p.name}
                 type="button"
-                onClick={() => { setActor(p.name); setMoveSlug(""); setMoveText(""); setSwitchTo(null); }}
+                onClick={() => { selectActor(p.name); setMoveSlug(""); setMoveText(""); setSwitchTo(null); }}
                 className={`rounded-full px-3 py-1 text-sm capitalize ${actor === p.name ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
               >
                 {p.name}
@@ -296,7 +296,7 @@ export default function EventComposer({
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {movepool.length === 0 && <p className="text-xs text-[color:var(--ink)]/40">No known moves — pick a species/moveset in Team Builder, or this is an opponent with no curated data.</p>}
                   {movepool.map((m) => (
-                    <button key={m} type="button" onClick={() => { setMoveSlug(m); setMoveText(""); }} className={`rounded-full px-3 py-1 text-sm ${moveSlug === m ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"}`}>
+                    <button key={m} type="button" onClick={() => { selectMove(m); setMoveText(""); }} className={`rounded-full px-3 py-1 text-sm ${moveSlug === m ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"}`}>
                       {formatMoveName(m)}
                     </button>
                   ))}
@@ -317,7 +317,7 @@ export default function EventComposer({
                         <button
                           key={m.name}
                           type="button"
-                          onMouseDown={() => { setMoveSlug(m.name); setMoveText(""); setShowMoveDropdown(false); }}
+                          onMouseDown={() => { selectMove(m.name); setMoveText(""); setShowMoveDropdown(false); }}
                           className="block w-full rounded-md px-2 py-1 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/5"
                         >
                           {formatMoveName(m.name)}

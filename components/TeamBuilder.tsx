@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useSavedTeamsStore } from "@/lib/store/savedTeamsStore";
 import { getTeamDefenseMatrix, getTeamOffenseReport } from "@/lib/logic/teamAnalysis";
-import TeamSlotPicker from "@/components/TeamSlotPicker";
 import TeamCoverageReport from "@/components/TeamCoverageReport";
 import TeamSuggestionPanel from "./TeamSuggestionPanel";
 import TeamSlotCard from "@/components/TeamSlotCard";
@@ -34,8 +33,8 @@ export default function TeamBuilder() {
 
   const isComplete = slots.every((s) => s.pokemon && s.itemName && s.abilityName);
   const filledCount = slots.filter((s) => s.pokemon && s.itemName && s.abilityName).length;
-  const defenseMatrix = useMemo(() => (isComplete ? getTeamDefenseMatrix(slots) : null), [slots, isComplete]);
-  const offense = useMemo(() => (isComplete ? getTeamOffenseReport(slots) : null), [slots, isComplete]);
+  const defenseMatrix = isComplete ? getTeamDefenseMatrix(slots) : null;
+  const offense = isComplete ? getTeamOffenseReport(slots) : null;
 
   const teamStrategy = useTeamStore((s) => s.teamStrategy);
   const setTeamStrategy = useTeamStore((s) => s.setTeamStrategy);

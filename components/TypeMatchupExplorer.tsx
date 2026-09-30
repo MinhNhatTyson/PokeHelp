@@ -7,36 +7,8 @@ import { getTypeMatchup } from "@/lib/logic/effectiveness";
 import { fetchPokemonNameList, fetchPokemonDetail } from "@/lib/data/fetchAndCache";
 import TypeBadge from "@/components/TypeBadge";
 import PokemonResultCard from "@/components/PokemonResultCard";
-import TypePip from "./TypePip";
 import TypeChip from "./TypeChip";
 import { useBackdropStore } from "@/lib/store/backdropStore";
-
-function BadgeRow({
-  types,
-  onSelect,
-}: {
-  types: PokemonTypeName[];
-  onSelect: (type: PokemonTypeName) => void;
-}) {
-  if (types.length === 0) {
-    return <p className="text-sm text-[color:var(--ink)]/50">None</p>;
-  }
-  return (
-    <div className="flex flex-wrap gap-2">
-      {types.map((t) => (
-        <button
-          key={t}
-          type="button"
-          onClick={() => onSelect(t)}
-          aria-label={`View ${TYPE_LABEL[t]} type matchups`}
-          className="cursor-pointer rounded-full outline-none transition-transform hover:scale-105 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
-        >
-          <TypeBadge type={t} size="sm" />
-        </button>
-      ))}
-    </div>
-  );
-}
 
 const MAX_TYPE_SUGGESTIONS = 5;
 const MAX_NAME_SUGGESTIONS = 8;

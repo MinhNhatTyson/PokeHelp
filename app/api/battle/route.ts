@@ -22,8 +22,6 @@ function buildSystemInstruction(megaLines: string[]) {
 ${megaLines.length ? `Possible Mega forms in this match:\n${megaLines.join("\n")}\n` : ""}After each turn, give SHORT, actionable advice (2-4 sentences max) for next turn: move choices, targeting, switches, Protect timing, and when to Mega Evolve. Be direct and specific. Do not restate the turn log. Do not invent moves/abilities not shown in the log.`;
 }
 
-const SYSTEM_INSTRUCTION = `You are a live VGC (Pokémon doubles) in-battle assistant. You are given a running log of what happened turn-by-turn in an actual match. After each turn, give SHORT, actionable advice (2-4 sentences max) for what to do next turn — move choices, targeting, switches, Protect/Tera timing. Be direct and specific, reference the actual Pokémon and moves involved. Do not restate the turn log back at the player. Do not simulate turns yourself or invent moves/abilities not shown in the log.`;
-
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {

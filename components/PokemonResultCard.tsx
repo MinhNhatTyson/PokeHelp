@@ -2,7 +2,6 @@ import { PokemonDetail } from "@/lib/types";
 import { getDualAttackProfile, getDualDefenseProfile } from "@/lib/logic/effectiveness";
 import TypeBadge from "@/components/TypeBadge";
 import { TYPE_COLOR } from "@/lib/typeMeta";
-import TypePip from "./TypePip";
 import TypeChip from "./TypeChip";
 
 const STAT_LABEL: Record<string, string> = {
@@ -15,14 +14,6 @@ const STAT_LABEL: Record<string, string> = {
 };
 
 const MAX_STAT = 255; // PokeAPI base stat ceiling, used only for bar scaling
-
-const DEFENSE_GROUPS = [
-  { key: "quad", label: "4× damage from" },
-  { key: "double", label: "2× damage from" },
-  { key: "half", label: "½× damage from" },
-  { key: "quarter", label: "¼× damage from" },
-  { key: "immune", label: "No damage from" },
-] as const;
 
 export default function PokemonResultCard({
   pokemon,

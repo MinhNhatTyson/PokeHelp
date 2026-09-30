@@ -86,24 +86,21 @@ export default function MovesetPicker({ slotIndex }: { slotIndex: number }) {
   const setSlotMove = useTeamStore((s) => s.setSlotMove);
   const teamStrategy = useTeamStore((s) => s.teamStrategy);
 
-  const [suggestion, setSuggestion] = useState<MoveSuggestion | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [result, setResult] = useState<{ key: string; suggestion: MoveSuggestion | null; failed: boolean } | null>(null);
 
   const chosenMoves = slot.moves.filter((m): m is string => m !== null);
   const emptyIndex = slot.moves.findIndex((m) => m === null);
   const shouldSuggest = !!slot.pokemon && chosenMoves.length === 3 && emptyIndex !== -1;
-  const chosenKey = [...chosenMoves].sort().join("|"); // re-fires only when the actual 3 moves change
+  const chosenKey = [...chosenMoves].sort().join("|");
+  const requestKey = shouldSuggest ? `${slotIndex}|${slot.pokemon!.name}|${chosenKey}` : null;
+
+  const current = result && result.key === requestKey ? result : null;
+  const status: "idle" | "loading" | "error" = !requestKey ? "idle" : !current ? "loading" : current.failed ? "error" : "idle";
+  const suggestion = current?.suggestion ?? null;
 
   useEffect(() => {
-    if (!shouldSuggest || !slot.pokemon) {
-      setSuggestion(null);
-      setStatus("idle");
-      return;
-    }
-
+    if (!requestKey || !slot.pokemon) return;
     let cancelled = false;
-    setStatus("loading");
-    setSuggestion(null);
 
     const teammates = slots
       .filter((s, i) => i !== slotIndex && s.pokemon)
@@ -123,12 +120,12 @@ export default function MovesetPicker({ slotIndex }: { slotIndex: number }) {
       }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("failed"))))
-      .then((data) => { if (!cancelled) { setSuggestion(data); setStatus("idle"); } })
-      .catch(() => { if (!cancelled) setStatus("error"); });
+      .then((data) => { if (!cancelled) setResult({ key: requestKey, suggestion: data, failed: false }); })
+      .catch(() => { if (!cancelled) setResult({ key: requestKey, suggestion: null, failed: true }); });
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldSuggest, chosenKey, slotIndex]);
+  }, [requestKey]);
 
   if (!slot.pokemon) return null;
 

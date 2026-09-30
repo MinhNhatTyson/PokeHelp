@@ -18,25 +18,22 @@ export default function TeamSuggestionPanel() {
   const setSlotAbility = useTeamStore((s) => s.setSlotAbility);
   const teamStrategy = useTeamStore((s) => s.teamStrategy);
 
-  const [suggestion, setSuggestion] = useState<TeamSuggestion | null>(null);
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
-  const [adopting, setAdopting] = useState(false);
+  const [result, setResult] = useState<{ key: string; suggestion: TeamSuggestion | null; failed: boolean } | null>(null);
 
   const filledIndices = slots.map((s, i) => (s.pokemon ? i : -1)).filter((i) => i !== -1);
   const emptyIndex = slots.findIndex((s) => !s.pokemon);
   const shouldSuggest = filledIndices.length === 5 && emptyIndex !== -1;
   const teamKey = filledIndices.map((i) => slots[i].pokemon!.name).sort().join("|");
+  
+  const requestKey = shouldSuggest ? teamKey : null;
+  const current = result && result.key === requestKey ? result : null;
+  const status: "idle" | "loading" | "error" = !requestKey ? "idle" : !current ? "loading" : current.failed ? "error" : "idle";
+  const suggestion = current?.suggestion ?? null;
+  const [adopting, setAdopting] = useState(false);
 
   useEffect(() => {
-    if (!shouldSuggest) {
-      setSuggestion(null);
-      setStatus("idle");
-      return;
-    }
-
+    if (!requestKey) return;
     let cancelled = false;
-    setStatus("loading");
-    setSuggestion(null);
 
     const members = filledIndices.map((i) => ({
       name: slots[i].pokemon!.name,
@@ -51,12 +48,12 @@ export default function TeamSuggestionPanel() {
       body: JSON.stringify({ members, teamStrategy }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("failed"))))
-      .then((data) => { if (!cancelled) { setSuggestion(data); setStatus("idle"); } })
-      .catch(() => { if (!cancelled) setStatus("error"); });
+      .then((data) => { if (!cancelled) setResult({ key: requestKey, suggestion: data, failed: false }); })
+      .catch(() => { if (!cancelled) setResult({ key: requestKey, suggestion: null, failed: true }); });
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldSuggest, teamKey]);
+  }, [requestKey]);
 
   async function handleAdopt() {
     if (!suggestion || emptyIndex === -1) return;

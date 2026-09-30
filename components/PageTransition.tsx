@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { AnimatePresence, motion, type PanInfo } from "motion/react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -8,16 +8,18 @@ const SWIPE_ROUTES = ["/", "/items", "/team", "/optimizer", "/history"];
 const SWIPE_DISTANCE_THRESHOLD = 90;
 const SWIPE_VELOCITY_THRESHOLD = 500;
 
+const MOBILE_QUERY = "(max-width: 1023px)";
+
 function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 1023px)");
-    setIsMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isMobile;
+  return useSyncExternalStore(
+    (onChange) => {
+      const mq = window.matchMedia(MOBILE_QUERY);
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(MOBILE_QUERY).matches,
+    () => false // server snapshot, avoids a hydration mismatch
+  );
 }
 
 export default function PageTransition({ children }: { children: React.ReactNode }) {

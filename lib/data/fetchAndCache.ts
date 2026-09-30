@@ -290,28 +290,6 @@ export async function fetchItemDetail(nameOrId: string): Promise<ItemDetail | nu
   return detail;
 }
 
-// Categories of items that can actually be held by a Pokémon in battle.
-// Excludes: balls, TMs, mail, key items, vitamins/mints, mulch, apricorns,
-// curry/sandwich ingredients, and other non-battle bag clutter.
-const COMPETITIVE_ITEM_CATEGORIES = [
-  "held-items",
-  "choice",
-  "species-specific",
-  "type-enhancement",
-  "in-a-pinch",
-  "type-protection",
-  "picky-healing",
-  "status-cures",
-  "pp-recovery",
-  "plates",
-  "mega-stones",
-  "z-crystals",
-  "jewels",
-  "memories",
-  "dynamax-crystals",
-  "bad-held-items",
-] as const;
-
 interface PokeApiItemCategoryResponse {
   items: { name: string; url: string }[];
 }
