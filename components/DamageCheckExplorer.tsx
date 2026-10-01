@@ -5,6 +5,7 @@ import { fetchCompetitiveItemNameList, fetchMoveNameList } from "@/lib/data/fetc
 import { ItemNameEntry, MoveNameEntry } from "@/lib/types";
 import { MonConfig, FieldSetup, DEFAULT_FIELD, blankConfig, configToSetup, runDamageCalc } from "@/lib/logic/damageCalc";
 import DamageMonPanel from "@/components/DamageMonPanel";
+import BackToOptimizer from "@/components/BackToOptimizer";
 
 const WEATHERS = ["", "Sun", "Rain", "Sand", "Snow"] as const;
 const TERRAINS = ["", "Electric", "Grassy", "Misty", "Psychic"] as const;
@@ -36,6 +37,7 @@ export default function DamageCheckExplorer() {
     <div className="w-full max-w-5xl rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
       <div className="h-2 rounded-t-lg bg-[color:var(--shell-accent)]" />
       <div className="rounded-b-lg bg-[color:var(--screen)] p-6 sm:p-8">
+        <BackToOptimizer />
         <h1 className="font-logo text-2xl sm:text-3xl text-[color:var(--ink)]">Damage check</h1>
         <p className="mt-1 text-sm text-[color:var(--ink)]/70">
           Pick an attacker, a defender and a move. Add stat stages, weather and screens to match the situation on the field.

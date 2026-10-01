@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useTeamStore, TEAM_SIZE } from "@/lib/store/teamStore";
 import { useBackdropStore } from "@/lib/store/backdropStore";
-import { useTeamStore } from "@/lib/store/teamStore";
 import { useSavedTeamsStore } from "@/lib/store/savedTeamsStore";
 import { getTeamDefenseMatrix, getTeamOffenseReport } from "@/lib/logic/teamAnalysis";
 import TeamCoverageReport from "@/components/TeamCoverageReport";
@@ -15,18 +15,34 @@ import ImportTeamModal from "@/components/ImportTeamModal";
 export default function TeamBuilder() {
   const slots = useTeamStore((s) => s.slots);
   const setBackdropFigures = useBackdropStore((s) => s.setFigures);
+  const prevNamesRef = useRef<string[]>([]);
+  const spotlightRef = useRef<string | null>(null);
+
   useEffect(() => {
-    setBackdropFigures(
-      slots
-        .filter((s) => s.pokemon)
-        .map((s) => ({
-          src: s.pokemon!.artworkUrl ?? s.pokemon!.spriteUrl ?? "",
-          type: s.pokemon!.types[0],
-        }))
-        .filter((f) => f.src)
-    );
-    return () => setBackdropFigures([]);
+    const filled = slots.filter((s) => s.pokemon).map((s) => s.pokemon!);
+    const names = filled.map((p) => p.name);
+
+    // Spotlight = the Pokémon that was just added; otherwise keep the previous one
+    const added = names.filter((n) => !prevNamesRef.current.includes(n));
+    prevNamesRef.current = names;
+    if (added.length === 1) spotlightRef.current = added[0];
+    else if (!spotlightRef.current || !names.includes(spotlightRef.current)) {
+      spotlightRef.current = names[names.length - 1] ?? null;
+    }
+
+    const toFigure = (p: (typeof filled)[number]) => ({
+      src: p.artworkUrl ?? p.spriteUrl ?? "",
+      type: p.types[0],
+    });
+    const figures =
+      filled.length >= TEAM_SIZE
+        ? filled.map(toFigure) // full team: AppBackground rotates through all six
+        : filled.filter((p) => p.name === spotlightRef.current).map(toFigure);
+    setBackdropFigures(figures.filter((f) => f.src));
   }, [slots, setBackdropFigures]);
+
+  // Clear the silhouettes only when leaving the page
+  useEffect(() => () => setBackdropFigures([]), [setBackdropFigures]);
   
   const clearTeam = useTeamStore((s) => s.clearTeam);
   const loadSlots = useTeamStore((s) => s.loadSlots);

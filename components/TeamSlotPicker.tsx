@@ -115,7 +115,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
           />
           {pokeLoading && <p className="mt-1 text-xs opacity-60">Loading…</p>}
           {showPokeDropdown && pokeMatches.length > 0 && (
-            <div className="absolute z-10 mt-1 max-h-[40vh] w-full overflow-y-auto rounded-md border border-black/10 bg-white p-1 shadow-lg">
+            <div className="mt-1 w-full rounded-md border border-black/10 bg-white p-1 shadow-lg">
               {pokeMatches.map((p) => (
                 <button
                   key={p.name}

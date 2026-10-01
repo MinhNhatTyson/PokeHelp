@@ -57,7 +57,7 @@ export default function TeamSlotCard({ index, onOpen }: { index: number; onOpen:
       </div>
 
       <div
-        className="relative mx-3 mt-1 flex h-24 items-center justify-center rounded-lg sm:h-28"
+        className="relative mx-3 mt-1 flex h-24 items-center justify-center rounded-lg sm:h-28 shrink-0 whitespace-nowrap inline-flex items-center justify-center tracking-wide"
         style={{ background: `linear-gradient(180deg, ${frame}30, ${frame}08)` }}
       >
         {image && (

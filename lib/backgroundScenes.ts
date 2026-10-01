@@ -11,13 +11,14 @@ export interface BackgroundScene {
   glow: SceneGlow;
   calm?: boolean;     // slows ball drift
   vignette?: boolean; // darkens the edges (Live Battle)
-  figures?: "single" | "lineup"; // page-driven silhouettes (omit = the type's default pair)
+  figures?: boolean;     // silhouettes are driven by the page via backdropStore.figures
+  figureSize?: string;
 }
 
 export const SCENES: Record<string, BackgroundScene> = {
   "/":          { type: "grass",    motif: "balls",      glow: "corner" },
-  "/items":     { type: "poison",   motif: "ballTypes",  glow: "corner", figures: "single" },
-  "/team":      { type: "water",    motif: "cards",      glow: "center", figures: "lineup" },
+  "/items":     { type: "poison",   motif: "ballTypes",  glow: "corner", figures: true, figureSize: "clamp(200px, 28vw, 380px)" },
+  "/team":      { type: "water",    motif: "cards",      glow: "center", figures: true, figureSize: "clamp(160px, calc((100vw - 34rem) / 2), 420px)" },
   "/optimizer": { type: "fighting", motif: "versus",     glow: "split" },
   "/history":   { type: "psychic",  motif: "rings",      glow: "center", calm: true },
   "/speed":     { type: "electric", motif: "speedlines", glow: "split" },

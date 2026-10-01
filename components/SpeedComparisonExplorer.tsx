@@ -11,6 +11,7 @@ import TypeBadge from "@/components/TypeBadge";
 import Link from "next/link";
 import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
 import { useListNav } from "@/lib/hooks/useListNav";
+import BackToOptimizer from "@/components/BackToOptimizer";
 
 const MAX_SUGGESTIONS = 8;
 
@@ -99,6 +100,7 @@ export default function SpeedComparisonExplorer() {
     <div className="w-full max-w-3xl rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
       <div className="h-2 rounded-t-lg bg-[color:var(--shell-accent)]" />
       <div className="rounded-b-lg bg-[color:var(--screen)] p-6 sm:p-8">
+        <BackToOptimizer />
         <h1 className="font-logo text-2xl sm:text-3xl text-[color:var(--ink)]">Speed check</h1>
         <p className="mt-1 text-sm text-[color:var(--ink)]/70">
           Compare one of your built mons against likely Speed spreads for any Pokémon.

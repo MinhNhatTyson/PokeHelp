@@ -21,11 +21,7 @@ export default function PokemonSearch() {
 
   useEffect(() => {
     const trimmed = query.trim();
-    if (!trimmed) {
-      setPokemon(null);
-      setStatus("idle");
-      return;
-    }
+    if (!trimmed) return;
 
     const handle = setTimeout(async () => {
       setStatus("loading");
@@ -50,7 +46,15 @@ export default function PokemonSearch() {
     <div className="w-full max-w-md">
       <input
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          const value = e.target.value;
+          setQuery(value);
+
+          if (!value.trim()) {
+            setPokemon(null);
+            setStatus("idle");
+          }
+        }}
         placeholder="Search a Pokémon by name..."
         className="w-full rounded-md border border-[color:var(--shell-accent)] bg-[color:var(--screen)] px-3 py-2 text-[color:var(--ink)]"
       />

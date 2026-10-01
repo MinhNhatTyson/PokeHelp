@@ -313,38 +313,30 @@ export default function AppBackground() {
   const scene = getScene(pathname);
   const type: PokemonTypeName = override ?? scene.type;
   const figures = useBackdropStore((s) => s.figures);
-  const [pair, setPair] = useState(0);
-  const lineupFull = scene.figures === "lineup" && figures.length >= 6;
+  const [cycle, setCycle] = useState(0);
+  const driven = !!scene.figures;
 
-  // Full team: slowly rotate through the pairs (1+2, 3+4, 5+6)
+  // Several figures (full team): rotate through them, one at a time
   useEffect(() => {
-    if (!lineupFull || reduceMotion) return;
-    const id = setInterval(() => setPair((p) => (p + 1) % 3), 7000);
+    if (!driven || figures.length < 2 || reduceMotion) return;
+    const id = setInterval(() => setCycle((c) => c + 1), 8000);
     return () => clearInterval(id);
-  }, [lineupFull, reduceMotion]);
+  }, [driven, figures.length, reduceMotion]);
 
   const colorOf = (f: BackdropFigure) => TYPE_COLOR[f.type ?? scene.type];
   const silhouettes: ReactNode[] = [];
-  if (!scene.figures) {
+  if (!driven) {
     const [l, r] = TYPE_MONS[type];
     silhouettes.push(
       <Silhouette key={`${type}-l`} src={`${ART_BASE}/${l}.png`} color={TYPE_COLOR[type]} side="left" />,
       <Silhouette key={`${type}-r`} src={`${ART_BASE}/${r}.png`} color={TYPE_COLOR[type]} side="right" />
     );
-  } else if (scene.figures === "single") {
-    const f = figures[0];
-    if (f) silhouettes.push(<Silhouette key={f.src} src={f.src} color={colorOf(f)} side="right" size="clamp(200px, 28vw, 380px)" />);
-  } else if (lineupFull) {
-    const l = figures[pair * 2];
-    const r = figures[pair * 2 + 1];
-    if (l) silhouettes.push(<Silhouette key={`l-${l.src}`} src={l.src} color={colorOf(l)} side="left" />);
-    if (r) silhouettes.push(<Silhouette key={`r-${r.src}`} src={r.src} color={colorOf(r)} side="right" />);
-  } else {
-    const n = figures.length;
-    figures.forEach((f, i) => {
-      const x = n === 1 ? 50 : 14 + (i * 72) / (n - 1);
-      silhouettes.push(<LineupSilhouette key={f.src} src={f.src} color={colorOf(f)} x={x} />);
-    });
+  } else if (figures.length > 0) {
+    const f = figures[cycle % figures.length];
+    silhouettes.push(
+      <Silhouette key={`l-${f.src}`} src={f.src} color={colorOf(f)} side="left" size={scene.figureSize} />,
+      <Silhouette key={`r-${f.src}`} src={f.src} color={colorOf(f)} side="right" size={scene.figureSize} />
+    );
   }
   const ballMotif = scene.motif === "balls" || scene.motif === "ballTypes";
   const tints = scene.motif === "ballTypes" ? BALL_TINTS : undefined;
