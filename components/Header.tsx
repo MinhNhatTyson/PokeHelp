@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { PokemonTypeName } from "@/lib/types";
 import { TYPE_COLOR } from "@/lib/typeMeta";
 import { AnimatePresence, motion } from "motion/react";
+import { SCENES } from "@/lib/backgroundScenes";
 
 
 function TabIcon({ href }: { href: string }) {
@@ -107,12 +108,12 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Type & Pokédex", href: "/", themeType: "grass", mobileLabel: "Dex" },
-  { label: "Items", href: "/items", themeType: "poison" },
-  { label: "Team Builder", href: "/team", themeType: "water", mobileLabel: "Team" },
-  { label: "Battle Optimizer", href: "/optimizer", themeType: "fighting", mobileLabel: "Matchups" },
-  { label: "Battle History", href: "/history", themeType: "psychic", mobileLabel: "History" },
-  { label: "Trainer Roster", href: "/trainers", themeType: "dragon", comingSoon: true },
+  { label: "Type & Pokédex", href: "/", themeType: SCENES["/"].type, mobileLabel: "Dex" },
+  { label: "Items", href: "/items", themeType: SCENES["/items"].type },
+  { label: "Team Builder", href: "/team", themeType: SCENES["/team"].type, mobileLabel: "Team" },
+  { label: "Battle Optimizer", href: "/optimizer", themeType: SCENES["/optimizer"].type, mobileLabel: "Matchups" },
+  { label: "Battle History", href: "/history", themeType: SCENES["/history"].type, mobileLabel: "History" },
+  { label: "Trainer Roster", href: "/trainers", themeType: SCENES["/trainers"].type, comingSoon: true },
 ];
 
 const MOBILE_TAB_HREFS = ["/", "/items", "/team", "/optimizer", "/history"];

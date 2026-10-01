@@ -5,6 +5,7 @@ import { ItemDetail, ItemNameEntry } from "@/lib/types";
 import { fetchCompetitiveItemNameList, fetchItemDetail } from "@/lib/data/fetchAndCache";
 import ItemResultCard from "@/components/ItemResultCard";
 import { useListNav } from "@/lib/hooks/useListNav";
+import { useBackdropStore } from "@/lib/store/backdropStore";
 
 const MAX_NAME_SUGGESTIONS = 8;
 
@@ -15,6 +16,11 @@ export default function ItemSearchExplorer() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [nameList, setNameList] = useState<ItemNameEntry[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const setBackdropFigures = useBackdropStore((s) => s.setFigures);
+  useEffect(() => {
+    setBackdropFigures(selectedItem?.spriteUrl ? [{ src: selectedItem.spriteUrl }] : []);
+    return () => setBackdropFigures([]);
+  }, [selectedItem, setBackdropFigures]);
 
   useEffect(() => {
     fetchCompetitiveItemNameList().then(setNameList);

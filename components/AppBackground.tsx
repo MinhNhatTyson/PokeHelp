@@ -4,12 +4,13 @@ import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } fr
 import { usePathname } from "next/navigation";
 import { PokemonTypeName } from "@/lib/types";
 import { TYPE_COLOR } from "@/lib/typeMeta";
-import { useBackdropStore } from "@/lib/store/backdropStore";
+import { useEffect, useState, type ReactNode } from "react";
+import { useBackdropStore, type BackdropFigure } from "@/lib/store/backdropStore";
 import TypeIcon from "@/components/TypeIcon";
+import { getScene, type SceneMotif } from "@/lib/backgroundScenes";
+
 
 const BOOST = 3; // raise/lower to taste (1 = the old values)
-const ART = (id: number) =>
-  `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
 
 // Two iconic Pokédex IDs per type: [left silhouette, right silhouette]
 const TYPE_MONS: Record<PokemonTypeName, [number, number]> = {
@@ -35,7 +36,11 @@ const TYPE_MONS: Record<PokemonTypeName, [number, number]> = {
 
 const SILHOUETTE_OPACITY = 0.16;
 
-function Silhouette({ id, type, side }: { id: number; type: PokemonTypeName; side: "left" | "right" }) {
+const ART_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork";
+
+function Silhouette({ src, color, side, size = "clamp(240px, 36vw, 500px)" }: {
+  src: string; color: string; side: "left" | "right"; size?: string;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }}
@@ -45,11 +50,11 @@ function Silhouette({ id, type, side }: { id: number; type: PokemonTypeName; sid
       className="absolute bottom-0"
       style={{
         [side]: "-3%",
-        width: "clamp(240px, 36vw, 500px)",
-        height: "clamp(240px, 36vw, 500px)",
-        backgroundColor: TYPE_COLOR[type],
-        WebkitMaskImage: `url(${ART(id)})`,
-        maskImage: `url(${ART(id)})`,
+        width: size,
+        height: size,
+        backgroundColor: color,
+        WebkitMaskImage: `url(${src})`,
+        maskImage: `url(${src})`,
         WebkitMaskSize: "contain",
         maskSize: "contain",
         WebkitMaskRepeat: "no-repeat",
@@ -62,17 +67,34 @@ function Silhouette({ id, type, side }: { id: number; type: PokemonTypeName; sid
   );
 }
 
-// Mirrors NAV_ITEMS themeType in Header.tsx
-const ROUTE_TYPE: Record<string, PokemonTypeName> = {
-  "/": "grass",
-  "/items": "poison",
-  "/team": "water",
-  "/optimizer": "fighting",
-  "/history": "psychic",
-  "/speed": "electric",
-  "/battle": "fire",
-  "/damage": "rock",
-};
+// Team Builder lineup: silhouettes standing along the bottom edge
+function LineupSilhouette({ src, color, x }: { src: string; color: string; x: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 40, left: `${x}%` }}
+      animate={{ opacity: SILHOUETTE_OPACITY, y: 0, left: `${x}%` }}
+      exit={{ opacity: 0, y: 40 }}
+      transition={{ duration: 0.8, ease: "easeOut" }}
+      className="absolute bottom-0"
+      style={{
+        x: "-50%",
+        scaleX: x < 50 ? -1 : 1, // face inward
+        width: "clamp(150px, 21vw, 300px)",
+        height: "clamp(150px, 21vw, 300px)",
+        backgroundColor: color,
+        WebkitMaskImage: `url(${src})`,
+        maskImage: `url(${src})`,
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center bottom",
+        maskPosition: "center bottom",
+      }}
+    />
+  );
+}
+
 
 interface Ball { l: number; t: number; s: number; dur: number; delay: number; dx: number; dy: number; rot: number; o: number }
 
@@ -97,9 +119,12 @@ const GLYPHS = [
   { l: 44, t: 82, s: 130, o: 0.06 },
 ];
 
-function PokeBallShape({ size, opacity }: { size: number; opacity: number }) {
+const BALL_TINTS = ["#d6362b", "#3b82f6", "#ffc72c", "#f5f5f5", "#a855f7"]; // Poké, Great, Ultra, Premier, Master
+
+function PokeBallShape({ size, opacity, tint }: { size: number; opacity: number; tint?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none" style={{ opacity: Math.min(1, opacity * BOOST) }} className="text-[color:var(--screen)]">
+      {tint && <path d="M2 10a8 8 0 0 1 16 0z" fill={tint} fillOpacity="0.55" />}
       <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.2" />
       <path d="M2 10h16" stroke="currentColor" strokeWidth="1.2" />
       <circle cx="10" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.2" />
@@ -107,7 +132,7 @@ function PokeBallShape({ size, opacity }: { size: number; opacity: number }) {
   );
 }
 
-function BallLayer({ balls }: { balls: Ball[] }) {
+function BallLayer({ balls, tints, calm }: { balls: Ball[]; tints?: string[]; calm?: boolean }) {
   return (
     <>
       {balls.map((b, i) => (
@@ -116,15 +141,165 @@ function BallLayer({ balls }: { balls: Ball[] }) {
           className="bg-float absolute"
           style={{
             left: `${b.l}%`, top: `${b.t}%`,
-            ["--dur" as string]: `${b.dur}s`, ["--delay" as string]: `${b.delay}s`,
+            ["--dur" as string]: `${b.dur * (calm ? 1.8 : 1)}s`, ["--delay" as string]: `${b.delay}s`,
             ["--dx" as string]: `${b.dx}px`, ["--dy" as string]: `${b.dy}px`, ["--rot" as string]: `${b.rot}deg`,
           }}
         >
-          <PokeBallShape size={b.s} opacity={b.o} />
+          <PokeBallShape size={b.s} opacity={b.o} tint={tints ? tints[i % tints.length] : undefined} />
         </span>
       ))}
     </>
   );
+}
+const CARDS = [
+  { l: 6,  t: 12, w: 78, dur: 30, delay: -4,  dx: 16,  dy: -34, rot: -14 },
+  { l: 22, t: 62, w: 64, dur: 34, delay: -10, dx: -14, dy: -28, rot: 10 },
+  { l: 40, t: 8,  w: 56, dur: 28, delay: -7,  dx: 12,  dy: -30, rot: 18 },
+  { l: 58, t: 70, w: 84, dur: 36, delay: -2,  dx: -18, dy: -40, rot: -8 },
+  { l: 74, t: 20, w: 70, dur: 32, delay: -12, dx: 14,  dy: -32, rot: 12 },
+  { l: 90, t: 58, w: 60, dur: 29, delay: -6,  dx: -12, dy: -26, rot: -16 },
+  { l: 48, t: 40, w: 52, dur: 38, delay: -15, dx: 10,  dy: -24, rot: 6 },
+];
+
+const STREAKS = Array.from({ length: 10 }, (_, i) => ({
+  t: 6 + i * 9.3, w: 140 + ((i * 53) % 200), dur: 2.4 + (i % 4) * 0.7, delay: -(i * 0.8), o: 0.18 + (i % 3) * 0.08,
+}));
+
+const EMBERS = Array.from({ length: 24 }, (_, i) => ({
+  l: (i * 37 + 11) % 100, s: 3 + (i % 4) * 2, dur: 9 + ((i * 7) % 9), delay: -((i * 5) % 14), dx: ((i % 5) - 2) * 18, o: 0.35 + (i % 3) * 0.15,
+}));
+
+const RETICLE_STYLE = { stroke: "var(--bg-accent)", strokeOpacity: 0.3 } as const;
+
+function MotifLayer({ motif }: { motif: SceneMotif }) {
+  switch (motif) {
+    case "cards":
+      return (
+        <>
+          {CARDS.map((c, i) => (
+            <span
+              key={i}
+              className="bg-float absolute rounded-xl border-2"
+              style={{
+                left: `${c.l}%`, top: `${c.t}%`, width: c.w, aspectRatio: "5 / 7",
+                borderColor: "color-mix(in srgb, var(--screen) 22%, transparent)",
+                background: "linear-gradient(160deg, color-mix(in srgb, var(--bg-accent) 22%, transparent), transparent 70%)",
+                ["--dur" as string]: `${c.dur}s`, ["--delay" as string]: `${c.delay}s`,
+                ["--dx" as string]: `${c.dx}px`, ["--dy" as string]: `${c.dy}px`, ["--rot" as string]: `${c.rot}deg`,
+              }}
+            >
+              <span
+                className="absolute inset-x-1.5 top-1.5 h-[46%] rounded-md"
+                style={{ border: "1.5px solid color-mix(in srgb, var(--screen) 18%, transparent)" }}
+              />
+            </span>
+          ))}
+        </>
+      );
+
+    case "versus":
+      return (
+        <>
+          <div
+            className="absolute inset-0"
+            style={{ backgroundImage: "repeating-linear-gradient(115deg, transparent 0 56px, color-mix(in srgb, var(--screen) 5%, transparent) 56px 58px)" }}
+          />
+          <span className="absolute" style={{ left: "50%", top: "46%", transform: "translate(-50%, -50%) rotate(-8deg)" }}>
+            <span
+              className="bg-float font-logo block select-none"
+              style={{
+                fontSize: "clamp(160px, 26vw, 380px)", lineHeight: 1,
+                color: "color-mix(in srgb, var(--bg-accent) 14%, transparent)",
+                ["--dx" as string]: "0px", ["--dy" as string]: "-24px", ["--rot" as string]: "3deg", ["--dur" as string]: "18s",
+              }}
+            >
+              VS
+            </span>
+          </span>
+        </>
+      );
+
+    case "rings":
+      return (
+        <div className="absolute" style={{ right: "-10%", top: "50%", width: "clamp(420px, 62vw, 860px)", aspectRatio: "1", transform: "translateY(-50%)" }}>
+          <div className="bg-spin absolute inset-0" style={{ ["--dur" as string]: "140s" }}>
+            <svg viewBox="0 0 200 200" className="h-full w-full" fill="none" style={RETICLE_STYLE}>
+              <circle cx="100" cy="100" r="96" strokeWidth="0.8" strokeDasharray="2 5" />
+              <circle cx="100" cy="100" r="76" strokeWidth="0.8" />
+              <circle cx="100" cy="100" r="56" strokeWidth="0.8" strokeDasharray="10 6" />
+              <path d="M100 4v192M4 100h192" strokeWidth="0.5" />
+            </svg>
+          </div>
+          <div className="bg-spin absolute inset-[26%]" style={{ ["--dur" as string]: "90s", animationDirection: "reverse" }}>
+            <svg viewBox="0 0 200 200" className="h-full w-full" fill="none" style={RETICLE_STYLE}>
+              <circle cx="100" cy="100" r="96" strokeWidth="1" strokeDasharray="4 8" />
+              <circle cx="100" cy="100" r="48" strokeWidth="1" />
+            </svg>
+          </div>
+        </div>
+      );
+
+    case "speedlines":
+      return (
+        <>
+          {STREAKS.map((s, i) => (
+            <span
+              key={i}
+              className="bg-streak absolute"
+              style={{
+                top: `${s.t}%`, left: 0, width: s.w, height: 2, borderRadius: 2,
+                background: "linear-gradient(90deg, transparent, var(--bg-accent))",
+                ["--dur" as string]: `${s.dur}s`, ["--delay" as string]: `${s.delay}s`, ["--o" as string]: `${s.o}`,
+              }}
+            />
+          ))}
+        </>
+      );
+
+    case "embers":
+      return (
+        <>
+          {EMBERS.map((e, i) => (
+            <span
+              key={i}
+              className="bg-ember absolute rounded-full"
+              style={{
+                left: `${e.l}%`, bottom: -10, width: e.s, height: e.s,
+                background: "var(--bg-accent)", boxShadow: "0 0 8px var(--bg-accent)",
+                ["--dur" as string]: `${e.dur}s`, ["--delay" as string]: `${e.delay}s`,
+                ["--dx" as string]: `${e.dx}px`, ["--o" as string]: `${e.o}`,
+              }}
+            />
+          ))}
+        </>
+      );
+
+    case "grid": {
+      const line = "color-mix(in srgb, var(--screen) 6%, transparent)";
+      const fade = "radial-gradient(ellipse at center, black 30%, transparent 75%)";
+      return (
+        <>
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `linear-gradient(${line} 1px, transparent 1px), linear-gradient(90deg, ${line} 1px, transparent 1px)`,
+              backgroundSize: "48px 48px", maskImage: fade, WebkitMaskImage: fade,
+            }}
+          />
+          <div className="bg-spin absolute" style={{ right: "4%", top: "50%", width: "clamp(260px, 34vw, 520px)", aspectRatio: "1", marginTop: "calc(clamp(260px, 34vw, 520px) / -2)", ["--dur" as string]: "120s" }}>
+            <svg viewBox="0 0 200 200" className="h-full w-full" fill="none" style={RETICLE_STYLE}>
+              <circle cx="100" cy="100" r="90" strokeWidth="1" />
+              <circle cx="100" cy="100" r="58" strokeWidth="1" strokeDasharray="6 6" />
+              <path d="M100 0v40M100 160v40M0 100h40M160 100h40" strokeWidth="1.2" />
+            </svg>
+          </div>
+        </>
+      );
+    }
+
+    default:
+      return null; // "balls" / "ballTypes" are handled by BallLayer
+  }
 }
 
 export default function AppBackground() {
@@ -135,20 +310,75 @@ export default function AppBackground() {
   const farY = useTransform(scrollY, [0, 1200], [0, -50]);
   const nearY = useTransform(scrollY, [0, 1200], [0, -160]);
 
-  const type: PokemonTypeName = override ?? ROUTE_TYPE[pathname] ?? "dragon";
+  const scene = getScene(pathname);
+  const type: PokemonTypeName = override ?? scene.type;
+  const figures = useBackdropStore((s) => s.figures);
+  const [pair, setPair] = useState(0);
+  const lineupFull = scene.figures === "lineup" && figures.length >= 6;
+
+  // Full team: slowly rotate through the pairs (1+2, 3+4, 5+6)
+  useEffect(() => {
+    if (!lineupFull || reduceMotion) return;
+    const id = setInterval(() => setPair((p) => (p + 1) % 3), 7000);
+    return () => clearInterval(id);
+  }, [lineupFull, reduceMotion]);
+
+  const colorOf = (f: BackdropFigure) => TYPE_COLOR[f.type ?? scene.type];
+  const silhouettes: ReactNode[] = [];
+  if (!scene.figures) {
+    const [l, r] = TYPE_MONS[type];
+    silhouettes.push(
+      <Silhouette key={`${type}-l`} src={`${ART_BASE}/${l}.png`} color={TYPE_COLOR[type]} side="left" />,
+      <Silhouette key={`${type}-r`} src={`${ART_BASE}/${r}.png`} color={TYPE_COLOR[type]} side="right" />
+    );
+  } else if (scene.figures === "single") {
+    const f = figures[0];
+    if (f) silhouettes.push(<Silhouette key={f.src} src={f.src} color={colorOf(f)} side="right" size="clamp(200px, 28vw, 380px)" />);
+  } else if (lineupFull) {
+    const l = figures[pair * 2];
+    const r = figures[pair * 2 + 1];
+    if (l) silhouettes.push(<Silhouette key={`l-${l.src}`} src={l.src} color={colorOf(l)} side="left" />);
+    if (r) silhouettes.push(<Silhouette key={`r-${r.src}`} src={r.src} color={colorOf(r)} side="right" />);
+  } else {
+    const n = figures.length;
+    figures.forEach((f, i) => {
+      const x = n === 1 ? 50 : 14 + (i * 72) / (n - 1);
+      silhouettes.push(<LineupSilhouette key={f.src} src={f.src} color={colorOf(f)} x={x} />);
+    });
+  }
+  const ballMotif = scene.motif === "balls" || scene.motif === "ballTypes";
+  const tints = scene.motif === "ballTypes" ? BALL_TINTS : undefined;
 
   return (
     <div
       aria-hidden="true"
+      data-glow={scene.glow}
       className="bg-glow pointer-events-none fixed inset-0 -z-10 overflow-hidden"
       style={{ ["--bg-accent" as string]: TYPE_COLOR[type] }}
     >
-      <motion.div className="absolute inset-x-0 -top-10 h-[130%]" style={{ y: reduceMotion ? 0 : farY }}>
-        <BallLayer balls={FAR_BALLS} />
-      </motion.div>
+      {ballMotif && (
+        <motion.div className="absolute inset-x-0 -top-10 h-[130%]" style={{ y: reduceMotion ? 0 : farY }}>
+          <BallLayer balls={FAR_BALLS} tints={tints} calm={scene.calm} />
+        </motion.div>
+      )}
+
+      <AnimatePresence>
+        {!ballMotif && (
+          <motion.div
+            key={scene.motif}
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <MotifLayer motif={scene.motif} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <motion.div className="absolute inset-x-0 -top-20 h-[140%]" style={{ y: reduceMotion ? 0 : nearY }}>
-        <BallLayer balls={NEAR_BALLS} />
+        {ballMotif && <BallLayer balls={NEAR_BALLS} tints={tints} calm={scene.calm} />}
         <AnimatePresence>
           {GLYPHS.map((g, i) => (
             <motion.span
@@ -160,17 +390,22 @@ export default function AppBackground() {
               className="absolute"
               style={{ left: `${g.l}%`, top: `${g.t}%`, color: TYPE_COLOR[type], opacity: g.o }}
             >
-            <span style={{ display: "block", width: g.s, height: g.s }}>
+              <span style={{ display: "block", width: g.s, height: g.s }}>
                 <TypeIcon type={type} className="h-full w-full" />
-            </span>
+              </span>
             </motion.span>
           ))}
         </AnimatePresence>
       </motion.div>
-      <AnimatePresence>
-        <Silhouette key={`${type}-l`} id={TYPE_MONS[type][0]} type={type} side="left" />
-        <Silhouette key={`${type}-r`} id={TYPE_MONS[type][1]} type={type} side="right" />
-      </AnimatePresence>
+
+      <AnimatePresence>{silhouettes}</AnimatePresence>
+
+      {scene.vignette && (
+        <div
+          className="absolute inset-0"
+          style={{ background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.55) 100%)" }}
+        />
+      )}
     </div>
   );
 }

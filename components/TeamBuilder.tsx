@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useBackdropStore } from "@/lib/store/backdropStore";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useSavedTeamsStore } from "@/lib/store/savedTeamsStore";
 import { getTeamDefenseMatrix, getTeamOffenseReport } from "@/lib/logic/teamAnalysis";
@@ -13,6 +14,20 @@ import ImportTeamModal from "@/components/ImportTeamModal";
 
 export default function TeamBuilder() {
   const slots = useTeamStore((s) => s.slots);
+  const setBackdropFigures = useBackdropStore((s) => s.setFigures);
+  useEffect(() => {
+    setBackdropFigures(
+      slots
+        .filter((s) => s.pokemon)
+        .map((s) => ({
+          src: s.pokemon!.artworkUrl ?? s.pokemon!.spriteUrl ?? "",
+          type: s.pokemon!.types[0],
+        }))
+        .filter((f) => f.src)
+    );
+    return () => setBackdropFigures([]);
+  }, [slots, setBackdropFigures]);
+  
   const clearTeam = useTeamStore((s) => s.clearTeam);
   const loadSlots = useTeamStore((s) => s.loadSlots);
 
