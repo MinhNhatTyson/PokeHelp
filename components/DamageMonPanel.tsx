@@ -8,6 +8,7 @@ import { getCommonSet } from "@/lib/data/commonSets";
 import { useListNav } from "@/lib/hooks/useListNav";
 import { NATURE_LABEL, NatureName, MAX_SP_PER_STAT, MAX_TOTAL_SP } from "@/lib/logic/statCalc";
 import { PokemonNameEntry } from "@/lib/types";
+import { TYPE_COLOR } from "@/lib/typeMeta";
 import {
   MonConfig, StatKey, BoostKey, PresetKey,
   applyPreset, configFromTeamSlot, configFromOpponent, configFromDetail,
@@ -59,6 +60,7 @@ export default function DamageMonPanel({ role, config, onChange }: {
 
   const patch = (p: Partial<MonConfig>) => onChange({ ...config, ...p });
   const mon = config.detail;
+  const accent = role === "attacker" ? TYPE_COLOR.fighting : TYPE_COLOR.water;
   const megaForm = mon ? getCommonSet(mon.name)?.megaForm : undefined;
   const boostKeys: BoostKey[] = role === "attacker" ? ["atk", "spa"] : ["def", "spd"];
   const totalSp = Object.values(config.sp).reduce((a, b) => a + b, 0);
@@ -67,27 +69,53 @@ export default function DamageMonPanel({ role, config, onChange }: {
   const scouted = oppSlots.filter((s) => s.pokemon);
 
   return (
-    <div className="rounded-lg border border-black/10 bg-white p-4">
-      <p className="font-heading text-base text-[color:var(--ink)]">{role === "attacker" ? "Attacker" : "Defender"}</p>
+    <div className="overflow-hidden rounded-lg border-2 bg-white" style={{ borderColor: accent }}>
+      <div className="px-4 py-2 text-white" style={{ backgroundColor: accent }}>
+        <p className="font-heading text-lg leading-tight">{role === "attacker" ? "Attacker" : "Defender"}</p>
+        <p className="text-[11px] opacity-90">{role === "attacker" ? "Uses the move" : "Takes the hit"}</p>
+      </div>
+      <div className="p-4">
 
       {(yourMons.length > 0 || scouted.length > 0) && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {yourMons.map((s) => (
-            <button key={`y-${s.pokemon!.name}`} type="button" onClick={() => { const c = configFromTeamSlot(s); if (c) onChange(c); }}
-              className="rounded-full bg-[color:var(--accent-gold)]/40 px-2.5 py-1 text-xs capitalize text-[color:var(--ink)] btn-tactile">
-              {s.pokemon!.name}
-            </button>
-          ))}
-          {scouted.map((s) => (
-            <button key={`o-${s.pokemon!.name}`} type="button" onClick={() => { const c = configFromOpponent(s); if (c) onChange(c); }}
-              className="rounded-full bg-black/10 px-2.5 py-1 text-xs capitalize text-[color:var(--ink)] btn-tactile">
-              {s.pokemon!.name}
-            </button>
-          ))}
+        <div className="space-y-1.5">
+            {yourMons.length > 0 && (
+            <div>
+                <p className="text-[10px] font-medium uppercase text-[color:var(--ink)]/40">Your team</p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                {yourMons.map((s) => (
+                    <button key={`y-${s.pokemon!.name}`} type="button"
+                    onClick={() => { const c = configFromTeamSlot(s); if (c) onChange(c); }}
+                    className={`rounded-full px-2.5 py-1 text-xs capitalize btn-tactile ${
+                        config.detail?.name === s.pokemon!.name ? "text-white" : "bg-[color:var(--accent-gold)]/40 text-[color:var(--ink)]"
+                    }`}
+                    style={config.detail?.name === s.pokemon!.name ? { backgroundColor: accent } : undefined}>
+                    {s.pokemon!.name}
+                    </button>
+                ))}
+                </div>
+            </div>
+            )}
+            {scouted.length > 0 && (
+            <div>
+                <p className="text-[10px] font-medium uppercase text-[color:var(--ink)]/40">Scouted opponent</p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                {scouted.map((s) => (
+                    <button key={`o-${s.pokemon!.name}`} type="button"
+                    onClick={() => { const c = configFromOpponent(s); if (c) onChange(c); }}
+                    className={`rounded-full px-2.5 py-1 text-xs capitalize btn-tactile ${
+                        config.detail?.name === s.pokemon!.name ? "text-white" : "bg-black/10 text-[color:var(--ink)]"
+                    }`}
+                    style={config.detail?.name === s.pokemon!.name ? { backgroundColor: accent } : undefined}>
+                    {s.pokemon!.name}
+                    </button>
+                ))}
+                </div>
+            </div>
+            )}
         </div>
-      )}
+        )}
 
-      <div className="relative mt-2">
+      <div className="relative mt-3">
         <input
           {...nav.inputProps}
           value={query}
@@ -197,6 +225,7 @@ export default function DamageMonPanel({ role, config, onChange }: {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

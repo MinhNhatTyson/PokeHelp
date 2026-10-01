@@ -33,7 +33,7 @@ export default function DamageCheckExplorer() {
   const outcome = atkSetup && defSetup && moveText.trim() ? runDamageCalc(atkSetup, defSetup, moveText, field) : null;
 
   return (
-    <div className="w-full max-w-4xl rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
+    <div className="w-full max-w-5xl rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
       <div className="h-2 rounded-t-lg bg-[color:var(--shell-accent)]" />
       <div className="rounded-b-lg bg-[color:var(--screen)] p-6 sm:p-8">
         <h1 className="font-logo text-2xl sm:text-3xl text-[color:var(--ink)]">Damage check</h1>
@@ -44,14 +44,20 @@ export default function DamageCheckExplorer() {
         <datalist id="item-options">{itemNames.map((i) => <option key={i.name} value={i.name.replace(/-/g, " ")} />)}</datalist>
         <datalist id="move-options">{moveNames.map((m) => <option key={m.name} value={m.name.replace(/-/g, " ")} />)}</datalist>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-          <DamageMonPanel role="attacker" config={attacker} onChange={setAttacker} />
-          <DamageMonPanel role="defender" config={defender} onChange={setDefender} />
-        </div>
-
-        <div className="mt-3 flex justify-center">
-          <button type="button" onClick={swap}
-            className="rounded-full bg-black/10 px-4 py-1.5 text-sm font-medium text-[color:var(--ink)] btn-tactile">⇄ Swap attacker / defender</button>
+        <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1">
+            <DamageMonPanel role="attacker" config={attacker} onChange={setAttacker} />
+          </div>
+          <div className="flex shrink-0 items-center justify-center lg:flex-col lg:self-center">
+            <button type="button" onClick={swap} aria-label="Swap attacker and defender"
+              className="flex h-12 w-12 flex-col items-center justify-center rounded-full bg-[color:var(--shell)] text-[color:var(--screen)] btn-tactile">
+              <span className="font-heading text-sm leading-none">VS</span>
+              <span className="text-[10px] leading-none opacity-70">⇄ swap</span>
+            </button>
+          </div>
+          <div className="min-w-0 flex-1">
+            <DamageMonPanel role="defender" config={defender} onChange={setDefender} />
+          </div>
         </div>
 
         <div className="mt-4 rounded-lg border border-black/10 bg-white p-4">
@@ -95,22 +101,31 @@ export default function DamageCheckExplorer() {
         </div>
 
         {outcome && (
-          <div className="mt-4 rounded-lg border border-[color:var(--accent-gold)]/60 bg-black/5 p-4">
-            {outcome.ok ? (
-              <>
-                <p className="font-heading text-2xl text-[color:var(--ink)]">{outcome.minPct}% – {outcome.maxPct}%</p>
-                <p className="text-sm font-medium text-[color:var(--shell-accent)]">{outcome.koText || "No KO"}</p>
-                <div className="relative mt-3 h-3 overflow-hidden rounded-full bg-black/15">
-                  <div className="absolute inset-y-0 left-0 bg-[color:var(--accent-gold)]/60" style={{ width: `${Math.min(100, outcome.maxPct)}%` }} />
-                  <div className="absolute inset-y-0 left-0 bg-[color:var(--shell-accent)]" style={{ width: `${Math.min(100, outcome.minPct)}%` }} />
-                </div>
-                <p className="mt-2 text-xs text-[color:var(--ink)]/60">{outcome.minDmg}–{outcome.maxDmg} of {outcome.defenderHp} HP</p>
-                <p className="mt-2 text-xs text-[color:var(--ink)]/70">{outcome.description}</p>
-              </>
+        <div className="mt-4 rounded-lg border border-[color:var(--accent-gold)]/60 bg-black/5 p-4">
+            {!outcome.ok ? (
+            <p className="text-sm text-red-600">{outcome.error}</p>
             ) : (
-              <p className="text-sm text-red-600">{outcome.error}</p>
+            <>
+                {outcome.kind === "noEffect" ? (
+                <p className="font-heading text-xl text-[color:var(--ink)]">{outcome.message}</p>
+                ) : (
+                <>
+                    <p className="font-heading text-2xl text-[color:var(--ink)]">{outcome.minPct}% – {outcome.maxPct}%</p>
+                    <p className="text-sm font-medium text-[color:var(--shell-accent)]">{outcome.koText || "No KO"}</p>
+                    <div className="relative mt-3 h-3 overflow-hidden rounded-full bg-black/15">
+                    <div className="absolute inset-y-0 left-0 bg-[color:var(--accent-gold)]/60" style={{ width: `${Math.min(100, outcome.maxPct)}%` }} />
+                    <div className="absolute inset-y-0 left-0 bg-[color:var(--shell-accent)]" style={{ width: `${Math.min(100, outcome.minPct)}%` }} />
+                    </div>
+                    <p className="mt-2 text-xs text-[color:var(--ink)]/60">{outcome.minDmg}–{outcome.maxDmg} of {outcome.defenderHp} HP</p>
+                    <p className="mt-2 text-xs text-[color:var(--ink)]/70">{outcome.description}</p>
+                </>
+                )}
+                {outcome.warnings.map((w, i) => (
+                <p key={i} className="mt-2 rounded-md bg-[color:var(--accent-gold)]/30 px-3 py-1.5 text-xs text-[color:var(--ink)]">{w}</p>
+                ))}
+            </>
             )}
-          </div>
+        </div>
         )}
         <p className="mt-3 text-[11px] text-[color:var(--ink)]/40">
           Uses the Gen 9 damage formula at Lv50 with 31 IVs. Champions-specific changes the calculator doesn&apos;t know about won&apos;t show up.

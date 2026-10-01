@@ -1,5 +1,5 @@
 import { calculate, Generations, Pokemon as CalcPokemon, Move, Field } from "@smogon/calc";
-import type { PokemonDetail, TeamSlot, OpponentSlot } from "@/lib/types";
+import type { PokemonDetail, TeamSlot, OpponentSlot, PokemonTypeName } from "@/lib/types";
 import type { NatureName } from "@/lib/logic/statCalc";
 import { getCommonSet, getActiveMega } from "@/lib/data/commonSets";
 
@@ -17,14 +17,18 @@ export interface MonConfig {
   item: string | null;
   ability: string | null;
   nature: NatureName | null;
-  sp: Record<StatKey, number>;       // Stat Points, 0-32 each
-  boosts: Record<BoostKey, number>;  // stat stages, -6..+6
+  sp: Record<StatKey, number>;
+  boosts: Record<BoostKey, number>; 
   burned: boolean;
-  knownMoves: string[];              // quick-pick chips for the attacker
+  knownMoves: string[];      
 }
 
 export interface MonSetup {
-  species: string; item: string | null; ability: string | null; nature: NatureName | null;
+  species: string;                      
+  baseSpecies: string;                  
+  megaTypes: PokemonTypeName[] | null; 
+  overrideTypes?: PokemonTypeName[]; 
+  item: string | null; ability: string | null; nature: NatureName | null;
   sp: Record<StatKey, number>; boosts: Record<BoostKey, number>; burned: boolean;
 }
 
@@ -39,7 +43,8 @@ export const DEFAULT_FIELD: FieldSetup = {
 };
 
 export type DamageOutcome =
-  | { ok: true; description: string; minDmg: number; maxDmg: number; defenderHp: number; minPct: number; maxPct: number; koText: string }
+  | { ok: true; kind: "damage"; description: string; minDmg: number; maxDmg: number; defenderHp: number; minPct: number; maxPct: number; koText: string; warnings: string[] }
+  | { ok: true; kind: "noEffect"; message: string; warnings: string[] }
   | { ok: false; error: string };
 
 export const blankConfig = (): MonConfig => ({
@@ -108,6 +113,8 @@ export function configToSetup(cfg: MonConfig): MonSetup | null {
   const mega = cfg.useMega ? getCommonSet(cfg.detail.name)?.megaForm : undefined;
   return {
     species: mega?.formShowdownName ?? cfg.detail.name,
+    baseSpecies: cfg.detail.name,
+    megaTypes: mega?.formTypes ?? null,
     item: cfg.item,
     ability: mega ? mega.formAbility : cfg.ability, // the Mega's ability replaces the base one
     nature: cfg.nature, sp: cfg.sp, boosts: cfg.boosts, burned: cfg.burned,
@@ -117,27 +124,44 @@ export function configToSetup(cfg: MonConfig): MonSetup | null {
 // 1 SP = +1 stat at Lv50 = 8 EVs in calc terms; the calc caps EVs at 252, so a 32-SP stat is 1 point low (negligible)
 const spToEv = (sp: number) => Math.min(252, Math.max(0, sp) * 8);
 
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 function toCalcPokemon(s: MonSetup) {
   const item = s.item && GEN.items.get(idOf(s.item) as never) ? s.item : undefined;
   const ability = s.ability && GEN.abilities.get(idOf(s.ability) as never) ? s.ability : undefined;
-  const nature = s.nature ? ((s.nature[0].toUpperCase() + s.nature.slice(1)) as CalcOpts["nature"]) : undefined;
+  const nature = s.nature ? (cap(s.nature) as CalcOpts["nature"]) : undefined;
   return new CalcPokemon(GEN, s.species, {
     level: LEVEL, item, ability, nature,
     evs: { hp: spToEv(s.sp.hp), atk: spToEv(s.sp.atk), def: spToEv(s.sp.def), spa: spToEv(s.sp.spa), spd: spToEv(s.sp.spd), spe: spToEv(s.sp.spe) },
     boosts: s.boosts,
     status: s.burned ? "brn" : undefined,
+    overrides: s.overrideTypes ? ({ types: s.overrideTypes.map(cap) } as CalcOpts["overrides"]) : undefined,
   });
 }
 
 const fail = (error: string): DamageOutcome => ({ ok: false, error });
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-export function runDamageCalc(attacker: MonSetup, defender: MonSetup, moveName: string, field: FieldSetup): DamageOutcome {
-  if (!GEN.species.get(idOf(attacker.species) as never)) return fail(`The calculator doesn't know "${attacker.species}" yet. Untick Mega to use the base form.`);
-  if (!GEN.species.get(idOf(defender.species) as never)) return fail(`The calculator doesn't know "${defender.species}" yet. Untick Mega to use the base form.`);
+export function runDamageCalc(attackerIn: MonSetup, defenderIn: MonSetup, moveName: string, field: FieldSetup): DamageOutcome {
+  const warnings: string[] = [];
+
+  // If the calculator doesn't know a new Mega form, fall back to the base form + Mega ability/typing instead of failing.
+  const prepare = (s: MonSetup, who: string): MonSetup => {
+    if (GEN.species.get(idOf(s.species) as never)) return s;
+    warnings.push(
+      `${who}: the calculator doesn't know ${s.species} yet, so it uses ${s.baseSpecies}'s base stats` +
+      `${s.megaTypes ? " with the Mega typing" : ""}. Mega stat boosts aren't included, so treat the numbers as approximate.`
+    );
+    return { ...s, species: s.baseSpecies, overrideTypes: s.megaTypes ?? undefined };
+  };
+  const attacker = prepare(attackerIn, "Attacker");
+  const defender = prepare(defenderIn, "Defender");
+
+  if (!GEN.species.get(idOf(attacker.species) as never)) return fail(`The calculator doesn't know "${attacker.species}".`);
+  if (!GEN.species.get(idOf(defender.species) as never)) return fail(`The calculator doesn't know "${defender.species}".`);
   const moveData = GEN.moves.get(idOf(moveName) as never);
   if (!moveData) return fail(`Unknown move "${moveName}". Pick one from the list.`);
-  if (moveData.category === "Status") return fail("That's a status move — it deals no damage.");
+  if (moveData.category === "Status") return fail("That's a status move, so it deals no damage.");
 
   try {
     const atk = toCalcPokemon(attacker);
@@ -151,13 +175,25 @@ export function runDamageCalc(attacker: MonSetup, defender: MonSetup, moveName: 
       defenderSide: { isReflect: field.reflect, isLightScreen: field.lightScreen, isAuroraVeil: field.auroraVeil },
     }));
     const [minDmg, maxDmg] = result.range();
+
+    if (maxDmg === 0) {
+      const chart = GEN.types.get(idOf(moveData.type) as never) as unknown as { effectiveness: Record<string, number> } | undefined;
+      const blocker = def.types.find((t) => chart?.effectiveness[t] === 0);
+      return {
+        ok: true, kind: "noEffect", warnings,
+        message: blocker
+          ? `No effect. ${cap(defender.baseSpecies)} is immune to ${moveData.type}-type moves (${blocker}).`
+          : "No effect. The move did no damage, usually because of an ability immunity (like Levitate or Volt Absorb) or a condition that isn't met.",
+      };
+    }
+
     const hp = def.maxHP();
     return {
-      ok: true, description: result.desc(), minDmg, maxDmg, defenderHp: hp,
+      ok: true, kind: "damage", description: result.desc(), minDmg, maxDmg, defenderHp: hp,
       minPct: round1((minDmg / hp) * 100), maxPct: round1((maxDmg / hp) * 100),
-      koText: result.kochance().text,
+      koText: result.kochance().text, warnings,
     };
-  } catch {
-    return fail("The calculator couldn't evaluate this combination. Try the base form or another move.");
+  } catch (e) {
+    return fail(`The calculator couldn't evaluate this combination (${e instanceof Error ? e.message : "unknown error"}).`);
   }
 }
