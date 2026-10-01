@@ -1,5 +1,5 @@
 import { PokemonDetail } from "@/lib/types";
-import { NatureName, calculateEffectiveSpeed } from "@/lib/logic/statCalc";
+import { NatureName, calculateEffectiveSpeed, SpeedConditions, NO_SPEED_CONDITIONS } from "@/lib/logic/statCalc";
 import { getCommonSet } from "@/lib/data/commonSets";
 
 export interface SpeedVariant {
@@ -21,7 +21,7 @@ function getWeights(hasCurated: boolean, curatedIsScarf: boolean) {
   return { maxSpeed: 35, scarf: 20, bulky: 30, trickRoom: 15, curated: 0 };
 }
 
-export function getSpeedVariants(pokemon: PokemonDetail): SpeedVariant[] {
+export function getSpeedVariants(pokemon: PokemonDetail, cond: SpeedConditions = NO_SPEED_CONDITIONS): SpeedVariant[] {
   const base = baseSpeedOf(pokemon);
   const commonSet = getCommonSet(pokemon.name);
   const curatedItemSlug = commonSet?.topItem.toLowerCase().replace(/\s+/g, "-") ?? null;
@@ -46,6 +46,6 @@ export function getSpeedVariants(pokemon: PokemonDetail): SpeedVariant[] {
   }
 
   return variants
-    .map((v) => ({ ...v, speed: calculateEffectiveSpeed(base, v.speedSp, v.nature, v.itemName) }))
+    .map((v) => ({ ...v, speed: calculateEffectiveSpeed(base, v.speedSp, v.nature, v.itemName, cond) }))
     .sort((a, b) => b.likelihood - a.likelihood);
 }

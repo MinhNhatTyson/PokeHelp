@@ -6,6 +6,7 @@ import { fetchMoveDetail, fetchMoveNameList } from "@/lib/data/fetchAndCache";
 import { FieldState, MoveDetail, MoveNameEntry } from "@/lib/types";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useBattleSessionStore } from "@/lib/store/battleSessionStore";
+import { useListNav } from "@/lib/hooks/useListNav";
 
 const MAX_MOVE_SUGGESTIONS = 8;
 type Side = "yours" | "opponent";
@@ -255,6 +256,14 @@ export default function EventComposer({
     onConfirm(fragment);
   }
 
+  const moveNav = useListNav({
+    items: moveMatches,
+    isOpen: showMoveDropdown,
+    onSelect: (m) => { selectMove(m.name); setMoveText(""); setShowMoveDropdown(false); },
+    onClose: () => setShowMoveDropdown(false),
+    onOpen: () => setShowMoveDropdown(true),
+  });
+
   const canConfirmMove =
     mode === "move" &&
     !!moveSlug &&
@@ -303,8 +312,9 @@ export default function EventComposer({
                 </div>
                 <div className="relative mt-2">
                   <input
+                    {...moveNav.inputProps}
                     value={moveText}
-                    onChange={(e) => { setMoveText(e.target.value); setShowMoveDropdown(true); }}
+                    onChange={(e) => { setMoveText(e.target.value); setShowMoveDropdown(true); moveNav.resetActive(); }}
                     onFocus={() => setShowMoveDropdown(true)}
                     onBlur={() => setTimeout(() => setShowMoveDropdown(false), 150)}
                     placeholder="Or type a move name (e.g. Expanding Force)…"
@@ -315,10 +325,11 @@ export default function EventComposer({
                     <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-black/10 bg-white p-1 shadow-lg">
                       {moveMatches.map((m) => (
                         <button
+                          {...moveNav.optionProps(moveMatches.indexOf(m))}
                           key={m.name}
                           type="button"
                           onMouseDown={() => { selectMove(m.name); setMoveText(""); setShowMoveDropdown(false); }}
-                          className="block w-full rounded-md px-2 py-1 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/5"
+                          className="block w-full rounded-md px-2 py-1 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/10"
                         >
                           {formatMoveName(m.name)}
                         </button>

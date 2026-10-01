@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ItemDetail, ItemNameEntry } from "@/lib/types";
 import { fetchCompetitiveItemNameList, fetchItemDetail } from "@/lib/data/fetchAndCache";
 import ItemResultCard from "@/components/ItemResultCard";
+import { useListNav } from "@/lib/hooks/useListNav";
 
 const MAX_NAME_SUGGESTIONS = 8;
 
@@ -35,6 +36,14 @@ export default function ItemSearchExplorer() {
     return nameList.filter((i) => i.name.startsWith(q)).slice(0, MAX_NAME_SUGGESTIONS);
   }, [query, nameList]);
 
+  const nav = useListNav({
+    items: nameMatches,
+    isOpen: showDropdown && !!query.trim(),
+    onSelect: (i) => handleSelectItem(i.name),
+    onClose: () => setShowDropdown(false),
+    onOpen: () => setShowDropdown(true),
+  });
+
   async function handleSelectItem(name: string) {
     setQuery("");
     setShowDropdown(false);
@@ -63,13 +72,11 @@ export default function ItemSearchExplorer() {
         <div className="relative mt-5">
           <label htmlFor="item-search" className="sr-only">Search for an item</label>
           <input
+            {...nav.inputProps}
             id="item-search"
             type="text"
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setShowDropdown(true);
-            }}
+            onChange={(e) => { setQuery(e.target.value); setShowDropdown(true); nav.resetActive(); }} 
             onFocus={() => setShowDropdown(true)}
             placeholder="Search items…"
             autoComplete="off"
@@ -84,13 +91,9 @@ export default function ItemSearchExplorer() {
                 </p>
               ) : (
                 <div className="max-h-64 overflow-y-auto p-2">
-                  {nameMatches.map((i) => (
-                    <button
-                      key={i.name}
-                      type="button"
-                      onClick={() => handleSelectItem(i.name)}
-                      className="block w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/5"
-                    >
+                  {nameMatches.map((i, idx) => (
+                    <button key={i.name} type="button" onClick={() => handleSelectItem(i.name)} {...nav.optionProps(idx)}
+                      className={`block w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] ${nav.activeIndex === idx ? "bg-black/10" : "hover:bg-black/5"}`}>
                       {i.name.replace(/-/g, " ")}
                     </button>
                   ))}

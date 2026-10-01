@@ -4,11 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { fetchPokemonNameList, fetchPokemonDetail } from "@/lib/data/fetchAndCache";
 import { OpponentSlot, PokemonDetail, PokemonNameEntry } from "@/lib/types";
-import { calculateEffectiveSpeed } from "@/lib/logic/statCalc";
+import { calculateEffectiveSpeed, SpeedConditions, NO_SPEED_CONDITIONS } from "@/lib/logic/statCalc";
+import SpeedConditionsControl, { describeConditions } from "@/components/SpeedConditionsControl";
 import { getSpeedVariants } from "@/lib/logic/speedVariants";
 import TypeBadge from "@/components/TypeBadge";
 import Link from "next/link";
 import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
+import { useListNav } from "@/lib/hooks/useListNav";
 
 const MAX_SUGGESTIONS = 8;
 
@@ -24,6 +26,8 @@ export default function SpeedComparisonExplorer() {
   const [opponent, setOpponent] = useState<PokemonDetail | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const containerRef = useRef<HTMLDivElement>(null);
+  const [ownCond, setOwnCond] = useState<SpeedConditions>(NO_SPEED_CONDITIONS);
+  const [oppCond, setOppCond] = useState<SpeedConditions>(NO_SPEED_CONDITIONS);
   
   const opponentSlots = useOpponentTeamStore((s) => s.slots);
   const scoutedOpponents = opponentSlots.filter((s) => s.pokemon);
@@ -61,15 +65,23 @@ export default function SpeedComparisonExplorer() {
     if (detail) { setOpponent(detail); setStatus("idle"); } else { setOpponent(null); setStatus("error"); }
   }
 
+  const nav = useListNav({
+    items: nameMatches,
+    isOpen: showDropdown && nameMatches.length > 0,
+    onSelect: (p) => handleSelectOpponent(p.name),
+    onClose: () => setShowDropdown(false),
+    onOpen: () => setShowDropdown(true),
+  });
+
   const ownSlot = ownIndex !== null ? builtSlots[ownIndex] : null;
   const ownSpeed = ownSlot?.pokemon
     ? calculateEffectiveSpeed(
         ownSlot.pokemon.stats.find((s) => s.name === "speed")?.baseStat ?? 0,
-        ownSlot.speedSp, ownSlot.nature, ownSlot.itemName
+        ownSlot.speedSp, ownSlot.nature, ownSlot.itemName, ownCond
       )
     : null;
 
-  const variants = opponent ? getSpeedVariants(opponent) : [];
+  const variants = opponent ? getSpeedVariants(opponent, oppCond) : [];
   // Weighted sum: full credit for variants you outspeed, half credit for
   // ties (speed ties resolve 50/50), zero for variants that outspeed you.
   const chanceFaster =
@@ -94,7 +106,7 @@ export default function SpeedComparisonExplorer() {
 
         {builtSlots.length === 0 ? (
           <p className="mt-4 rounded-md bg-black/5 px-4 py-3 text-sm text-[color:var(--ink)]/70">
-            Build at least one Pokémon (with Nature + Speed EVs set) in Team Builder first.
+            Build at least one Pokémon (with Nature + Speed Points set) in Team Builder first.
           </p>
         ) : (
           <div className="mt-4">
@@ -113,7 +125,8 @@ export default function SpeedComparisonExplorer() {
                 </button>
               ))}
             </div>
-          </div>
+            <SpeedConditionsControl value={ownCond} onChange={setOwnCond} />
+          </div>            
         )}
 
         <div className="mt-5">
@@ -123,7 +136,7 @@ export default function SpeedComparisonExplorer() {
               No opponent scouted yet. Set their team preview in{" "}
               <Link href="/optimizer" className="underline underline-offset-2">Battle Optimizer</Link>, or search any Pokémon below.
             </p>
-          ) : (
+          ) : (            
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {scoutedOpponents.map((s) => (
                 <button
@@ -145,27 +158,32 @@ export default function SpeedComparisonExplorer() {
               ))}
             </div>
           )}
+          <SpeedConditionsControl value={oppCond} onChange={setOppCond} />
         </div>
 
         <div ref={containerRef} className="relative mt-5">
           <label htmlFor="speed-search" className="sr-only">Search opponent Pokémon</label>
           <input
+            {...nav.inputProps}
             id="speed-search"
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setShowDropdown(true); }}
+            onChange={(e) => { setQuery(e.target.value); setShowDropdown(true); nav.resetActive(); }}
             onFocus={() => setShowDropdown(true)}
             placeholder="Or search any other Pokémon…"
             autoComplete="off"
             className="w-full rounded-lg border border-black/10 bg-white px-4 py-2.5 text-[color:var(--ink)] outline-none placeholder:text-black/40 focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
           />
           {showDropdown && nameMatches.length > 0 && (
-            <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-black/10 bg-white p-2 shadow-lg">
-              {nameMatches.map((p) => (
+            <div role="listbox" className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-black/10 bg-white p-2 shadow-lg">
+              {nameMatches.map((p, i) => (
                 <button
                   key={p.name}
                   type="button"
                   onClick={() => handleSelectOpponent(p.name)}
-                  className="block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/5"
+                  {...nav.optionProps(i)}
+                  className={`block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] ${
+                    nav.activeIndex === i ? "bg-black/10" : "hover:bg-black/5"
+                  }`}
                 >
                   {p.name}
                 </button>
@@ -183,11 +201,15 @@ export default function SpeedComparisonExplorer() {
               <div className="flex items-center gap-2">
                 <span className="text-sm capitalize text-[color:var(--ink)]">{ownSlot.pokemon.name}</span>
                 <div className="flex gap-1">{ownSlot.pokemon.types.map((t) => <TypeBadge key={t} type={t} size="sm" />)}</div>
-                <span className="text-sm font-medium text-[color:var(--ink)]">{ownSpeed} Spe</span>
+                <span className="text-sm font-medium text-[color:var(--ink)]">
+                  {ownSpeed} Spe{describeConditions(ownCond) && ` (${describeConditions(ownCond)})`}
+                </span>
               </div>
               <span className="text-xs text-[color:var(--ink)]/40">vs</span>
               <div className="flex items-center gap-2">
-                <span className="text-sm capitalize text-[color:var(--ink)]">{opponent.name}</span>
+                <span className="text-sm capitalize text-[color:var(--ink)]">
+                  {opponent.name}{describeConditions(oppCond) && ` (${describeConditions(oppCond)})`}
+                </span>
                 <div className="flex gap-1">{opponent.types.map((t) => <TypeBadge key={t} type={t} size="sm" />)}</div>
               </div>
             </div>

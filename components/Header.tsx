@@ -190,6 +190,9 @@ function NavLink({
 export default function Header() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const OPTIMIZER_SUBROUTES = ["/speed", "/battle", "/damage"];
+  const isItemActive = (pathname: string, href: string) =>
+   pathname === href || (href === "/optimizer" && OPTIMIZER_SUBROUTES.includes(pathname));
 
   return (
     <header className="sticky top-0 z-20 overflow-hidden bg-gradient-to-b from-[#26282c] to-[color:var(--shell)]">
@@ -215,7 +218,7 @@ export default function Header() {
           <ul className="flex flex-wrap items-center justify-end gap-1">
             {NAV_ITEMS.map((item) => (
               <li key={item.href}>
-                <NavLink item={item} isActive={pathname === item.href} />
+                <NavLink item={item} isActive={isItemActive(pathname, item.href)} />
               </li>
             ))}
           </ul>
@@ -274,7 +277,7 @@ export default function Header() {
                           onClick={() => setMenuOpen(false)}
                           className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[color:var(--ink)] transition-colors hover:bg-black/5"
                         >
-                          <NavIconBadge href={item.href} themeType={item.themeType} active={pathname === item.href} />
+                          <NavIconBadge href={item.href} themeType={item.themeType} active={isItemActive(pathname, item.href)} />
                           {item.label}
                         </Link>
                       )}
@@ -294,7 +297,7 @@ export default function Header() {
         >
           <ul className="grid grid-cols-6">
             {NAV_ITEMS.filter((item) => MOBILE_TAB_HREFS.includes(item.href)).map((item) => {
-              const isActive = pathname === item.href;
+              const isActive = isItemActive(pathname, item.href);
               return (
                 <li key={item.href}>
                   <Link

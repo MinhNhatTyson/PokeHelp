@@ -1,5 +1,12 @@
 import { getItemSignal } from "@/lib/logic/itemSignals";
 
+export interface SpeedConditions { stage: number; tailwind: boolean; paralyzed: boolean }
+export const NO_SPEED_CONDITIONS: SpeedConditions = { stage: 0, tailwind: false, paralyzed: false };
+export function stageMultiplier(stage: number): number {
+  const s = Math.max(-6, Math.min(6, stage));
+  return s >= 0 ? (2 + s) / 2 : 2 / (2 - s);
+}
+
 export const NATURES = {
   hardy: { up: null, down: null }, lonely: { up: "attack", down: "defense" },
   brave: { up: "attack", down: "speed" }, adamant: { up: "attack", down: "spAttack" },
@@ -52,10 +59,14 @@ export function calculateSpeedStat(baseSpeed: number, speedSp: number, nature: N
 
 /** Full effective Speed: base formula + held-item multiplier (Choice Scarf, Iron Ball, etc.) */
 export function calculateEffectiveSpeed(
-  baseSpeed: number, speedSp: number, nature: NatureName | null, itemName: string | null
+  baseSpeed: number, speedSp: number, nature: NatureName | null, itemName: string | null,
+  cond: SpeedConditions = NO_SPEED_CONDITIONS
 ): number {
-  const stat = calculateSpeedStat(baseSpeed, speedSp, nature);
-  return Math.floor(stat * (getItemSignal(itemName)?.speedMultiplier ?? 1));
+  let speed = Math.floor(calculateSpeedStat(baseSpeed, speedSp, nature) * stageMultiplier(cond.stage));
+  speed = Math.floor(speed * (getItemSignal(itemName)?.speedMultiplier ?? 1));
+  if (cond.tailwind) speed *= 2;
+  if (cond.paralyzed) speed = Math.floor(speed / 2);
+  return speed;
 }
 
 export function evToSp(ev: number): number {

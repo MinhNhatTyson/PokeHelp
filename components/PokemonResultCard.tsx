@@ -54,7 +54,7 @@ export default function PokemonResultCard({
       <p className="mx-4 mt-2 text-center text-xs italic text-[color:var(--ink)]/60">{pokemon.genus}</p>
     )}
 
-    <div className="p-5 pt-3 text-[color:var(--foreground)]">
+    <div className="p-5 pt-3 text-[color:var(--ink)]">
 
       {pokemon.forms.length > 1 && (
         <div className="mt-4 flex flex-wrap gap-1.5 border-b border-black/10 pb-3">

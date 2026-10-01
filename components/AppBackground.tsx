@@ -71,6 +71,7 @@ const ROUTE_TYPE: Record<string, PokemonTypeName> = {
   "/history": "psychic",
   "/speed": "electric",
   "/battle": "fire",
+  "/damage": "rock",
 };
 
 interface Ball { l: number; t: number; s: number; dur: number; delay: number; dx: number; dy: number; rot: number; o: number }

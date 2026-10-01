@@ -9,6 +9,7 @@ import TypeBadge from "@/components/TypeBadge";
 import PokemonResultCard from "@/components/PokemonResultCard";
 import TypeChip from "./TypeChip";
 import { useBackdropStore } from "@/lib/store/backdropStore";
+import { useListNav } from "@/lib/hooks/useListNav";
 
 const MAX_TYPE_SUGGESTIONS = 5;
 const MAX_NAME_SUGGESTIONS = 8;
@@ -50,6 +51,8 @@ export default function TypeMatchupExplorer() {
   const containerRef = useRef<HTMLDivElement>(null);
   const setBackdrop = useBackdropStore((s) => s.setOverride);
 
+  type Suggestion = { kind: "type"; type: PokemonTypeName } | { kind: "pokemon"; name: string };
+
   useEffect(() => {
     setBackdrop(selectedPokemon ? selectedPokemon.types[0] : selectedType);
     return () => setBackdrop(null);
@@ -81,6 +84,22 @@ export default function TypeMatchupExplorer() {
     return nameList.filter((p) => p.name.startsWith(q)).slice(0, MAX_NAME_SUGGESTIONS);
   }, [query, nameList]);
 
+  const suggestions = useMemo<Suggestion[]>(
+    () => [
+      ...typeMatches.map((type) => ({ kind: "type" as const, type })),
+      ...nameMatches.map((p) => ({ kind: "pokemon" as const, name: p.name })),
+    ],
+    [typeMatches, nameMatches]
+  );
+
+  const nav = useListNav({
+    items: suggestions,
+    isOpen: showDropdown && !!query.trim(),
+    onSelect: (s) => (s.kind === "type" ? handleSelectType(s.type) : handleSelectPokemon(s.name)),
+    onClose: () => setShowDropdown(false),
+    onOpen: () => setShowDropdown(true),
+  });
+
   const matchup = useMemo(() => getTypeMatchup(selectedType), [selectedType]);
 
   async function handleSelectPokemon(name: string) {
@@ -104,7 +123,7 @@ export default function TypeMatchupExplorer() {
     setSelectedType(type);
   }
 
-  const hasSuggestions = typeMatches.length > 0 || nameMatches.length > 0;
+  const hasSuggestions = suggestions.length > 0;
 
   return (
     <div
@@ -126,13 +145,10 @@ export default function TypeMatchupExplorer() {
             Search for a type or Pokémon
           </label>
           <input
+            {...nav.inputProps}
             id="unified-search"
-            type="text"
             value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setShowDropdown(true);
-            }}
+            onChange={(e) => { setQuery(e.target.value); setShowDropdown(true); nav.resetActive(); }}
             onFocus={() => setShowDropdown(true)}
             placeholder="Search types or Pokémon…"
             autoComplete="off"
@@ -151,8 +167,9 @@ export default function TypeMatchupExplorer() {
                 <div className="border-b border-black/5 p-2">
                   <p className="px-2 pb-1 text-xs font-medium uppercase text-[color:var(--ink)]/40">Types</p>
                   <div className="flex flex-wrap gap-1.5 px-2">
-                    {typeMatches.map((t) => (
-                      <button key={t} type="button" onClick={() => handleSelectType(t)} className="cursor-pointer">
+                    {typeMatches.map((t, i) => (
+                      <button key={t} type="button" onClick={() => handleSelectType(t)} {...nav.optionProps(i)}
+                        className={`cursor-pointer rounded-full ${nav.activeIndex === i ? "ring-2 ring-[color:var(--ink)]" : ""}`}>
                         <TypeBadge type={t} size="sm" />
                       </button>
                     ))}
@@ -163,16 +180,15 @@ export default function TypeMatchupExplorer() {
               {nameMatches.length > 0 && (
                 <div className="max-h-64 overflow-y-auto p-2">
                   <p className="px-2 pb-1 text-xs font-medium uppercase text-[color:var(--ink)]/40">Pokémon</p>
-                  {nameMatches.map((p) => (
-                    <button
-                      key={p.name}
-                      type="button"
-                      onClick={() => handleSelectPokemon(p.name)}
-                      className="block w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/5"
-                    >
-                      {p.name}
-                    </button>
-                  ))}
+                  {nameMatches.map((p, i) => {
+                    const idx = typeMatches.length + i; 
+                    return (
+                      <button key={p.name} type="button" onClick={() => handleSelectPokemon(p.name)} {...nav.optionProps(idx)}
+                        className={`block w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] ${nav.activeIndex === idx ? "bg-black/10" : "hover:bg-black/5"}`}>
+                        {p.name}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>

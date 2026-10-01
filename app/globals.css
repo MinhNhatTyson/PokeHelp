@@ -60,6 +60,11 @@
 .font-logo {
   font-family: var(--font-logo), var(--font-display), sans-serif;
 }
+h1.font-logo {
+  line-height: 1.35;
+  padding-bottom: 0.2em;
+  letter-spacing: 0.02em;
+}
 .font-heading {
   font-family: var(--font-heading), var(--font-display), sans-serif;
 }
@@ -103,6 +108,7 @@ body {
   border-width: 3px;
   border-style: solid;
   background: var(--screen);
+  color: var(--ink);   
   overflow: hidden;
 }
 

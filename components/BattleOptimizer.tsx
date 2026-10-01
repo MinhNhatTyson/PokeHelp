@@ -17,6 +17,7 @@ import { PokemonTypeName } from "@/lib/types";
 const FEATURES: { href: string; label: string; blurb: string; type: PokemonTypeName }[] = [
     { href: "/speed", label: "Speed Check", blurb: "Will you outspeed it? Compare against likely spreads.", type: "electric" },
     { href: "/battle", label: "Live Battle", blurb: "Log each turn and get advice for the next.", type: "fire" },
+    { href: "/damage", label: "Damage Check", blurb: "Calculate any attack with stat stages, weather and screens.", type: "rock" },
 ];
 export default function BattleOptimizer() {
   const userSlots = useTeamStore((s) => s.slots);
@@ -116,7 +117,7 @@ export default function BattleOptimizer() {
           type coverage and a curated set of ability signals (weather, Intimidate, key immunities).
         </p>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {FEATURES.map((f) => (
             <Link key={f.href} href={f.href} className="pokecard btn-tactile flex items-center gap-3 p-3" style={{ borderColor: TYPE_COLOR[f.type] }}>
               <span

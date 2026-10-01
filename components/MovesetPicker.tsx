@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { PokemonMoveEntry } from "@/lib/types";
+import { useListNav } from "@/lib/hooks/useListNav";
 
 const MAX_MOVE_SUGGESTIONS = 8;
 interface MoveSuggestion {
@@ -40,6 +41,13 @@ function MoveSlot({
       .slice(0, MAX_MOVE_SUGGESTIONS);
   }, [query, movepool, takenMoves]);
 
+  const nav = useListNav({
+    items: matches,
+    isOpen: showDropdown,
+    onSelect: (m) => { onSelect(m.name); },
+    onClose: () => setShowDropdown(false),
+    onOpen: () => setShowDropdown(true),
+  });
   if (moveName) {
     return (
       <div className="flex items-center justify-between rounded-md bg-black/5 px-2.5 py-1.5 text-sm">
@@ -54,8 +62,9 @@ function MoveSlot({
   return (
     <div className="relative">
       <input
+        {...nav.inputProps}
         value={query}
-        onChange={(e) => { setQuery(e.target.value); setShowDropdown(true); }}
+        onChange={(e) => { setQuery(e.target.value); setShowDropdown(true); nav.resetActive(); }}
         onFocus={() => setShowDropdown(true)}
         onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
         placeholder={`Move ${index + 1}…`}
@@ -69,7 +78,8 @@ function MoveSlot({
               key={m.name}
               type="button"
               onMouseDown={() => onSelect(m.name)}
-              className="block w-full rounded-md px-2 py-1 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/5"
+              {...nav.optionProps(matches.indexOf(m))}
+              className="block w-full rounded-md px-2 py-1 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/10"
             >
               {formatMoveName(m.name)}
             </button>

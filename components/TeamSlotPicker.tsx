@@ -7,6 +7,7 @@ import { ItemNameEntry, PokemonNameEntry } from "@/lib/types";
 import TypeBadge from "@/components/TypeBadge";
 import MovesetPicker from "./MovesetPicker";
 import { NATURE_LABEL, NatureName, calculateEffectiveSpeed } from "@/lib/logic/statCalc";
+import { useListNav } from "@/lib/hooks/useListNav";
 
 const MAX_SUGGESTIONS = 8;
 
@@ -30,6 +31,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const setSlotNature = useTeamStore((s) => s.setSlotNature);
   const setSlotSpeedSp = useTeamStore((s) => s.setSlotSpeedSp);  
+
 
   useEffect(() => {
     fetchPokemonNameList().then(setPokeNames);
@@ -58,6 +60,21 @@ export default function TeamSlotPicker({ index }: { index: number }) {
     if (!q) return [];
     return itemNames.filter((i) => i.name.startsWith(q)).slice(0, MAX_SUGGESTIONS);
   }, [itemQuery, itemNames]);
+  
+  const pokeNav = useListNav({
+    items: pokeMatches,
+    isOpen: showPokeDropdown,
+    onSelect: (p) => handleSelectPokemon(p.name),
+    onClose: () => setShowPokeDropdown(false),
+    onOpen: () => setShowPokeDropdown(true),
+  });
+  const itemNav = useListNav({
+    items: itemMatches,
+    isOpen: showItemDropdown,
+    onSelect: (i) => handleSelectItem(i.name),
+    onClose: () => setShowItemDropdown(false),
+    onOpen: () => setShowItemDropdown(true),
+  });
 
   async function handleSelectPokemon(name: string) {
     setPokeQuery("");
@@ -88,8 +105,9 @@ export default function TeamSlotPicker({ index }: { index: number }) {
       {!slot.pokemon ? (
         <div className="relative mt-2">
           <input
+            {...pokeNav.inputProps}
             value={pokeQuery}
-            onChange={(e) => { setPokeQuery(e.target.value); setShowPokeDropdown(true); }}
+            onChange={(e) => { setPokeQuery(e.target.value); setShowPokeDropdown(true); pokeNav.resetActive(); }}
             onFocus={() => setShowPokeDropdown(true)}
             placeholder="Search Pokémon…"
             autoComplete="off"
@@ -103,7 +121,8 @@ export default function TeamSlotPicker({ index }: { index: number }) {
                   key={p.name}
                   type="button"
                   onClick={() => handleSelectPokemon(p.name)}
-                  className="block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/5"
+                  {...pokeNav.optionProps(pokeMatches.indexOf(p))}
+                  className="block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/10"
                 >
                   {p.name}
                 </button>
@@ -129,8 +148,9 @@ export default function TeamSlotPicker({ index }: { index: number }) {
           <div className="relative mt-3">
             <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Item</label>
             <input
+              {...itemNav.inputProps}
               value={slot.itemName ? slot.itemName.replace(/-/g, " ") : itemQuery}
-              onChange={(e) => { setItemQuery(e.target.value); setSlotItem(index, null); setShowItemDropdown(true); }}
+              onChange={(e) => { setItemQuery(e.target.value); setSlotItem(index, null); setShowItemDropdown(true); itemNav.resetActive(); }}
               onFocus={() => setShowItemDropdown(true)}
               placeholder="Search item…"
               autoComplete="off"
@@ -141,9 +161,10 @@ export default function TeamSlotPicker({ index }: { index: number }) {
                 {itemMatches.map((i) => (
                   <button
                     key={i.name}
+                    {...itemNav.optionProps(itemMatches.indexOf(i))}
                     type="button"
                     onClick={() => handleSelectItem(i.name)}
-                    className="block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/5"
+                    className="block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/10"
                   >
                     {i.name.replace(/-/g, " ")}
                   </button>
