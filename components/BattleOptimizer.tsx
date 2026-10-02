@@ -13,6 +13,7 @@ import BattleHistoryLogger from "@/components/BattleHistoryLogger";
 import TypeIcon from "@/components/TypeIcon";
 import { TYPE_COLOR, TYPE_TEXT_ON_COLOR } from "@/lib/typeMeta";
 import { PokemonTypeName } from "@/lib/types";
+import { useAiSettingsStore } from "@/lib/store/aiSettingsStore";
 
 const FEATURES: { href: string; label: string; blurb: string; type: PokemonTypeName }[] = [
     { href: "/speed", label: "Speed Check", blurb: "Will you outspeed it? Compare against likely spreads.", type: "electric" },
@@ -85,15 +86,18 @@ export default function BattleOptimizer() {
             .map((s) => ({ name: s.pokemon!.name, abilityGuess: s.abilityName })),
           topCombo: results[0],
           recentHistory,
+          model: useAiSettingsStore.getState().model,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         setStrategyErrorDetail(
           data.error === "rate_limit"
-            ? `Gemini ${data.rateLimitInfo.limitType} limit hit${
-                data.rateLimitInfo.retryAfterSeconds ? ` — retry in ~${data.rateLimitInfo.retryAfterSeconds}s` : ""
+            ? `Gemini ${data.rateLimitInfo?.limitType ?? "rate"} limit hit${
+                data.rateLimitInfo?.retryAfterSeconds ? ` — retry in ~${data.rateLimitInfo.retryAfterSeconds}s` : ""
               }.`
+            : data.error === "overloaded"
+            ? "Every Gemini model is busy right now. Try again in a minute, or pick a specific model in Settings."
             : "Couldn't reach the strategy assistant. Try again."
         );
         setStrategyStatus("error");

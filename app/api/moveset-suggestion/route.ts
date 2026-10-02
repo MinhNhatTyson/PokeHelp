@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCommonSet, CommonSetEntry } from "@/lib/data/commonSets";
 import { parseGeminiError } from "@/lib/server/geminiError";
+import { callGemini, extractText, geminiFailure } from "@/lib/server/gemini";
 
 const GEMINI_MODEL = "gemini-3.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -13,6 +14,7 @@ interface MoveSuggestionRequestBody {
   itemName: string | null;
   teammates: { name: string; roleNotes: string | null }[]; // rest of the team, this slot excluded
   teamStrategy: string;
+  model?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body: MoveSuggestionRequestBody = await req.json();
-  const { species, chosenMoves, legalMovepool, abilityName, itemName, teammates, teamStrategy } = body;
+  const { species, chosenMoves, legalMovepool, abilityName, itemName, teammates, teamStrategy, model } = body;
 
   if (chosenMoves.length !== 3) {
     return NextResponse.json({ error: "Expected exactly 3 chosen moves" }, { status: 400 });
@@ -36,68 +38,42 @@ export async function POST(req: NextRequest) {
 
   const prompt = buildPrompt({ species, chosenMoves, remainingMoves, abilityName, itemName, teammates, teamStrategy, commonSet });
 
-  try {
-    const res = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 1024,
-          thinkingConfig: { thinkingBudget: 0 },
-          responseMimeType: "application/json",
-        },
-      }),
-    });
+  const result = await callGemini(
+    apiKey,
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.4,
+        maxOutputTokens: 1024,
+        thinkingConfig: { thinkingBudget: 0 },
+        responseMimeType: "application/json",
+      },
+    },
+    model
+  );
+  if (!result.ok) return geminiFailure(result);
 
-    if (!res.ok) {
-      const errorBody = await res.text();
-      const rateLimitInfo = parseGeminiError(res.status, errorBody);
-      if (rateLimitInfo.isRateLimit) {
-        console.error("Gemini rate limit hit:", rateLimitInfo);
-        return NextResponse.json({ error: "rate_limit", rateLimitInfo }, { status: 429 });
-      }
-      if (res.status === 503) {
-        console.error("Gemini overloaded after retries:", errorBody);
-        return NextResponse.json({ error: "overloaded" }, { status: 503 });
-      }
-      console.error("Gemini request failed:", res.status, errorBody);
-      return NextResponse.json({ error: "Gemini request failed", detail: errorBody }, { status: 502 });
-    }
-
-    const data = await res.json();
-    const rawText: string | undefined = data.candidates?.[0]?.content?.parts
-      ?.map((p: { text?: string }) => p.text ?? "")
-      .join("")
-      .trim();
-
-    if (!rawText) {
-      console.error("Empty response from Gemini:", JSON.stringify(data));
-      return NextResponse.json({ error: "Empty response from Gemini" }, { status: 502 });
-    }
-
-    let parsed: { move?: string; reasoning?: string };
-    try {
-      parsed = JSON.parse(rawText.replace(/```json|```/g, "").trim());
-    } catch {
-      console.error("Gemini moveset-suggestion returned non-JSON:", rawText);
-      return NextResponse.json({ error: "Gemini returned malformed JSON" }, { status: 502 });
-    }
-
-    // Hard validation gate — the prompt told the model to pick only from
-    // `remainingMoves`, but we never trust that on the model's word alone.
-    // This is the actual line of defense against a hallucinated/illegal move.
-    if (!parsed.move || !remainingMoves.includes(parsed.move)) {
-      console.error("Gemini suggested a move that failed validation:", parsed.move);
-      return NextResponse.json({ error: "Suggested move failed validation" }, { status: 502 });
-    }
-
-    return NextResponse.json({ move: parsed.move, reasoning: parsed.reasoning ?? "" });
-  } catch (err) {
-    console.error("Gemini moveset-suggestion request threw:", err);
-    return NextResponse.json({ error: "Gemini request threw" }, { status: 502 });
+  const rawText = extractText(result.data);
+  if (!rawText) {
+    console.error("Empty response from Gemini:", JSON.stringify(result.data));
+    return NextResponse.json({ error: "Empty response from Gemini" }, { status: 502 });
   }
+
+  let parsed: { move?: string; reasoning?: string };
+  try {
+    parsed = JSON.parse(rawText.replace(/```json|```/g, "").trim());
+  } catch {
+    console.error("Gemini moveset-suggestion returned non-JSON:", rawText);
+    return NextResponse.json({ error: "Gemini returned malformed JSON" }, { status: 502 });
+  }
+
+  // Hard validation gate: never trust the model's pick on its word alone.
+  if (!parsed.move || !remainingMoves.includes(parsed.move)) {
+    console.error("Gemini suggested a move that failed validation:", parsed.move);
+    return NextResponse.json({ error: "Suggested move failed validation" }, { status: 502 });
+  }
+
+  return NextResponse.json({ move: parsed.move, reasoning: parsed.reasoning ?? "", model: result.model });
 }
 
 function buildPrompt({

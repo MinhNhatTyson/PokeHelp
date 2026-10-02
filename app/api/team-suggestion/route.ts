@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCommonSet } from "@/lib/data/commonSets";
 import { parseGeminiError } from "@/lib/server/geminiError";
+import { callGemini, extractText, geminiFailure } from "@/lib/server/gemini";
 
 const GEMINI_MODEL = "gemini-3.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -16,6 +17,7 @@ interface TeamMemberContext {
 interface TeamSuggestionRequestBody {
   members: TeamMemberContext[]; // exactly 5
   teamStrategy: string;
+  model?: string;
 }
 
 interface PokeApiPokemonMinimal {
@@ -30,58 +32,39 @@ export async function POST(req: NextRequest) {
   }
 
   const body: TeamSuggestionRequestBody = await req.json();
-  const { members, teamStrategy } = body;
+  const { members, teamStrategy, model } = body;
 
   if (members.length !== 5) {
     return NextResponse.json({ error: "Expected exactly 5 existing team members" }, { status: 400 });
   }
 
+  const result = await callGemini(
+    apiKey,
+    {
+      contents: [{ parts: [{ text: buildPrompt(members, teamStrategy) }] }],
+      generationConfig: {
+        temperature: 0.5,
+        maxOutputTokens: 1024,
+        thinkingConfig: { thinkingBudget: 0 },
+        responseMimeType: "application/json",
+      },
+    },
+    model
+  );
+  if (!result.ok) return geminiFailure(result);
+
+  const rawText = extractText(result.data);
+  if (!rawText) {
+    console.error("Empty response from Gemini:", JSON.stringify(result.data));
+    return NextResponse.json({ error: "Empty response from Gemini" }, { status: 502 });
+  }
+
   let parsed: { species?: string; item?: string; ability?: string; reasoning?: string };
   try {
-    const res = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: buildPrompt(members, teamStrategy) }] }],
-        generationConfig: {
-          temperature: 0.5,
-          maxOutputTokens: 1024,
-          thinkingConfig: { thinkingBudget: 0 },
-          responseMimeType: "application/json",
-        },
-      }),
-    });
-
-    if (!res.ok) {
-      const errorBody = await res.text();
-      const rateLimitInfo = parseGeminiError(res.status, errorBody);
-      if (rateLimitInfo.isRateLimit) {
-        console.error("Gemini rate limit hit:", rateLimitInfo);
-        return NextResponse.json({ error: "rate_limit", rateLimitInfo }, { status: 429 });
-      }
-      if (res.status === 503) {
-        console.error("Gemini overloaded after retries:", errorBody);
-        return NextResponse.json({ error: "overloaded" }, { status: 503 });
-      }
-      console.error("Gemini request failed:", res.status, errorBody);
-      return NextResponse.json({ error: "Gemini request failed", detail: errorBody }, { status: 502 });
-    }
-
-    const data = await res.json();
-    const rawText: string | undefined = data.candidates?.[0]?.content?.parts
-      ?.map((p: { text?: string }) => p.text ?? "")
-      .join("")
-      .trim();
-
-    if (!rawText) {
-      console.error("Empty response from Gemini:", JSON.stringify(data));
-      return NextResponse.json({ error: "Empty response from Gemini" }, { status: 502 });
-    }
-
     parsed = JSON.parse(rawText.replace(/```json|```/g, "").trim());
-  } catch (err) {
-    console.error("Gemini team-suggestion request threw:", err);
-    return NextResponse.json({ error: "Gemini request threw" }, { status: 502 });
+  } catch {
+    console.error("Gemini team-suggestion returned non-JSON:", rawText);
+    return NextResponse.json({ error: "Gemini returned malformed JSON" }, { status: 502 });
   }
 
   if (!parsed.species) {

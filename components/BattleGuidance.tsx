@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { useBattleHistoryStore } from "@/lib/store/battleHistoryStore";
 import Link from "next/link";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
@@ -21,10 +23,33 @@ export default function BattleGuidance() {
   const {
     started, activeBattlers, yourTeamNames, opponentTeamNames, currentTurnEvents,
     conversation, turnNumber, adviceStatus,
-    startSession, resetSession, addEvent, removeEvent, switchActiveBattler, submitTurn,
+    startSession, resetSession, addEvent, removeEvent, switchActiveBattler, submitTurn, initialLeads
   } = useBattleSessionStore();
 
   const [showComposer, setShowComposer] = useState(false);
+  const logBattle = useBattleHistoryStore((s) => s.logBattle);
+  const [ending, setEnding] = useState(false);
+  const [outcome, setOutcome] = useState<"win" | "loss" | null>(null);
+  const [reason, setReason] = useState("");
+
+  function endWithoutSaving() {
+    setEnding(false); setOutcome(null); setReason("");
+    resetSession();
+  }
+
+  function finishSession() {
+    if (!outcome) return;
+    const opp = initialLeads?.opponent ?? [];
+    logBattle({
+      yourTeamNames,
+      opponentTeamNames,
+      recommendedLead: (initialLeads?.yours ?? []).filter((n): n is string => n !== null),
+      outcome,
+      reason: reason.trim(),
+      opponentLeads: opp.length === 2 && opp.every(Boolean) ? (opp as string[]) : undefined,
+    });
+    endWithoutSaving();
+  }
   const [yourBringFour, setYourBringFour] = useState<string[]>([]);
   const [yourLeads, setYourLeads] = useState<string[]>([]);
   const [opponentLeads, setOpponentLeads] = useState<string[]>([]);
@@ -77,7 +102,7 @@ export default function BattleGuidance() {
                       toggleSelection(yourBringFour, setYourBringFour, name, 4);
                       if (willRemove) setYourLeads((prev) => prev.filter((n) => n !== name));
                     }}
-                    className={`rounded-full px-3 py-1 text-sm capitalize ${yourBringFour.includes(name) ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
+                    className={`rounded-full px-4 py-2 text-sm capitalize ${yourBringFour.includes(name) ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
                   >
                     {name}
                   </button>
@@ -93,7 +118,7 @@ export default function BattleGuidance() {
                         key={name}
                         type="button"
                         onClick={() => toggleSelection(yourLeads, setYourLeads, name, 2)}
-                        className={`rounded-full px-3 py-1 text-sm capitalize ${yourLeads.includes(name) ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
+                        className={`rounded-full px-4 py-2 text-sm capitalize ${yourLeads.includes(name) ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
                       >
                         {name}
                       </button>
@@ -111,7 +136,7 @@ export default function BattleGuidance() {
                     key={name}
                     type="button"
                     onClick={() => toggleSelection(opponentLeads, setOpponentLeads, name, 2)}
-                    className={`rounded-full px-3 py-1 text-sm capitalize ${opponentLeads.includes(name) ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
+                    className={`rounded-full px-4 py-2 text-sm capitalize ${opponentLeads.includes(name) ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
                   >
                     {name}
                   </button>
@@ -145,18 +170,73 @@ export default function BattleGuidance() {
       <div className="rounded-b-lg bg-[color:var(--screen)] p-5 sm:p-6">
         <BackToOptimizer confirmMessage="Leave Live Battle? The current session will be lost." />
         <div className="flex items-center justify-between">
-          <h1 className="font-heading text-xl text-[color:var(--ink)]">Turn {turnNumber}</h1>
-          <button type="button" onClick={resetSession} className="text-xs text-[color:var(--ink)]/50 hover:underline">
+          <h1 className="font-logo text-xl text-[color:var(--ink)]">Turn {turnNumber}</h1>
+          <button
+            type="button"
+            onClick={() => setEnding(true)}
+            className="btn-tactile rounded-full bg-black/10 px-3.5 py-2 text-xs font-medium text-[color:var(--ink)]"
+          >
             End session
           </button>
         </div>
 
+        {ending && (
+          <div className="mt-3 rounded-lg border border-[color:var(--accent-gold)]/60 bg-black/5 p-3">
+            <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">How did it go? (saved to Battle History)</p>
+            <div className="mt-2 flex gap-2">
+              {(["win", "loss"] as const).map((o) => (
+                <button
+                  key={o}
+                  type="button"
+                  onClick={() => setOutcome(o)}
+                  className={`btn-tactile min-h-[44px] flex-1 rounded-lg text-sm font-semibold capitalize ${
+                    outcome === o ? (o === "win" ? "bg-emerald-600 text-white" : "bg-red-600 text-white") : "bg-black/10 text-[color:var(--ink)]"
+                  }`}
+                >
+                  {o}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={2}
+              placeholder="Main reason (optional) — what went right or wrong?"
+              className="mt-2 w-full resize-none rounded-md border border-black/10 bg-white px-3 py-2 text-sm text-[color:var(--ink)] outline-none placeholder:text-black/30 focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
+            />
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={finishSession}
+                disabled={!outcome}
+                className="btn-tactile btn-glow-accent min-h-[44px] flex-1 rounded-lg bg-[color:var(--shell-accent)] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Save &amp; end
+              </button>
+              <button type="button" onClick={endWithoutSaving} className="btn-tactile min-h-[44px] rounded-lg bg-black/10 px-3 text-sm text-[color:var(--ink)]">
+                End without saving
+              </button>
+              <button type="button" onClick={() => setEnding(false)} className="min-h-[44px] px-2 text-sm text-[color:var(--ink)]/60 hover:underline">
+                Keep playing
+              </button>
+            </div>
+          </div>
+        )}
+
         <FieldStatusPanel />
 
         {conversation.length > 0 && (
-          <div className="mt-4 rounded-lg border border-[color:var(--accent-gold)]/40 bg-black/5 p-3 text-sm text-[color:var(--ink)]">
-            <p className="mb-1 text-xs font-medium uppercase text-[color:var(--ink)]/40">Advice</p>
-            <p>{conversation[conversation.length - 1].text}</p>
+          <div
+            className={`pokecard mt-4 transition-opacity ${adviceStatus === "loading" ? "opacity-60" : ""}`}
+            style={{ borderColor: "var(--accent-gold)" }}
+          >
+            <div className="flex items-center justify-between bg-gradient-to-r from-[color:var(--shell-accent)] to-[color:var(--accent-gold)] px-3 py-1.5">
+              <span className="font-heading text-sm uppercase tracking-wide text-white">Advice</span>
+              <span className="text-xs font-medium text-white/90">for turn {turnNumber}</span>
+            </div>
+            <p className="px-4 py-3 text-base leading-relaxed text-[color:var(--ink)]">
+              {conversation[conversation.length - 1].text}
+            </p>
           </div>
         )}
 
@@ -183,30 +263,51 @@ export default function BattleGuidance() {
             {currentTurnEvents.map((e) => (
               <div key={e.id} className="flex items-center justify-between rounded-md bg-black/5 px-3 py-1.5 text-sm text-[color:var(--ink)]">
                 <span>{e.sentenceFragment}</span>
-                <button type="button" onClick={() => removeEvent(e.id)} className="ml-2 text-[color:var(--ink)]/40 hover:text-red-600">×</button>
+                <button
+                  type="button"
+                  onClick={() => removeEvent(e.id)}
+                  aria-label="Remove event"
+                  className="ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg text-[color:var(--ink)]/50 hover:bg-black/10 hover:text-red-600"
+                >
+                  ×
+                </button>
               </div>
             ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowComposer(true)}
-            className="mt-2 w-full rounded-md border border-dashed border-black/20 px-3 py-2 text-sm text-[color:var(--ink)]/60 hover:bg-black/5"
-          >
-            + Add event
-          </button>
+          </div>          
         </div>
 
-        <button
-          type="button"
-          onClick={submitTurn}
-          disabled={currentTurnEvents.length === 0 || adviceStatus === "loading"}
-          className="mt-4 w-full rounded-md bg-[color:var(--shell-accent)] px-3 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {adviceStatus === "loading" ? "Thinking…" : "Get advice for next turn"}
-        </button>
         {adviceStatus === "error" && (
           <p className="mt-2 text-sm text-red-500">Couldn&apos;t reach the strategy assistant. Try again.</p>
         )}
+
+        {!ending &&
+          createPortal(
+            <div className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-20 border-t-2 border-[color:var(--accent-gold)] bg-[color:var(--shell)] px-4 py-3 lg:bottom-0">
+              <div className="mx-auto flex max-w-lg items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowComposer(true)}
+                  className="btn-tactile btn-glow-gold flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[color:var(--accent-gold)] px-3 text-sm font-semibold text-black"
+                >
+                  + Add event
+                  {currentTurnEvents.length > 0 && (
+                    <span className="rounded-full bg-black/20 px-2 py-0.5 text-xs">{currentTurnEvents.length}</span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={submitTurn}
+                  disabled={currentTurnEvents.length === 0 || adviceStatus === "loading"}
+                  className="btn-tactile btn-glow-accent flex min-h-[48px] flex-[1.4] items-center justify-center rounded-xl bg-[color:var(--shell-accent)] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {adviceStatus === "loading" ? "Thinking…" : "Get advice"}
+                </button>
+              </div>
+            </div>,
+            document.body
+          )}
+
+        <div className="h-16" aria-hidden="true" />
 
         {showComposer && (
           <EventComposer

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseGeminiError } from "@/lib/server/geminiError";
+import { callGemini, extractText, geminiFailure } from "@/lib/server/gemini";
 import { describeMegaForm } from "@/lib/data/commonSets";
-
-const GEMINI_MODEL = "gemini-3.5-flash";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 interface GeminiTurn {
   role: "user" | "model";
@@ -15,6 +12,7 @@ interface BattleRequestBody {
   opponentTeam: string[];
   conversation: GeminiTurn[]; // prior turns, NOT including the new one
   newTurnSentence: string;
+  model?: string;
 }
 
 function buildSystemInstruction(megaLines: string[]) {
@@ -29,7 +27,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body: BattleRequestBody = await req.json();
-  const { yourTeam, opponentTeam, conversation, newTurnSentence } = body;
+  const { yourTeam, opponentTeam, conversation, newTurnSentence, model } = body;
 
   const contents = [
     ...(conversation.length === 0
@@ -45,46 +43,21 @@ export async function POST(req: NextRequest) {
   .map((n) => { const d = describeMegaForm(n); return d ? `${n} -> ${d}` : null; })
   .filter((l): l is string => l !== null);
 
-  try {
-    const res = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: buildSystemInstruction(megaLines) }] },
-        contents,
-        generationConfig: { temperature: 0.6, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
-      }),
-    });
+    const result = await callGemini(
+    apiKey,
+    {
+      systemInstruction: { parts: [{ text: buildSystemInstruction(megaLines) }] },
+      contents,
+      generationConfig: { temperature: 0.6, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
+    },
+    model
+  );
+  if (!result.ok) return geminiFailure(result);
 
-    if (!res.ok) {
-      const errorBody = await res.text();
-      const rateLimitInfo = parseGeminiError(res.status, errorBody);
-      if (rateLimitInfo.isRateLimit) {
-        console.error("Gemini rate limit hit:", rateLimitInfo);
-        return NextResponse.json({ error: "rate_limit", rateLimitInfo }, { status: 429 });
-      }
-      if (res.status === 503) {
-        console.error("Gemini overloaded after retries:", errorBody);
-        return NextResponse.json({ error: "overloaded" }, { status: 503 });
-      }
-      console.error("Gemini request failed:", res.status, errorBody);
-      return NextResponse.json({ error: "Gemini request failed", detail: errorBody }, { status: 502 });
-    }
-
-    const data = await res.json();
-    const advice: string | undefined = data.candidates?.[0]?.content?.parts
-      ?.map((p: { text?: string }) => p.text ?? "")
-      .join("")
-      .trim();
-
-    if (!advice) {
-      console.error("Empty response from Gemini:", JSON.stringify(data));
-      return NextResponse.json({ error: "Empty response from Gemini" }, { status: 502 });
-    }
-
-    return NextResponse.json({ advice });
-  } catch (err) {
-    console.error("Gemini battle request threw:", err);
-    return NextResponse.json({ error: "Gemini request threw" }, { status: 502 });
+  const advice = extractText(result.data);
+  if (!advice) {
+    console.error("Empty response from Gemini:", JSON.stringify(result.data));
+    return NextResponse.json({ error: "Empty response from Gemini" }, { status: 502 });
   }
+  return NextResponse.json({ advice, model: result.model });
 }

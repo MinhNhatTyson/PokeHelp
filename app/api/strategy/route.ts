@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ComboResult } from "@/lib/logic/battleOptimizer";
 import { parseGeminiError } from "@/lib/server/geminiError";
+import { callGemini, extractText, geminiFailure } from "@/lib/server/gemini";
 
 const GEMINI_MODEL = "gemini-3.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -19,6 +20,7 @@ interface StrategyRequestBody {
   opponentPreview: { name: string; abilityGuess: string | null }[];
   topCombo: ComboResult;
   recentHistory: HistoryEntryInput[]; // NEW — up to last 10 logged battles
+  model?: string;
 }
 
 function formatHistory(
@@ -49,47 +51,22 @@ export async function POST(req: NextRequest) {
 
   const prompt = buildPrompt(body);
 
-  try {
-    const res = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.6, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } },
-      }),
-    });
+  const result = await callGemini(
+    apiKey,
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.6, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } },
+    },
+    body.model
+  );
+  if (!result.ok) return geminiFailure(result);
 
-    if (!res.ok) {
-      const errorBody = await res.text();
-      const rateLimitInfo = parseGeminiError(res.status, errorBody);
-      if (rateLimitInfo.isRateLimit) {
-        console.error("Gemini rate limit hit:", rateLimitInfo);
-        return NextResponse.json({ error: "rate_limit", rateLimitInfo }, { status: 429 });
-      }
-      if (res.status === 503) {
-        console.error("Gemini overloaded after retries:", errorBody);
-        return NextResponse.json({ error: "overloaded" }, { status: 503 });
-      }
-      console.error("Gemini request failed:", res.status, errorBody);
-      return NextResponse.json({ error: "Gemini request failed", detail: errorBody }, { status: 502 });
-    }
-
-    const data = await res.json();
-    const narrative = data.candidates?.[0]?.content?.parts
-      ?.map((p: { text?: string }) => p.text ?? "")
-      .join("")
-      .trim();
-
-    if (!narrative) {
-      console.error("Empty response from Gemini:", JSON.stringify(data));
-      return NextResponse.json({ error: "Empty response from Gemini", detail: data }, { status: 502 });
-    }
-
-    return NextResponse.json({ narrative });
-  } catch (err) {
-    console.error("Gemini request threw:", err);
-    return NextResponse.json({ error: "Gemini request threw" }, { status: 502 });
+  const narrative = extractText(result.data);
+  if (!narrative) {
+    console.error("Empty response from Gemini:", JSON.stringify(result.data));
+    return NextResponse.json({ error: "Empty response from Gemini", detail: result.data }, { status: 502 });
   }
+  return NextResponse.json({ narrative, model: result.model });
 }
 
 function buildPrompt(body: StrategyRequestBody): string {

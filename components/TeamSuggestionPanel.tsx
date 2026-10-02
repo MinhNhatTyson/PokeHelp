@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { fetchPokemonDetail } from "@/lib/data/fetchAndCache";
+import { useAiSettingsStore } from "@/lib/store/aiSettingsStore";
 
 interface TeamSuggestion {
   species: string;
@@ -45,7 +46,7 @@ export default function TeamSuggestionPanel() {
     fetch("/api/team-suggestion", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ members, teamStrategy }),
+      body: JSON.stringify({ members, teamStrategy, model: useAiSettingsStore.getState().model }),
     })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("failed"))))
       .then((data) => { if (!cancelled) setResult({ key: requestKey, suggestion: data, failed: false }); })

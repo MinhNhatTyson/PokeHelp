@@ -276,9 +276,9 @@ export default function EventComposer({
     <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center">
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-[color:var(--screen)] p-5 sm:rounded-2xl">
         <div className="flex gap-1 rounded-lg bg-black/5 p-1">
-          <button type="button" onClick={() => setMode("move")} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mode === "move" ? "bg-white shadow-sm" : "opacity-50"}`}>Move</button>
-          <button type="button" onClick={() => setMode("switch")} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mode === "switch" ? "bg-white shadow-sm" : "opacity-50"}`}>Switch</button>
-          <button type="button" onClick={() => setMode("mega")} className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mode === "mega" ? "bg-white shadow-sm" : "opacity-50"}`}>Mega</button>
+          <button type="button" onClick={() => setMode("move")} className={`min-h-[44px] flex-1 rounded-md px-3 py-2 text-sm font-medium ${mode === "move" ? "bg-white shadow-sm" : "opacity-50"}`}>Move</button>
+          <button type="button" onClick={() => setMode("switch")} className={`min-h-[44px] flex-1 rounded-md px-3 py-2 text-sm font-medium ${mode === "switch" ? "bg-white shadow-sm" : "opacity-50"}`}>Switch</button>
+          <button type="button" onClick={() => setMode("mega")} className={`min-h-[44px] flex-1 rounded-md px-3 py-2 text-sm font-medium ${mode === "mega" ? "bg-white shadow-sm" : "opacity-50"}`}>Mega</button>
         </div>
 
         <div className="mt-4">
@@ -289,7 +289,7 @@ export default function EventComposer({
                 key={p.name}
                 type="button"
                 onClick={() => { selectActor(p.name); setMoveSlug(""); setMoveText(""); setSwitchTo(null); }}
-                className={`rounded-full px-3 py-1 text-sm capitalize ${actor === p.name ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
+                className={`min-h-[40px] rounded-full px-4 py-2 text-sm capitalize ${actor === p.name ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
               >
                 {p.name}
               </button>
@@ -305,7 +305,7 @@ export default function EventComposer({
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {movepool.length === 0 && <p className="text-xs text-[color:var(--ink)]/40">No known moves — pick a species/moveset in Team Builder, or this is an opponent with no curated data.</p>}
                   {movepool.map((m) => (
-                    <button key={m} type="button" onClick={() => { selectMove(m); setMoveText(""); }} className={`rounded-full px-3 py-1 text-sm ${moveSlug === m ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"}`}>
+                    <button key={m} type="button" onClick={() => { selectMove(m); setMoveText(""); }} className={`min-h-[40px] rounded-full px-4 py-2 text-sm ${moveSlug === m ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"}`}>
                       {formatMoveName(m)}
                     </button>
                   ))}
@@ -357,7 +357,7 @@ export default function EventComposer({
                         key={p.name}
                         type="button"
                         onClick={() => toggleTarget(p.name)}
-                        className={`rounded-full px-3 py-1 text-sm capitalize ${selectedTargets.includes(p.name) ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
+                        className={`min-h-[40px] rounded-full px-4 py-2 text-sm capitalize ${selectedTargets.includes(p.name) ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
                       >
                         {p.name}
                       </button>
@@ -377,7 +377,7 @@ export default function EventComposer({
                           key={r.key}
                           type="button"
                           onClick={() => setTargetResults((prev) => ({ ...prev, [t]: r.key }))}
-                          className={`rounded-full px-2.5 py-1 text-xs ${targetResults[t] === r.key ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
+                          className={`min-h-[36px] rounded-full px-3 py-1.5 text-xs ${targetResults[t] === r.key ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
                         >
                           {r.label}
                         </button>
@@ -398,7 +398,7 @@ export default function EventComposer({
                         key={opt}
                         type="button"
                         onClick={() => setEffectChoice(effectChoice === opt ? null : opt)}
-                        className={`rounded-full px-2.5 py-1 text-xs ${effectChoice === opt ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"}`}
+                        className={`min-h-[36px] rounded-full px-3 py-1.5 text-xs ${effectChoice === opt ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"}`}
                       >
                         {opt}
                       </button>
@@ -426,7 +426,7 @@ export default function EventComposer({
                       key={name}
                       type="button"
                       onClick={() => setSwitchTo(name)}
-                      className={`rounded-full px-3 py-1 text-sm capitalize ${switchTo === name ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
+                      className={`min-h-[40px] rounded-full px-4 py-2 text-sm capitalize ${switchTo === name ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
                     >
                       {name}
                     </button>
@@ -443,12 +443,12 @@ export default function EventComposer({
         )}
 
         <div className="mt-5 flex gap-2">
-          <button type="button" onClick={onCancel} className="flex-1 rounded-md bg-black/10 px-3 py-2 text-sm font-medium text-[color:var(--ink)]">Cancel</button>
+          <button type="button" onClick={onCancel} className="btn-tactile min-h-[48px] flex-1 rounded-md bg-black/10 px-3 text-sm font-medium text-[color:var(--ink)]">Cancel</button>
           <button
             type="button"
             onClick={handleConfirm}
             disabled={mode === "switch" ? !switchTo : mode === "mega" ? !actor || !describeMegaForm(actor) : !canConfirmMove}
-            className="flex-1 rounded-md bg-[color:var(--shell-accent)] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-tactile btn-glow-accent min-h-[48px] flex-1 rounded-md bg-[color:var(--shell-accent)] px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Add event
           </button>

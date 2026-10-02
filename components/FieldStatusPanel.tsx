@@ -35,9 +35,9 @@ function Stepper({
     <div className="flex items-center justify-between text-xs text-[color:var(--ink)]/70">
       <span>{label}</span>
       <div className="flex items-center gap-1.5">
-        <button type="button" onClick={() => onChange(Math.max(0, value - 1))} className="h-5 w-5 rounded-full bg-black/10 text-[color:var(--ink)]">−</button>
+        <button type="button" onClick={() => onChange(Math.max(0, value - 1))} className="h-8 w-8 rounded-full bg-black/10 text-base text-[color:var(--ink)]">−</button>
         <span className="w-4 text-center font-medium text-[color:var(--ink)]">{value}</span>
-        <button type="button" onClick={() => onChange(value + 1)} className="h-5 w-5 rounded-full bg-black/10 text-[color:var(--ink)]">+</button>
+        <button type="button" onClick={() => onChange(value + 1)} className="h-8 w-8 rounded-full bg-black/10 text-base text-[color:var(--ink)]">+</button>
       </div>
     </div>
   );

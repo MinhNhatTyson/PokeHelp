@@ -4,8 +4,8 @@ import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } fr
 import { usePathname } from "next/navigation";
 import { PokemonTypeName } from "@/lib/types";
 import { TYPE_COLOR } from "@/lib/typeMeta";
-import { useEffect, useState, type ReactNode } from "react";
-import { useBackdropStore, type BackdropFigure } from "@/lib/store/backdropStore";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useBackdropStore } from "@/lib/store/backdropStore";
 import TypeIcon from "@/components/TypeIcon";
 import { getScene, type SceneMotif } from "@/lib/backgroundScenes";
 
@@ -65,6 +65,22 @@ function Silhouette({ src, color, side, size = "clamp(240px, 36vw, 500px)" }: {
       }}
     />
   );
+}
+
+function maskStyle(src: string, color: string, size: string): CSSProperties {
+  return {
+    width: size,
+    height: size,
+    backgroundColor: color,
+    WebkitMaskImage: `url(${src})`,
+    maskImage: `url(${src})`,
+    WebkitMaskSize: "contain",
+    maskSize: "contain",
+    WebkitMaskRepeat: "no-repeat",
+    maskRepeat: "no-repeat",
+    WebkitMaskPosition: "center bottom",
+    maskPosition: "center bottom",
+  };
 }
 
 // Team Builder lineup: silhouettes standing along the bottom edge
@@ -311,33 +327,30 @@ export default function AppBackground() {
   const nearY = useTransform(scrollY, [0, 1200], [0, -160]);
 
   const scene = getScene(pathname);
-  const type: PokemonTypeName = override ?? scene.type;
   const figures = useBackdropStore((s) => s.figures);
   const [cycle, setCycle] = useState(0);
   const driven = !!scene.figures;
 
-  // Several figures (full team): rotate through them, one at a time
+  // Full team: step to the next Pokémon every 8s (each change is a fade-out then fade-in)
   useEffect(() => {
     if (!driven || figures.length < 2 || reduceMotion) return;
     const id = setInterval(() => setCycle((c) => c + 1), 8000);
     return () => clearInterval(id);
   }, [driven, figures.length, reduceMotion]);
 
-  const colorOf = (f: BackdropFigure) => TYPE_COLOR[f.type ?? scene.type];
-  const silhouettes: ReactNode[] = [];
-  if (!driven) {
-    const [l, r] = TYPE_MONS[type];
-    silhouettes.push(
-      <Silhouette key={`${type}-l`} src={`${ART_BASE}/${l}.png`} color={TYPE_COLOR[type]} side="left" />,
-      <Silhouette key={`${type}-r`} src={`${ART_BASE}/${r}.png`} color={TYPE_COLOR[type]} side="right" />
-    );
-  } else if (figures.length > 0) {
-    const f = figures[cycle % figures.length];
-    silhouettes.push(
-      <Silhouette key={`l-${f.src}`} src={f.src} color={colorOf(f)} side="left" size={scene.figureSize} />,
-      <Silhouette key={`r-${f.src}`} src={f.src} color={colorOf(f)} side="right" size={scene.figureSize} />
-    );
-  }
+  const active = driven && figures.length > 0 ? figures[cycle % figures.length] : null;
+  const type: PokemonTypeName = override ?? active?.types?.[0] ?? scene.type;
+  const glyphTypes: PokemonTypeName[] = !override && active?.types?.length ? active.types : [type];
+  const [t1, t2] = active?.types ?? [];
+  const leftColor = TYPE_COLOR[t1 ?? type];
+  const rightColor = TYPE_COLOR[t2 ?? t1 ?? type];
+  const figureSize = scene.figureSize ?? "clamp(240px, 36vw, 500px)";
+
+  const [monL, monR] = TYPE_MONS[type];
+  const defaultSilhouettes: ReactNode[] = [
+    <Silhouette key={`${type}-l`} src={`${ART_BASE}/${monL}.png`} color={TYPE_COLOR[type]} side="left" />,
+    <Silhouette key={`${type}-r`} src={`${ART_BASE}/${monR}.png`} color={TYPE_COLOR[type]} side="right" />,
+  ];
   const ballMotif = scene.motif === "balls" || scene.motif === "ballTypes";
   const tints = scene.motif === "ballTypes" ? BALL_TINTS : undefined;
 
@@ -372,25 +385,56 @@ export default function AppBackground() {
       <motion.div className="absolute inset-x-0 -top-20 h-[140%]" style={{ y: reduceMotion ? 0 : nearY }}>
         {ballMotif && <BallLayer balls={NEAR_BALLS} tints={tints} calm={scene.calm} />}
         <AnimatePresence>
-          {GLYPHS.map((g, i) => (
-            <motion.span
-              key={`${type}-${i}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: Math.min(1, g.o * BOOST) }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.8 }}
-              className="absolute"
-              style={{ left: `${g.l}%`, top: `${g.t}%`, color: TYPE_COLOR[type], opacity: g.o }}
-            >
-              <span style={{ display: "block", width: g.s, height: g.s }}>
-                <TypeIcon type={type} className="h-full w-full" />
-              </span>
-            </motion.span>
-          ))}
+          {GLYPHS.map((g, i) => {
+            const gType = glyphTypes[i % glyphTypes.length];
+            return (
+              <motion.span
+                key={`${gType}-${i}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: Math.min(1, g.o * BOOST) }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.8 }}
+                className="absolute"
+                style={{ left: `${g.l}%`, top: `${g.t}%`, color: TYPE_COLOR[gType], opacity: g.o }}
+              >
+                <span style={{ display: "block", width: g.s, height: g.s }}>
+                  <TypeIcon type={gType} className="h-full w-full" />
+                </span>
+              </motion.span>
+            );
+          })}
         </AnimatePresence>
       </motion.div>
 
-      <AnimatePresence>{silhouettes}</AnimatePresence>
+      {driven ? (
+        <AnimatePresence mode="wait">
+          {active && (
+            <motion.div
+              key={active.src}
+              className="absolute inset-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.1, ease: "easeInOut" }}
+            >
+              {(["left", "right"] as const).map((side) => (
+                <div
+                  key={side}
+                  className="absolute bottom-0"
+                  style={{
+                    ...maskStyle(active.src, side === "left" ? leftColor : rightColor, figureSize),
+                    [side]: "-3%",
+                    opacity: SILHOUETTE_OPACITY,
+                    transform: side === "left" ? "scaleX(-1)" : undefined,
+                  }}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      ) : (
+        <AnimatePresence>{defaultSilhouettes}</AnimatePresence>
+      )}
 
       {scene.vignette && (
         <div

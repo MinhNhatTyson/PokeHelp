@@ -32,7 +32,7 @@ export default function TeamBuilder() {
 
     const toFigure = (p: (typeof filled)[number]) => ({
       src: p.artworkUrl ?? p.spriteUrl ?? "",
-      type: p.types[0],
+      types: p.types,
     });
     const figures =
       filled.length >= TEAM_SIZE

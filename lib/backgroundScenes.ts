@@ -25,6 +25,7 @@ export const SCENES: Record<string, BackgroundScene> = {
   "/battle":    { type: "fire",     motif: "embers",     glow: "low", calm: true, vignette: true },
   "/damage":    { type: "rock",     motif: "grid",       glow: "corner", calm: true },
   "/trainers":  { type: "dragon",   motif: "balls",      glow: "corner" },
+  "/settings":  { type: "steel",    motif: "grid",       glow: "center", calm: true },
 };
 
 const DEFAULT_SCENE: BackgroundScene = { type: "dragon", motif: "balls", glow: "corner" };

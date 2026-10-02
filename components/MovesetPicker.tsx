@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { PokemonMoveEntry } from "@/lib/types";
 import { useListNav } from "@/lib/hooks/useListNav";
+import { useAiSettingsStore } from "@/lib/store/aiSettingsStore";
 
 const MAX_MOVE_SUGGESTIONS = 8;
 interface MoveSuggestion {
@@ -127,7 +128,8 @@ export default function MovesetPicker({ slotIndex }: { slotIndex: number }) {
         itemName: slot.itemName,
         teammates,
         teamStrategy,
-      }),
+        model: useAiSettingsStore.getState().model,
+      }), 
     })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("failed"))))
       .then((data) => { if (!cancelled) setResult({ key: requestKey, suggestion: data, failed: false }); })

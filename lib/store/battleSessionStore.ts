@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers } from "@/lib/types";
+import { useAiSettingsStore } from "./aiSettingsStore";
 
 const EMPTY_FIELD_STATE: FieldState = {
   weather: "none",
@@ -17,6 +18,7 @@ interface BattleSessionState {
   yourTeamNames: string[];
   opponentTeamNames: string[];
   activeBattlers: ActiveBattlers;
+  initialLeads: ActiveBattlers | null;
   fieldState: FieldState;
   currentTurnEvents: BattleEvent[];
   conversation: BattleConversationTurn[];
@@ -37,6 +39,7 @@ const initialState = {
   yourTeamNames: [] as string[],
   opponentTeamNames: [] as string[],
   activeBattlers: EMPTY_ACTIVE_BATTLERS,
+  initialLeads: null as ActiveBattlers | null,
   fieldState: EMPTY_FIELD_STATE,
   currentTurnEvents: [] as BattleEvent[],
   conversation: [] as BattleConversationTurn[],
@@ -48,7 +51,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
   ...initialState,
 
   startSession: (yourTeamNames, opponentTeamNames, activeBattlers) =>
-    set({ ...initialState, started: true, yourTeamNames, opponentTeamNames, activeBattlers }),
+    set({ ...initialState, started: true, yourTeamNames, opponentTeamNames, activeBattlers, initialLeads: activeBattlers }),
 
   resetSession: () => set({ ...initialState }),
 
@@ -94,6 +97,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
           opponentTeam: state.opponentTeamNames,
           conversation: state.conversation,
           newTurnSentence: compiledSentence,
+          model: useAiSettingsStore.getState().model,
         }),
       });
 
