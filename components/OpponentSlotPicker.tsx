@@ -74,6 +74,7 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
         const megaDetail = (await fetchPokemonDetail(commonSet.megaForm.formSpecies))
         ?? synthesizeMegaDetail(detail, commonSet.megaForm);
         setSlotMegaFormDetail(index, megaDetail);
+        setSlotAbility(index, commonSet.megaForm.formAbility); // a Mega has exactly one ability
       } else if (detail.abilities.some((a) => a.name === commonSet.likelyAbility)) {
         setSlotAbility(index, commonSet.likelyAbility);
       }
@@ -98,11 +99,17 @@ async function handleSelectItem(name: string) {
       const megaDetail = (await fetchPokemonDetail(commonSet.megaForm.formSpecies))
         ?? synthesizeMegaDetail(mon, commonSet.megaForm);
       setSlotMegaFormDetail(index, megaDetail);
+      setSlotAbility(index, commonSet.megaForm.formAbility);
     } else {
       setSlotMegaFormDetail(index, null); // holding something else, so no Mega assumed
+      // back to the normal (pre-Mega) ability
+      setSlotAbility(index, mon.abilities.some((a) => a.name === commonSet.likelyAbility) ? commonSet.likelyAbility : null);
     }
   }
 }
+
+  const activeSet = slot.pokemon ? getCommonSet(slot.pokemon.name) : null;
+  const megaActive = !!slot.megaFormDetail && !!activeSet?.megaForm;
 
   return (
     <div ref={containerRef} className="rounded-lg border border-black/10 bg-white p-4">
@@ -157,27 +164,40 @@ async function handleSelectItem(name: string) {
           </div>
 
           <div className="mt-3">
-            <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Guessed ability (optional)</label>
-            <select
-              value={slot.abilityName ?? ""}
-              onChange={(e) => setSlotAbility(index, e.target.value || null)}
-              className="mt-1 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm capitalize text-[color:var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
-            >
-              <option value="">Not sure / unknown</option>
-              {slot.pokemon.abilities.map((a) => (
-                <option key={a.name} value={a.name}>
-                  {a.name.replace(/-/g, " ")}{a.isHidden ? " (hidden)" : ""}
-                </option>
-              ))}
-            </select>
-            {(() => {
-              const commonSet = getCommonSet(slot.pokemon!.name);
-              return commonSet?.megaForm ? (
+            <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">
+              {megaActive ? "Ability (Mega)" : "Guessed ability (optional)"}
+            </label>
+            {megaActive && activeSet?.megaForm ? (
+              <>
+                <div className="mt-1 flex min-h-[40px] items-center justify-between rounded-md border border-black/10 bg-black/5 px-3 py-2 text-sm capitalize text-[color:var(--ink)]">
+                  <span>{activeSet.megaForm.formAbility.replace(/-/g, " ")}</span>
+                  <span className="rounded-full bg-[color:var(--accent-gold)] px-2 py-0.5 text-[10px] font-semibold uppercase text-black">Mega</span>
+                </div>
                 <p className="mt-1.5 text-xs text-[color:var(--ink)]/50">
-                  Likely Mega Evolves via {commonSet.topItem} → <span className="capitalize">{commonSet.megaForm.formAbility.replace(/-/g, " ")}</span>
+                  Mega Evolves via {activeSet.topItem}. A Mega has exactly one ability, so it&apos;s locked. Change the item to undo.
                 </p>
-              ) : null;
-            })()}
+              </>
+            ) : (
+              <>
+                <select
+                  value={slot.abilityName ?? ""}
+                  onChange={(e) => setSlotAbility(index, e.target.value || null)}
+                  className="mt-1 w-full rounded-md border border-black/10 bg-white px-3 py-2 text-sm capitalize text-[color:var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
+                >
+                  <option value="">Not sure / unknown</option>
+                  {slot.pokemon.abilities.map((a) => (
+                    <option key={a.name} value={a.name}>
+                      {a.name.replace(/-/g, " ")}{a.isHidden ? " (hidden)" : ""}
+                    </option>
+                  ))}
+                </select>
+                {activeSet?.megaForm && (
+                  <p className="mt-1.5 text-xs text-[color:var(--ink)]/50">
+                    Can Mega Evolve via {activeSet.topItem} → <span className="capitalize">{activeSet.megaForm.formAbility.replace(/-/g, " ")}</span>
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           <div className="relative mt-3">

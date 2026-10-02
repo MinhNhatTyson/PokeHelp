@@ -3,7 +3,8 @@ import { PokemonTypeName } from "@/lib/types";
 
 export interface BackdropFigure {
   src: string;                 // image whose alpha becomes the silhouette
-  types?: PokemonTypeName[];   // actual types; falls back to the page's scene type
+  types?: PokemonTypeName[];
+  side?: "left" | "right";
 }
 
 interface BackdropState {

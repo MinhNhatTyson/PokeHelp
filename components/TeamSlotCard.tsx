@@ -49,10 +49,10 @@ export default function TeamSlotCard({ index, onOpen }: { index: number; onOpen:
           Slot {index + 1}
         </span>
         <span
-          className="font-dex inline-flex h-5 items-center rounded-full px-2.5 text-[10px] leading-none tracking-wider text-white"
+          className="font-dex inline-flex h-5 items-center rounded-full px-2.5 text-[10px] leading-none text-white"
           style={{ backgroundColor: frame }}
         >
-          #{String(mon.dexNumber).padStart(4, "0")}
+          <span className="translate-y-[0.18em]">#{String(mon.dexNumber).padStart(4, "0")}</span>
         </span>
       </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useBackdropStore } from "@/lib/store/backdropStore";
 import Link from "next/link";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useOpponentTeamStore, OPPONENT_TEAM_SIZE } from "@/lib/store/opponentTeamStore";
@@ -33,6 +34,20 @@ export default function BattleOptimizer() {
   const opponentReady = opponentSlots.every((s) => s.pokemon);
   const [strategyErrorDetail, setStrategyErrorDetail] = useState<string | null>(null);
   const recentHistory = useBattleHistoryStore((s) => s.entries);  
+
+  const setBackdropFigures = useBackdropStore((s) => s.setFigures);
+  useEffect(() => {
+    type Slotish = { pokemon: { artworkUrl: string | null; spriteUrl: string | null; types: PokemonTypeName[] } | null };
+    const toFigures = (slots: Slotish[], side: "left" | "right") =>
+      slots.flatMap((s) => {
+        const src = s.pokemon?.artworkUrl ?? s.pokemon?.spriteUrl;
+        return s.pokemon && src ? [{ src, types: s.pokemon.types, side }] : [];
+      });
+    setBackdropFigures([...toFigures(userSlots, "left"), ...toFigures(opponentSlots, "right")]);
+  }, [userSlots, opponentSlots, setBackdropFigures]);
+
+  // Clear only when leaving the page
+  useEffect(() => () => setBackdropFigures([]), [setBackdropFigures]);
 
   const userCoverage = useMemo(() => userSlots.map((s) => {
     const mega = s.pokemon ? getActiveMega(s.pokemon.name, s.itemName) : null;

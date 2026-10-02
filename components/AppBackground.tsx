@@ -4,10 +4,11 @@ import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } fr
 import { usePathname } from "next/navigation";
 import { PokemonTypeName } from "@/lib/types";
 import { TYPE_COLOR } from "@/lib/typeMeta";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useBackdropStore } from "@/lib/store/backdropStore";
 import TypeIcon from "@/components/TypeIcon";
 import { getScene, type SceneMotif } from "@/lib/backgroundScenes";
+import { useBattleHistoryStore, MAX_BATTLE_HISTORY } from "@/lib/store/battleHistoryStore";
 
 
 const BOOST = 3; // raise/lower to taste (1 = the old values)
@@ -313,10 +314,271 @@ function MotifLayer({ motif }: { motif: SceneMotif }) {
       );
     }
 
+        case "arena": {
+      const you = "var(--shell-accent)";
+      const opp = "#3b82f6";
+      const beam = "linear-gradient(to bottom, color-mix(in srgb, var(--screen) 15%, transparent), transparent 80%)";
+      return (
+        <>
+          {/* red light on your side, blue on the opponent's */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                `radial-gradient(60% 75% at 0% 90%, color-mix(in srgb, ${you} 36%, transparent), transparent 70%), ` +
+                `radial-gradient(60% 75% at 100% 90%, color-mix(in srgb, ${opp} 36%, transparent), transparent 70%)`,
+            }}
+          />
+          {/* stadium spotlights */}
+          <div className="absolute inset-0" style={{ clipPath: "polygon(8% 0, 22% 0, 30% 100%, 0 100%)", background: beam }} />
+          <div className="absolute inset-0" style={{ clipPath: "polygon(78% 0, 92% 0, 100% 100%, 70% 100%)", background: beam }} />
+
+          {/* battlefield floor in perspective, with a Poké Ball-style center mark */}
+          <div className="absolute inset-x-0 bottom-0 h-[40%]" style={{ background: "linear-gradient(to bottom, transparent, rgba(0,0,0,0.38))" }}>
+            <svg viewBox="0 0 1000 380" preserveAspectRatio="none" className="h-full w-full" fill="none">
+              <g style={{ stroke: "var(--screen)", strokeOpacity: 0.14 }} strokeWidth="1">
+                {ARENA_COLS.map((xb) => (
+                  <line key={xb} x1={arenaVp(xb)} y1="0" x2={xb} y2="380" vectorEffect="non-scaling-stroke" />
+                ))}
+                {ARENA_ROWS.map((y) => (
+                  <line key={y} x1="0" y1={y} x2="1000" y2={y} vectorEffect="non-scaling-stroke" />
+                ))}
+              </g>
+              <g style={{ stroke: "var(--bg-accent)", strokeOpacity: 0.4 }} strokeWidth="1.5">
+                <ellipse cx="500" cy="215" rx="300" ry="62" vectorEffect="non-scaling-stroke" />
+                <ellipse cx="500" cy="215" rx="46" ry="11" vectorEffect="non-scaling-stroke" />
+                <line x1="200" y1="215" x2="800" y2="215" vectorEffect="non-scaling-stroke" />
+              </g>
+            </svg>
+          </div>
+
+          {/* trainer platforms under each side's silhouette */}
+          {(["left", "right"] as const).map((side) => {
+            const c = side === "left" ? you : opp;
+            return (
+              <div
+                key={side}
+                className="absolute rounded-[50%]"
+                style={{
+                  [side]: "-3%", bottom: "-1.5%", width: DEFAULT_FIGURE, height: "clamp(50px, 7vw, 100px)",
+                  background: `radial-gradient(closest-side, color-mix(in srgb, ${c} 45%, transparent), transparent 75%)`,
+                  border: `2px solid color-mix(in srgb, ${c} 55%, transparent)`,
+                }}
+              />
+            );
+          })}
+
+          {/* clash burst + VS */}
+          <div className="absolute" style={{ left: "50%", top: "44%", transform: "translate(-50%, -50%)" }}>
+            <div className="bg-pulse relative" style={{ width: "clamp(180px, 22vw, 320px)", aspectRatio: "1" }}>
+              <svg viewBox="-100 -100 200 200" className="absolute inset-0 h-full w-full">
+                <polygon points={BURST_POINTS} style={{ fill: "var(--bg-accent)", fillOpacity: 0.16 }} />
+              </svg>
+              <span
+                className="font-logo absolute inset-0 flex select-none items-center justify-center"
+                style={{ fontSize: "clamp(56px, 8vw, 120px)", color: "color-mix(in srgb, var(--screen) 22%, transparent)" }}
+              >
+                VS
+              </span>
+            </div>
+          </div>
+
+          {/* sparks from the middle of the field */}
+          {EMBERS.slice(0, 12).map((e, i) => {
+            const c = i % 2 ? opp : you;
+            return (
+              <span
+                key={i}
+                className="bg-ember absolute rounded-full"
+                style={{
+                  left: `${36 + (e.l % 28)}%`, bottom: "14%", width: e.s, height: e.s,
+                  background: c, boxShadow: `0 0 8px ${c}`,
+                  ["--dur" as string]: `${e.dur}s`, ["--delay" as string]: `${e.delay}s`,
+                  ["--dx" as string]: `${e.dx}px`, ["--o" as string]: `${e.o}`,
+                }}
+              />
+            );
+          })}
+
+          {/* a Poké Ball in the air on each side (pixel sprite from PokeAPI) */}
+          {(["left", "right"] as const).map((side) => {
+            return (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={side}
+                src={`${SPRITE}/poke-ball.png`}
+                alt=""
+                className="bg-float absolute"
+                style={{
+                  [side]: "27%", top: "30%", width: 56, height: 56, imageRendering: "pixelated", opacity: 0.35,
+                  ["--dx" as string]: side === "left" ? "18px" : "-18px", ["--dy" as string]: "-22px",
+                  ["--rot" as string]: side === "left" ? "14deg" : "-14deg", ["--dur" as string]: "9s",
+                }}
+              />
+            );
+          })}
+        </>
+      );
+    }
+
+    case "timeline":
+      return <TimelineMotif />;
+
+    case "machinery":
+      return (
+        <div className="absolute inset-0" style={{ ["--g" as string]: "clamp(170px, 24vw, 340px)" }}>
+          <div className="absolute" style={{ left: "-5%", bottom: "8%", width: "var(--g)", height: "var(--g)" }}>
+            <Gear dur={80} />
+          </div>
+          <div
+            className="absolute"
+            style={{ left: "calc(-5% + var(--g) * 0.62)", bottom: "calc(8% + var(--g) * 0.62)", width: "var(--g)", height: "var(--g)" }}
+          >
+            <Gear dur={80} reverse offset={15} />
+          </div>
+          <div className="absolute" style={{ right: "-6%", top: "6%", width: "calc(var(--g) * 1.25)", height: "calc(var(--g) * 1.25)" }}>
+            <Gear dur={110} reverse offset={7} />
+          </div>
+          {FADERS.map((f, i) => (
+            <span
+              key={i}
+              className="absolute"
+              style={{ left: `${f.l}%`, bottom: "3%", width: 2, height: f.h, background: "color-mix(in srgb, var(--screen) 22%, transparent)" }}
+            >
+              <span
+                className="bg-fader absolute rounded-sm"
+                style={{
+                  left: -6, bottom: 0, width: 14, height: 8, background: "var(--bg-accent)", opacity: 0.55,
+                  ["--travel" as string]: `${-(f.h - 8)}px`, ["--dur" as string]: `${f.dur}s`, ["--delay" as string]: `${f.delay}s`,
+                }}
+              />
+            </span>
+          ))}
+        </div>
+      );
+
     default:
       return null; // "balls" / "ballTypes" are handled by BallLayer
   }
 }
+
+const DEFAULT_FIGURE = "clamp(240px, 36vw, 500px)";
+
+// Official art mostly faces left. If a Pokémon's art faces right, add its dex number here
+// so it still turns toward the other side.
+const FACES_RIGHT = new Set<number>([]);
+const artId = (src: string) => Number(src.match(/\/(\d+)\.png/)?.[1] ?? 0);
+const flipFor = (side: "left" | "right", src: string) => (side === "left") !== FACES_RIGHT.has(artId(src));
+
+function SideSilhouette({ side, src, color, size, flip }: {
+  side: "left" | "right"; src: string; color: string; size: string; flip: boolean;
+}) {
+  return (
+    <motion.div
+      className="absolute inset-0"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 1.1, ease: "easeInOut" }}
+    >
+      <div
+        className="absolute bottom-0"
+        style={{
+          ...maskStyle(src, color, size),
+          [side]: "-3%",
+          opacity: SILHOUETTE_OPACITY,
+          transform: flip ? "scaleX(-1)" : undefined,
+        }}
+      />
+    </motion.div>
+  );
+}
+
+// ---- Arena (Battle Optimizer) ----
+const ARENA_COLS = [-480, -320, -160, 0, 160, 320, 480, 640, 800, 960, 1120, 1280, 1440];
+const ARENA_ROWS = [34, 82, 142, 218, 316];
+const arenaVp = (xb: number) => 500 + (xb - 500) * 0.40625; // converge toward a vanishing point above the floor
+const BURST_POINTS = Array.from({ length: 24 }, (_, i) => {
+  const a = (i * Math.PI) / 12;
+  const r = i % 2 === 0 ? 96 : 44;
+  return `${(Math.cos(a) * r).toFixed(1)},${(Math.sin(a) * r).toFixed(1)}`;
+}).join(" ");
+const SPRITE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items";
+
+// ---- Timeline (Battle History) ----
+function TimelineMotif() {
+  const entries = useBattleHistoryStore((s) => s.entries);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const rows = Array.from({ length: MAX_BATTLE_HISTORY }, (_, i) => (mounted ? entries[i] : undefined));
+
+  return (
+    <>
+      {(["left", "right"] as const).map((side, s) => (
+        <div key={side} className="absolute inset-y-0" style={{ [side]: "2.5%", width: 14 }}>
+          <div
+            className="absolute inset-y-[6%] left-1/2 w-px"
+            style={{ background: "linear-gradient(to bottom, transparent, color-mix(in srgb, var(--screen) 28%, transparent) 12%, color-mix(in srgb, var(--screen) 28%, transparent) 88%, transparent)" }}
+          />
+          {rows.map((e, i) => {
+            const color = e ? (e.outcome === "win" ? "#10b981" : "#ef4444") : null;
+            return (
+              <span
+                key={i}
+                className="absolute left-1/2 rounded-full"
+                style={{
+                  top: `${8 + i * 9.3}%`, width: 12, height: 12, transform: "translate(-50%, -50%)",
+                  border: `2px solid ${color ?? "color-mix(in srgb, var(--screen) 22%, transparent)"}`,
+                  background: color ? `color-mix(in srgb, ${color} 55%, transparent)` : "transparent",
+                  boxShadow: color ? `0 0 10px ${color}` : undefined,
+                }}
+              />
+            );
+          })}
+          <span
+            className="bg-scan absolute"
+            style={{
+              left: -4, right: -4, height: 90,
+              background: "linear-gradient(to bottom, transparent, color-mix(in srgb, var(--bg-accent) 70%, transparent), transparent)",
+              ["--dur" as string]: "8s", ["--delay" as string]: `${-s * 4}s`,
+            }}
+          />
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ---- Machinery (Settings) ----
+function gearPath(teeth: number, outer: number, inner: number): string {
+  const step = (Math.PI * 2) / teeth;
+  const p = (ang: number, r: number) => `${(Math.cos(ang) * r).toFixed(2)},${(Math.sin(ang) * r).toFixed(2)}`;
+  const pts: string[] = [];
+  for (let i = 0; i < teeth; i++) {
+    const a = i * step;
+    pts.push(p(a - step * 0.28, inner), p(a - step * 0.16, outer), p(a + step * 0.16, outer), p(a + step * 0.28, inner));
+  }
+  return `M${pts.join("L")}Z`;
+}
+const GEAR_D = gearPath(12, 96, 80);
+
+function Gear({ dur, reverse, offset = 0 }: { dur: number; reverse?: boolean; offset?: number }) {
+  return (
+    <div className="h-full w-full" style={{ transform: `rotate(${offset}deg)` }}>
+      <div className="bg-spin h-full w-full" style={{ ["--dur" as string]: `${dur}s`, animationDirection: reverse ? "reverse" : "normal" }}>
+        <svg viewBox="-100 -100 200 200" className="h-full w-full" fill="none" style={RETICLE_STYLE}>
+          <path d={GEAR_D} strokeWidth="1.4" />
+          <circle r="58" strokeWidth="1" strokeDasharray="3 5" />
+          <circle r="26" strokeWidth="1.4" />
+          <circle r="8" strokeWidth="1.4" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+const FADERS = Array.from({ length: 14 }, (_, i) => ({
+  l: 4 + i * 6.8, h: 70 + (i % 3) * 18, dur: 5 + ((i * 3) % 6), delay: -(i * 1.3),
+}));
 
 export default function AppBackground() {
   const pathname = usePathname();
@@ -331,26 +593,42 @@ export default function AppBackground() {
   const [cycle, setCycle] = useState(0);
   const driven = !!scene.figures;
 
-  // Full team: step to the next Pokémon every 8s (each change is a fade-out then fade-in)
+  // Figures tagged with a side fill only that side (Battle Optimizer: your team vs the opponent's)
+  const sided = figures.some((f) => f.side);
+  const leftFigs = sided ? figures.filter((f) => f.side === "left") : figures;
+  const rightFigs = sided ? figures.filter((f) => f.side === "right") : figures;
+  const leftFig = driven && leftFigs.length > 0 ? leftFigs[cycle % leftFigs.length] : null;
+  const rightFig = driven && rightFigs.length > 0 ? rightFigs[cycle % rightFigs.length] : null;
+  const active = leftFig ?? rightFig;
+
+  // Several figures: step to the next one every 8s (each change is a fade-out then fade-in)
+  const cycleCount = Math.max(leftFigs.length, rightFigs.length);
   useEffect(() => {
-    if (!driven || figures.length < 2 || reduceMotion) return;
+    if (!driven || cycleCount < 2 || reduceMotion) return;
     const id = setInterval(() => setCycle((c) => c + 1), 8000);
     return () => clearInterval(id);
-  }, [driven, figures.length, reduceMotion]);
+  }, [driven, cycleCount, reduceMotion]);
 
-  const active = driven && figures.length > 0 ? figures[cycle % figures.length] : null;
-  const type: PokemonTypeName = override ?? active?.types?.[0] ?? scene.type;
-  const glyphTypes: PokemonTypeName[] = !override && active?.types?.length ? active.types : [type];
+  const type: PokemonTypeName = override ?? (scene.arena ? undefined : active?.types?.[0]) ?? scene.type;
+  const glyphTypes: PokemonTypeName[] = !override && !scene.arena && active?.types?.length ? active.types : [type];
   const [t1, t2] = active?.types ?? [];
-  const leftColor = TYPE_COLOR[t1 ?? type];
-  const rightColor = TYPE_COLOR[t2 ?? t1 ?? type];
-  const figureSize = scene.figureSize ?? "clamp(240px, 36vw, 500px)";
+  const sideColor = (side: "left" | "right") =>
+    scene.arena
+      ? side === "left" ? "var(--shell-accent)" : "#3b82f6"
+      : TYPE_COLOR[side === "left" ? (t1 ?? type) : (t2 ?? t1 ?? type)];
+  const figureSize = scene.figureSize ?? DEFAULT_FIGURE;
 
   const [monL, monR] = TYPE_MONS[type];
   const defaultSilhouettes: ReactNode[] = [
     <Silhouette key={`${type}-l`} src={`${ART_BASE}/${monL}.png`} color={TYPE_COLOR[type]} side="left" />,
     <Silhouette key={`${type}-r`} src={`${ART_BASE}/${monR}.png`} color={TYPE_COLOR[type]} side="right" />,
   ];
+  // Driven pages show their own Pokémon; the arena falls back to the type's default pair when empty
+  const sideSrc = (side: "left" | "right") => {
+    const fig = side === "left" ? leftFig : rightFig;
+    if (fig) return fig.src;
+    return scene.arena ? `${ART_BASE}/${side === "left" ? monL : monR}.png` : null;
+  };
   const ballMotif = scene.motif === "balls" || scene.motif === "ballTypes";
   const tints = scene.motif === "ballTypes" ? BALL_TINTS : undefined;
 
@@ -407,31 +685,25 @@ export default function AppBackground() {
       </motion.div>
 
       {driven ? (
-        <AnimatePresence mode="wait">
-          {active && (
-            <motion.div
-              key={active.src}
-              className="absolute inset-0"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1.1, ease: "easeInOut" }}
-            >
-              {(["left", "right"] as const).map((side) => (
-                <div
-                  key={side}
-                  className="absolute bottom-0"
-                  style={{
-                    ...maskStyle(active.src, side === "left" ? leftColor : rightColor, figureSize),
-                    [side]: "-3%",
-                    opacity: SILHOUETTE_OPACITY,
-                    transform: side === "left" ? "scaleX(-1)" : undefined,
-                  }}
-                />
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <>
+          {(["left", "right"] as const).map((side) => {
+            const src = sideSrc(side);
+            return (
+              <AnimatePresence key={side} mode="wait">
+                {src && (
+                  <SideSilhouette
+                    key={src}
+                    side={side}
+                    src={src}
+                    color={sideColor(side)}
+                    size={figureSize}
+                    flip={flipFor(side, src)}
+                  />
+                )}
+              </AnimatePresence>
+            );
+          })}
+        </>
       ) : (
         <AnimatePresence>{defaultSilhouettes}</AnimatePresence>
       )}
