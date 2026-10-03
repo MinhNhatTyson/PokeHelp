@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
 import { useListNav } from "@/lib/hooks/useListNav";
 import BackToOptimizer from "@/components/BackToOptimizer";
+import Skeleton from "@/components/Skeleton";
 
 const MAX_SUGGESTIONS = 8;
 
@@ -194,7 +195,13 @@ export default function SpeedComparisonExplorer() {
           )}
         </div>
 
-        {status === "loading" && <p className="mt-3 text-sm text-[color:var(--ink)]/60">Loading…</p>}
+        {status === "loading" && (
+          <div role="status" aria-label="Loading Pokémon" className="mt-6 border-t border-black/10 pt-5">
+            <Skeleton className="h-8 w-2/3" />
+            <Skeleton className="mt-4 h-16 w-full" />
+            <Skeleton className="mt-3 h-10 w-full" />
+          </div>
+        )}
         {status === "error" && <p className="mt-3 text-sm text-red-500">Couldn&apos;t load that Pokémon.</p>}
 
         {opponent && ownSlot?.pokemon && ownSpeed !== null && (
@@ -217,16 +224,17 @@ export default function SpeedComparisonExplorer() {
             </div>
 
             {chanceFaster !== null && (
-              <div
-                className={`mt-4 rounded-lg px-4 py-3 text-sm font-medium ${
-                  chanceFaster >= 60
-                    ? "bg-emerald-100 text-emerald-900"
-                    : chanceFaster <= 40
-                    ? "bg-red-100 text-red-900"
-                    : "bg-[color:var(--accent-gold)]/30 text-[color:var(--ink)]"
-                }`}
-              >
-                ~{chanceFaster}% chance you move first this matchup
+              <div className="mt-4 overflow-hidden rounded-lg border border-black/10">
+                <div className={`effect-banner ${chanceFaster >= 60 ? "effect-banner--resist" : chanceFaster <= 40 ? "effect-banner--weak" : "effect-banner--not-very"}`}>
+                  <span>{chanceFaster >= 60 ? "You likely move first" : chanceFaster <= 40 ? "They likely move first" : "Too close to call"}</span>
+                  <span className="tabular-nums">{chanceFaster}%</span>
+                </div>
+                <div className="bg-black/5 p-3">
+                  <div role="img" aria-label={`${chanceFaster}% chance you move first`} className="h-3 overflow-hidden rounded-full bg-black/15">
+                    <div className="h-full rounded-full bg-emerald-500 transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${chanceFaster}%` }} />
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-[color:var(--ink)]/50">Chance you outspeed, weighted across the likely spreads below.</p>
+                </div>
               </div>
             )}
             <p className="mt-3 text-xs text-[color:var(--ink)]/50">
@@ -244,11 +252,17 @@ export default function SpeedComparisonExplorer() {
                   : verdict === "slower" ? `Opponent's faster (${v.speed} vs ${ownSpeed})`
                   : `Speed tie (${ownSpeed} vs ${v.speed}) — 50/50`;
                 return (
-                  <div key={v.label} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-black/5 px-3 py-2 text-sm">
-                    <span className="text-[color:var(--ink)]/80">
-                      {v.label} <span className="text-[color:var(--ink)]/40">· ~{v.likelihood}% likely</span>
-                    </span>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${style}`}>{verdictLabel}</span>
+                  <div key={v.label} className="rounded-md bg-black/5 px-3 py-2 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[color:var(--ink)]/80">{v.label}</span>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${style}`}>{verdictLabel}</span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-black/10">
+                        <div className="h-full rounded-full bg-[color:var(--accent-gold)]" style={{ width: `${Math.min(100, v.likelihood)}%` }} />
+                      </div>
+                      <span className="w-20 text-right text-[11px] tabular-nums text-[color:var(--ink)]/50">~{v.likelihood}% likely</span>
+                    </div>
                   </div>
                 );
               })}

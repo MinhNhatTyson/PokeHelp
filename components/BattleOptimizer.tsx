@@ -5,7 +5,8 @@ import { useBackdropStore } from "@/lib/store/backdropStore";
 import Link from "next/link";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useOpponentTeamStore, OPPONENT_TEAM_SIZE } from "@/lib/store/opponentTeamStore";
-import { rankBringFourCombos, statsFromEntries, CoverageMon } from "@/lib/logic/battleOptimizer";
+import { rankBringFourCombos, getLeadPrediction, statsFromEntries, CoverageMon } from "@/lib/logic/battleOptimizer";
+import OpponentLeadPrediction from "@/components/OpponentLeadPrediction";
 import OpponentSlotPicker from "@/components/OpponentSlotPicker";
 import ComboResultCard from "@/components/ComboResultCard";
 import { getCommonSet, getActiveMega } from "@/lib/data/commonSets";
@@ -28,6 +29,7 @@ export default function BattleOptimizer() {
   const [view, setView] = useState<"top" | "all">("top");
   const teamStrategy = useTeamStore((s) => s.teamStrategy);
   const [strategyNarrative, setStrategyNarrative] = useState<string | null>(null);
+  const [strategyModel, setStrategyModel] = useState<string | null>(null);
   const [strategyStatus, setStrategyStatus] = useState<"idle" | "loading" | "error">("idle");
 
   const userReady = userSlots.every((s) => s.pokemon && s.abilityName);
@@ -80,12 +82,21 @@ export default function BattleOptimizer() {
     if (!userReady || !opponentReady) return null;
     return rankBringFourCombos(userCoverage, opponentCoverage, recentHistory);
   }, [userReady, opponentReady, userCoverage, opponentCoverage, recentHistory]);
+  const leadPrediction = useMemo(
+    () => (opponentReady ? getLeadPrediction(opponentCoverage, recentHistory) : null),
+    [opponentReady, opponentCoverage, recentHistory]
+  );
+  const opponentSprites = useMemo(
+    () => Object.fromEntries(opponentSlots.filter((s) => s.pokemon).map((s) => [s.pokemon!.name, s.pokemon!.spriteUrl])),
+    [opponentSlots]
+  );
 
   async function handleGetStrategy() {
     if (!results || results.length === 0) return;
     setStrategyStatus("loading");
     setStrategyNarrative(null);
     setStrategyErrorDetail(null);
+    setStrategyModel(null);
 
     try {
       const res = await fetch("/api/strategy", {
@@ -119,6 +130,7 @@ export default function BattleOptimizer() {
         return;
       }
       setStrategyNarrative(data.narrative);
+      setStrategyModel(data.model ?? null);
       setStrategyStatus("idle");
     } catch {
       setStrategyStatus("error");
@@ -172,6 +184,8 @@ export default function BattleOptimizer() {
           </div>
         </div>
 
+        {leadPrediction && <OpponentLeadPrediction prediction={leadPrediction} sprites={opponentSprites} />}
+
         {results && (
           <div className="mt-8 border-t border-black/10 pt-6">
             <h2 className="font-heading text-lg text-[color:var(--ink)]">Recommended lineups</h2>
@@ -192,7 +206,10 @@ export default function BattleOptimizer() {
               )}
               {strategyNarrative && (
                 <div className="mt-3 rounded-lg border border-[color:var(--accent-gold)]/40 bg-black/5 p-4 text-sm text-[color:var(--ink)]">
-                  <p className="mb-1 text-xs font-medium uppercase text-[color:var(--ink)]/40">AI strategy notes</p>
+                  <p className="mb-1 text-xs font-medium uppercase text-[color:var(--ink)]/40">
+                    AI strategy notes
+                    {strategyModel && <span className="ml-2 normal-case opacity-70">· {strategyModel}</span>}
+                  </p>
                   <p>{strategyNarrative}</p>
                 </div>
               )}

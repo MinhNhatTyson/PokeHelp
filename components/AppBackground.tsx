@@ -1,14 +1,16 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from "motion/react";
+import { AnimatePresence, MotionConfig, motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 import { usePathname } from "next/navigation";
 import { PokemonTypeName } from "@/lib/types";
 import { TYPE_COLOR } from "@/lib/typeMeta";
 import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useBackdropStore } from "@/lib/store/backdropStore";
+import { useTeamStore } from "@/lib/store/teamStore";
 import TypeIcon from "@/components/TypeIcon";
 import { getScene, type SceneMotif } from "@/lib/backgroundScenes";
 import { useBattleHistoryStore, MAX_BATTLE_HISTORY } from "@/lib/store/battleHistoryStore";
+import { useBattleSessionStore } from "@/lib/store/battleSessionStore";
 
 
 const BOOST = 3; // raise/lower to taste (1 = the old values)
@@ -35,7 +37,7 @@ const TYPE_MONS: Record<PokemonTypeName, [number, number]> = {
   fairy: [700, 468],    // Sylveon, Togekiss
 };
 
-const SILHOUETTE_OPACITY = 0.16;
+const SILHOUETTE_OPACITY = 0.30;
 
 const ART_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork";
 
@@ -188,6 +190,237 @@ const EMBERS = Array.from({ length: 24 }, (_, i) => ({
 
 const RETICLE_STYLE = { stroke: "var(--bg-accent)", strokeOpacity: 0.3 } as const;
 
+const RAIN = Array.from({ length: 46 }, (_, i) => ({
+  l: (i * 23 + 7) % 100, h: 50 + ((i * 17) % 70), dur: 0.9 + (i % 5) * 0.2, delay: -((i % 9) * 0.35), o: 0.25 + (i % 3) * 0.12,
+}));
+const SNOW = Array.from({ length: 36 }, (_, i) => ({
+  l: (i * 29 + 5) % 100, s: 3 + (i % 4) * 1.5, dur: 9 + ((i * 5) % 9), delay: -((i * 3) % 14), dx: ((i % 5) - 2) * 14, o: 0.45 + (i % 3) * 0.15,
+}));
+const SAND = Array.from({ length: 30 }, (_, i) => ({
+  t: (i * 13 + 5) % 100, w: 40 + ((i * 31) % 90), dur: 2.4 + (i % 5) * 0.6, delay: -((i * 7) % 9) * 0.5, dy: ((i % 5) - 2) * 10, o: 0.25 + (i % 3) * 0.12,
+}));
+const TERRAIN_COLOR = { electric: "#facc15", grassy: "#4ade80", misty: "#f9a8d4", psychic: "#c084fc" } as const;
+const FIELD_FADE = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.7 } };
+
+function BattleFieldMotif() {
+  const { weather, terrain, trickRoomTurnsLeft, tailwindTurnsLeft } = useBattleSessionStore((s) => s.fieldState);
+  const emberCount = weather === "rain" || weather === "snow" ? 6 : weather === "sand" ? 12 : 24;
+  const tailwind = tailwindTurnsLeft.yours > 0 || tailwindTurnsLeft.opponents > 0;
+
+  return (
+    <>
+      {EMBERS.slice(0, emberCount).map((e, i) => (
+        <span
+          key={i}
+          className="bg-ember absolute rounded-full"
+          style={{
+            left: `${e.l}%`, bottom: -10, width: e.s, height: e.s,
+            background: "var(--bg-accent)", boxShadow: "0 0 8px var(--bg-accent)",
+            ["--dur" as string]: `${e.dur}s`, ["--delay" as string]: `${e.delay}s`,
+            ["--dx" as string]: `${e.dx}px`, ["--o" as string]: `${e.o}`,
+          }}
+        />
+      ))}
+
+      <AnimatePresence>
+        {terrain !== "none" && (
+          <motion.div key={`terrain-${terrain}`} className="absolute inset-0" {...FIELD_FADE}>
+            <div
+              className="bg-pulse absolute inset-x-0 bottom-0 h-[34%]"
+              style={{
+                ["--dur" as string]: "4s",
+                background: `linear-gradient(to top, color-mix(in srgb, ${TERRAIN_COLOR[terrain]} 38%, transparent), transparent)`,
+              }}
+            />
+          </motion.div>
+        )}
+
+        {trickRoomTurnsLeft > 0 && (
+          <motion.div key="trick-room" className="absolute inset-0" {...FIELD_FADE}>
+            <div
+              className="absolute"
+              style={{ left: "50%", top: "46%", width: "clamp(360px, 50vw, 700px)", aspectRatio: "1", transform: "translate(-50%, -50%)" }}
+            >
+              <div className="bg-spin absolute inset-0" style={{ ["--dur" as string]: "60s", animationDirection: "reverse" }}>
+                <svg viewBox="0 0 200 200" className="h-full w-full" fill="none" style={{ stroke: "#c084fc", strokeOpacity: 0.35 }}>
+                  <circle cx="100" cy="100" r="96" strokeWidth="1.2" strokeDasharray="3 6" />
+                  <circle cx="100" cy="100" r="70" strokeWidth="1.2" strokeDasharray="10 8" />
+                  <circle cx="100" cy="100" r="44" strokeWidth="1.2" strokeDasharray="2 5" />
+                </svg>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {tailwind && (
+          <motion.div key="tailwind" className="absolute inset-0" {...FIELD_FADE}>
+            {STREAKS.slice(0, 7).map((s, i) => (
+              <span
+                key={i}
+                className="bg-streak absolute"
+                style={{
+                  top: `${s.t}%`, left: 0, width: s.w, height: 2, borderRadius: 2,
+                  background: "linear-gradient(90deg, transparent, #7dd3fc)",
+                  ["--dur" as string]: `${s.dur}s`, ["--delay" as string]: `${s.delay}s`, ["--o" as string]: `${s.o}`,
+                }}
+              />
+            ))}
+          </motion.div>
+        )}
+
+        {weather === "sun" && (
+          <motion.div key="sun" className="absolute inset-0" {...FIELD_FADE}>
+            <div className="absolute" style={{ right: "-12%", top: "-18%", width: "clamp(420px, 56vw, 780px)", aspectRatio: "1" }}>
+              <div
+                className="bg-spin absolute inset-0 rounded-full"
+                style={{
+                  ["--dur" as string]: "120s",
+                  background: "repeating-conic-gradient(from 0deg, rgba(255,199,44,0.20) 0 6deg, transparent 6deg 18deg)",
+                  maskImage: "radial-gradient(circle, black 15%, transparent 70%)",
+                  WebkitMaskImage: "radial-gradient(circle, black 15%, transparent 70%)",
+                }}
+              />
+              <div
+                className="bg-pulse absolute inset-[30%] rounded-full"
+                style={{ background: "radial-gradient(circle, rgba(255,199,44,0.55), transparent 70%)" }}
+              />
+            </div>
+          </motion.div>
+        )}
+
+        {weather === "rain" && (
+          <motion.div key="rain" className="absolute inset-0 overflow-hidden" {...FIELD_FADE}>
+            <div className="absolute inset-0" style={{ background: "rgba(59,130,246,0.08)" }} />
+            <div className="absolute -inset-[20%]" style={{ transform: "rotate(10deg)" }}>
+              {RAIN.map((d, i) => (
+                <span
+                  key={i}
+                  className="bg-rain absolute"
+                  style={{
+                    left: `${d.l}%`, top: 0, width: 2, height: d.h, borderRadius: 2,
+                    background: "linear-gradient(to bottom, transparent, #7dd3fc)",
+                    ["--dur" as string]: `${d.dur}s`, ["--delay" as string]: `${d.delay}s`, ["--o" as string]: `${d.o}`,
+                  }}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {weather === "snow" && (
+          <motion.div key="snow" className="absolute inset-0 overflow-hidden" {...FIELD_FADE}>
+            <div className="absolute inset-0" style={{ background: "rgba(255,255,255,0.04)" }} />
+            {SNOW.map((f, i) => (
+              <span
+                key={i}
+                className="bg-snow absolute rounded-full bg-white"
+                style={{
+                  left: `${f.l}%`, top: 0, width: f.s, height: f.s,
+                  ["--dur" as string]: `${f.dur}s`, ["--delay" as string]: `${f.delay}s`,
+                  ["--dx" as string]: `${f.dx}px`, ["--o" as string]: `${f.o}`,
+                }}
+              />
+            ))}
+          </motion.div>
+        )}
+
+        {weather === "sand" && (
+          <motion.div key="sand" className="absolute inset-0 overflow-hidden" {...FIELD_FADE}>
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(217,180,106,0.18), transparent 60%)" }} />
+            {SAND.map((s, i) => (
+              <span
+                key={i}
+                className="bg-sand absolute"
+                style={{
+                  top: `${s.t}%`, left: 0, width: s.w, height: 2, borderRadius: 2,
+                  background: "linear-gradient(90deg, transparent, #d9b46a)",
+                  ["--dur" as string]: `${s.dur}s`, ["--delay" as string]: `${s.delay}s`,
+                  ["--dy" as string]: `${s.dy}px`, ["--o" as string]: `${s.o}`,
+                }}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+const PIP = "clamp(12px, 1.7vw, 24px)";
+const SPARK_ANGLES = Array.from({ length: 6 }, (_, i) => (i * Math.PI * 2) / 6 + 0.3);
+
+function TeamPip({ slot, types, burst }: { slot: number; types?: PokemonTypeName[]; burst: boolean }) {
+  const top = types ? TYPE_COLOR[types[0]] : null;
+  const bottom = types?.[1] ? TYPE_COLOR[types[1]] : null;
+
+  return (
+    <span className="relative block" style={{ width: PIP, height: PIP }}>
+      {/* keyed on the types so the pop animation replays whenever the slot's Pokémon changes */}
+      <motion.span
+        key={types ? types.join("-") : "empty"}
+        className="block h-full w-full"
+        initial={{ scale: 0.4, opacity: 0 }}
+        animate={{ scale: 1, opacity: types ? 0.8 : 0.2 }}
+        transition={{ type: "spring", stiffness: 380, damping: 16 }}
+        style={types ? { filter: `drop-shadow(0 0 6px ${top})` } : undefined}
+      >
+        <span
+          className={`block h-full w-full ${types ? "bg-pulse" : ""}`}
+          style={{ ["--dur" as string]: `${3 + slot * 0.3}s` }}
+        >
+          <svg viewBox="0 0 20 20" className="h-full w-full text-[color:var(--screen)]" fill="none">
+            {top && <path d="M2 10a8 8 0 0 1 16 0z" fill={top} fillOpacity="0.85" />}
+            {bottom && <path d="M2 10a8 8 0 0 0 16 0z" fill={bottom} fillOpacity="0.85" />}
+            <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M2 10h16" stroke="currentColor" strokeWidth="1.2" />
+            <circle cx="10" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.2" />
+          </svg>
+        </span>
+      </motion.span>
+
+      {burst &&
+        top &&
+        SPARK_ANGLES.map((a, i) => (
+          <motion.span
+            key={i}
+            className="absolute left-1/2 top-1/2 h-1.5 w-1.5 rounded-full"
+            style={{ marginLeft: -3, marginTop: -3, background: top, boxShadow: `0 0 6px ${top}` }}
+            initial={{ x: 0, y: 0, opacity: 0, scale: 1 }}
+            animate={{ x: Math.cos(a) * 34, y: Math.sin(a) * 34, opacity: [0, 1, 0], scale: 0.3 }}
+            transition={{ duration: 0.9, ease: "easeOut", delay: slot * 0.1, times: [0, 0.15, 1] }}
+          />
+        ))}
+    </span>
+  );
+}
+
+function TeamRails() {
+  const slots = useTeamStore((s) => s.slots);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false); // persisted store: avoid a hydration mismatch
+  const pips = slots.map((s) => (mounted && s.pokemon ? s.pokemon.types : undefined));
+  const complete = pips.length === 6 && pips.every(Boolean);
+  const line = complete
+    ? "color-mix(in srgb, var(--accent-gold) 70%, transparent)"
+    : "color-mix(in srgb, var(--screen) 22%, transparent)";
+
+  return (
+    <MotionConfig reducedMotion="user">
+      {(["left", "right"] as const).map((side, r) => (
+        <div
+          key={side}
+          className="absolute flex flex-col items-center"
+          style={{ [side]: "clamp(2px, 0.6vw, 14px)", top: "30%", width: PIP, gap: "clamp(14px, 3.2vh, 34px)" }}
+        >
+          <span className="absolute inset-y-2 left-1/2 w-px transition-colors duration-700" style={{ background: line }} />
+          {pips.slice(r * 3, r * 3 + 3).map((types, i) => (
+            <TeamPip key={r * 3 + i} slot={r * 3 + i} types={types} burst={complete} />
+          ))}
+        </div>
+      ))}
+    </MotionConfig>
+  );
+}
+
 function MotifLayer({ motif }: { motif: SceneMotif }) {
   switch (motif) {
     case "cards":
@@ -211,6 +444,7 @@ function MotifLayer({ motif }: { motif: SceneMotif }) {
               />
             </span>
           ))}
+          <TeamRails />
         </>
       );
 
@@ -274,22 +508,7 @@ function MotifLayer({ motif }: { motif: SceneMotif }) {
       );
 
     case "embers":
-      return (
-        <>
-          {EMBERS.map((e, i) => (
-            <span
-              key={i}
-              className="bg-ember absolute rounded-full"
-              style={{
-                left: `${e.l}%`, bottom: -10, width: e.s, height: e.s,
-                background: "var(--bg-accent)", boxShadow: "0 0 8px var(--bg-accent)",
-                ["--dur" as string]: `${e.dur}s`, ["--delay" as string]: `${e.delay}s`,
-                ["--dx" as string]: `${e.dx}px`, ["--o" as string]: `${e.o}`,
-              }}
-            />
-          ))}
-        </>
-      );
+      return <BattleFieldMotif />;
 
     case "grid": {
       const line = "color-mix(in srgb, var(--screen) 6%, transparent)";

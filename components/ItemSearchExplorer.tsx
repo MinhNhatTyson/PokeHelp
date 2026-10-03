@@ -6,6 +6,7 @@ import { fetchCompetitiveItemNameList, fetchItemDetail } from "@/lib/data/fetchA
 import ItemResultCard from "@/components/ItemResultCard";
 import { useListNav } from "@/lib/hooks/useListNav";
 import { useBackdropStore } from "@/lib/store/backdropStore";
+import Skeleton from "@/components/Skeleton";
 
 const MAX_NAME_SUGGESTIONS = 8;
 
@@ -109,7 +110,16 @@ export default function ItemSearchExplorer() {
           )}
         </div>
 
-        {itemStatus === "loading" && <p className="mt-4 text-sm text-[color:var(--ink)]/60">Loading item…</p>}
+        {itemStatus === "loading" && (
+          <div role="status" aria-label="Loading item" className="pokecard mt-6 p-5" style={{ borderColor: "var(--accent-gold)" }}>
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-20 w-20" />
+              <Skeleton className="h-7 w-48" />
+            </div>
+            <Skeleton className="mt-5 h-20 w-full" />
+            <Skeleton className="mt-3 h-4 w-2/3" />
+          </div>
+        )}
         {itemStatus === "error" && (
           <p className="mt-4 text-sm text-red-500">Couldn&apos;t load that item. Try another search.</p>
         )}

@@ -5,32 +5,77 @@ import { getCommonSet } from "@/lib/data/commonSets";
 import { checkLeadDamage, LeadDamageCheck } from "@/lib/logic/damageCheck";
 import { getItemSignal } from "@/lib/logic/itemSignals";
 
-const HISTORY_WEIGHT = 0.6;
-const SIGNAL_WEIGHT = 0.4;
-const PRIOR_STRENGTH = 6; 
+export const HISTORY_WEIGHT = 0.6;
+export const SIGNAL_WEIGHT = 0.4;
+const PRIOR_STRENGTH = 6;
 
-export function predictOpponentLead(opponents: CoverageMon[], history: BattleHistoryEntry[] = []): CoverageMon[] {
+export interface LeadPredictionEntry {
+  name: string;
+  types: PokemonTypeName[];
+  historyPart: number; // weighted contribution from Battle History (0 when there is no usable history)
+  signalPart: number;  // weighted contribution from Fake Out / Intimidate / redirection / weather / speed
+  score: number;       // historyPart + signalPart
+  seen: number;        // logged battles where this species was on the opponent's team
+  led: number;         // ...of which they actually led
+  tags: string[];
+}
+
+export interface LeadPrediction {
+  leads: CoverageMon[];            // top 2, what the rest of the optimizer uses
+  entries: LeadPredictionEntry[];  // all opponents, best first
+  historyCount: number;            // logged battles that recorded the opponent's leads
+}
+
+function leadTags(mon: CoverageMon): string[] {
+  const s = getLeadSignals(mon);
+  const tags: string[] = [];
+  if (s.hasFakeOut) tags.push("Fake Out");
+  if (s.isIntimidate) tags.push("Intimidate");
+  if (s.hasRedirection) tags.push("Redirection");
+  if (s.isWeatherSetter) tags.push("Weather");
+  if (s.isTailwindSetter) tags.push("Tailwind");
+  if (s.isTrickRoomSetter) tags.push("Trick Room");
+  if ((getItemSignal(mon.itemName)?.speedMultiplier ?? 1) > 1) tags.push("Scarf speed");
+  return tags;
+}
+
+export function getLeadPrediction(opponents: CoverageMon[], history: BattleHistoryEntry[] = []): LeadPrediction {
+  if (opponents.length === 0) return { leads: [], entries: [], historyCount: 0 };
+
   const maxSignal = Math.max(1, ...opponents.map(leadScore));
   const usable = history.filter((h) => h.opponentLeads?.length === 2);
+  const hasHistory = usable.length > 0;
 
-  const historyRate = (m: CoverageMon) => {
+  const historyStats = (m: CoverageMon) => {
     const seen = usable.filter((h) => h.opponentTeamNames.includes(m.name)).length;
     const led = usable.filter((h) => h.opponentLeads!.includes(m.name)).length;
-    return (led + PRIOR_STRENGTH / 3) / (seen + PRIOR_STRENGTH);
+    return { seen, led, rate: (led + PRIOR_STRENGTH / 3) / (seen + PRIOR_STRENGTH) };
   };
-  const maxRate = Math.max(...opponents.map(historyRate));
+  const maxRate = Math.max(...opponents.map((m) => historyStats(m).rate));
 
-  return opponents
+  const ranked = opponents
     .map((m) => {
       const signal = leadScore(m) / maxSignal;
-      const score = usable.length === 0
-        ? signal
-        : HISTORY_WEIGHT * (historyRate(m) / maxRate) + SIGNAL_WEIGHT * signal;
-      return { m, score };
+      const { seen, led, rate } = historyStats(m);
+      const signalPart = hasHistory ? SIGNAL_WEIGHT * signal : signal;
+      const historyPart = hasHistory ? HISTORY_WEIGHT * (rate / maxRate) : 0;
+      const entry: LeadPredictionEntry = {
+        name: m.name, types: m.types, historyPart, signalPart,
+        score: historyPart + signalPart, seen, led, tags: leadTags(m),
+      };
+      return { m, entry };
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 2)
-    .map((x) => x.m);
+    .sort((a, b) => b.entry.score - a.entry.score);
+
+  return {
+    leads: ranked.slice(0, 2).map((x) => x.m),
+    entries: ranked.map((x) => x.entry),
+    historyCount: usable.length,
+  };
+}
+
+export function predictOpponentLead(opponents: CoverageMon[], history: BattleHistoryEntry[] = []): CoverageMon[] {
+  return getLeadPrediction(opponents, history).leads;
 }
 
 interface LeadSignals {

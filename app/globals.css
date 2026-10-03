@@ -82,6 +82,29 @@
 }
 @keyframes bg-fader { to { transform: translateY(var(--travel, -40px)); } }
 
+@keyframes bg-rain {
+  0%   { transform: translate3d(0, -20vh, 0); opacity: 0; }
+  10%  { opacity: var(--o, 0.5); }
+  100% { transform: translate3d(0, 120vh, 0); opacity: 0; }
+}
+@keyframes bg-snow {
+  0%   { transform: translate3d(0, -5vh, 0); opacity: 0; }
+  10%  { opacity: var(--o, 0.7); }
+  50%  { transform: translate3d(var(--dx, 20px), 50vh, 0); }
+  100% { transform: translate3d(calc(var(--dx, 20px) * -1), 108vh, 0); opacity: 0; }
+}
+@keyframes bg-sand {
+  0%   { transform: translate3d(-10vw, 0, 0); opacity: 0; }
+  10%  { opacity: var(--o, 0.5); }
+  100% { transform: translate3d(115vw, var(--dy, 20px), 0); opacity: 0; }
+}
+.bg-rain { opacity: 0; animation: bg-rain var(--dur, 1.2s) linear var(--delay, 0s) infinite; will-change: transform; }
+.bg-snow { opacity: 0; animation: bg-snow var(--dur, 12s) linear var(--delay, 0s) infinite; will-change: transform; }
+.bg-sand { opacity: 0; animation: bg-sand var(--dur, 3s) linear var(--delay, 0s) infinite; will-change: transform; }
+@media (prefers-reduced-motion: reduce) {
+  .bg-rain, .bg-snow, .bg-sand { animation: none; }
+}
+
 .bg-pulse { animation: bg-pulse var(--dur, 3.2s) ease-in-out infinite; }
 .bg-scan  { opacity: 0; animation: bg-scan var(--dur, 7s) linear var(--delay, 0s) infinite; }
 .bg-fader { animation: bg-fader var(--dur, 6s) ease-in-out var(--delay, 0s) infinite alternate; }
