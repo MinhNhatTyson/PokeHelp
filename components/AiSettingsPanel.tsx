@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AI_MODELS, AUTO_MODEL } from "@/lib/aiModels";
 import { useAiSettingsStore } from "@/lib/store/aiSettingsStore";
+import { useBackdropStore } from "@/lib/store/backdropStore";
 
 const OPTIONS = [
   { id: AUTO_MODEL, label: "Auto (recommended)", note: "Tries the models below in order and skips any that are busy, out of quota or retired" },
@@ -13,6 +14,9 @@ export default function AiSettingsPanel() {
   const model = useAiSettingsStore((s) => s.model);
   const setModel = useAiSettingsStore((s) => s.setModel);
   const [test, setTest] = useState<{ status: "idle" | "loading" | "ok" | "fail"; text: string }>({ status: "idle", text: "" });
+  const setAiTest = useBackdropStore((s) => s.setAiTest);
+  useEffect(() => { setAiTest(test.status); }, [test.status, setAiTest]);
+  useEffect(() => () => setAiTest("idle"), [setAiTest]); // clear only when leaving the page
 
   async function runTest() {
     setTest({ status: "loading", text: "" });

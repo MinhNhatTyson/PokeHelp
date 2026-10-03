@@ -6,6 +6,7 @@ import { ItemNameEntry, MoveNameEntry } from "@/lib/types";
 import { MonConfig, FieldSetup, DEFAULT_FIELD, blankConfig, configToSetup, runDamageCalc } from "@/lib/logic/damageCalc";
 import DamageMonPanel from "@/components/DamageMonPanel";
 import BackToOptimizer from "@/components/BackToOptimizer";
+import { useBackdropStore } from "@/lib/store/backdropStore";
 
 const WEATHERS = ["", "Sun", "Rain", "Sand", "Snow"] as const;
 const TERRAINS = ["", "Electric", "Grassy", "Misty", "Psychic"] as const;
@@ -32,6 +33,18 @@ export default function DamageCheckExplorer() {
   const atkSetup = configToSetup(attacker);
   const defSetup = configToSetup(defender);
   const outcome = atkSetup && defSetup && moveText.trim() ? runDamageCalc(atkSetup, defSetup, moveText, field) : null;
+  const damageSignal = (() => {
+    if (!outcome || !outcome.ok) return null;
+    if (outcome.kind === "noEffect") return { kind: "immune" as const, key: "immune" };
+    return { kind: outcome.maxPct >= 100 ? ("ko" as const) : ("hit" as const), key: `${outcome.minPct}-${outcome.maxPct}` };
+  })();
+  const damageKind = damageSignal?.kind ?? null;
+  const damageKey = damageSignal?.key ?? null;
+  const setDamageSignal = useBackdropStore((s) => s.setDamage);
+  useEffect(() => {
+    setDamageSignal(damageKind && damageKey ? { kind: damageKind, key: `${damageKind}-${damageKey}` } : null);
+  }, [damageKind, damageKey, setDamageSignal]);
+  useEffect(() => () => setDamageSignal(null), [setDamageSignal]);
 
   return (
     <div className="w-full max-w-5xl rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">

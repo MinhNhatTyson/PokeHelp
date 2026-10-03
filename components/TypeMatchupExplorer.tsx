@@ -50,13 +50,17 @@ export default function TypeMatchupExplorer() {
   const [nameList, setNameList] = useState<PokemonNameEntry[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const setBackdrop = useBackdropStore((s) => s.setOverride);
+  const pingDex = useBackdropStore((s) => s.pingDex);
 
   type Suggestion = { kind: "type"; type: PokemonTypeName } | { kind: "pokemon"; name: string };
 
   useEffect(() => {
-    setBackdrop(selectedPokemon ? selectedPokemon.types[0] : selectedType);
+    const type = selectedPokemon ? selectedPokemon.types[0] : selectedType;
+    setBackdrop(type);
+    pingDex(type);
     return () => setBackdrop(null);
-  }, [selectedType, selectedPokemon, setBackdrop]);
+  }, [selectedType, selectedPokemon, setBackdrop, pingDex]);
+  useEffect(() => () => pingDex(null), [pingDex]); // clear only when leaving the page
 
   useEffect(() => {
     fetchPokemonNameList().then(setNameList);

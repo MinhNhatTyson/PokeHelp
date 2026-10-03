@@ -1,10 +1,10 @@
 "use client";
 
-import { AnimatePresence, MotionConfig, motion, useReducedMotion, useScroll, useTransform } from "motion/react";
+import { AnimatePresence, MotionConfig, motion, useAnimationFrame, useMotionValue, useReducedMotion, useScroll, useTransform } from "motion/react";
 import { usePathname } from "next/navigation";
 import { PokemonTypeName } from "@/lib/types";
 import { TYPE_COLOR } from "@/lib/typeMeta";
-import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useBackdropStore } from "@/lib/store/backdropStore";
 import { useTeamStore } from "@/lib/store/teamStore";
 import TypeIcon from "@/components/TypeIcon";
@@ -421,6 +421,144 @@ function TeamRails() {
   );
 }
 
+const SIGNAL_FADE = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.6 } };
+
+// ---- Speed Check: streaks follow the verdict ----
+const SPEED_LOOK = {
+  even: { color: "var(--bg-accent)", dur: 1,   o: 1,   w: 1,   glow: false },
+  fast: { color: "#ffc72c",          dur: 0.5, o: 1.8, w: 1.5, glow: true  },
+  slow: { color: "#ef4444",          dur: 1.9, o: 0.9, w: 0.6, glow: false },
+} as const;
+
+function SpeedStreaks() {
+  const chance = useBackdropStore((s) => s.speedChance);
+  const mood: keyof typeof SPEED_LOOK = chance === null || (chance > 40 && chance < 60) ? "even" : chance >= 60 ? "fast" : "slow";
+  const look = SPEED_LOOK[mood];
+
+  return (
+    <AnimatePresence>
+      <motion.div key={mood} className="absolute inset-0" {...SIGNAL_FADE}>
+        {mood === "fast" && (
+          <div className="absolute inset-y-0 right-0 w-1/3" style={{ background: "linear-gradient(to left, rgba(255,199,44,0.22), transparent)" }} />
+        )}
+        {mood === "slow" && (
+          <div className="absolute inset-y-0 left-0 w-1/3" style={{ background: "linear-gradient(to right, rgba(239,68,68,0.18), transparent)" }} />
+        )}
+        {STREAKS.map((s, i) => (
+          <span
+            key={i}
+            className="bg-streak absolute"
+            style={{
+              top: `${s.t}%`, left: 0, width: s.w * look.w, height: 2, borderRadius: 2,
+              background: `linear-gradient(90deg, transparent, ${look.color})`,
+              boxShadow: look.glow ? `0 0 8px ${look.color}` : undefined,
+              ["--dur" as string]: `${s.dur * look.dur}s`, ["--delay" as string]: `${s.delay}s`,
+              ["--o" as string]: `${Math.min(0.9, s.o * look.o)}`,
+            }}
+          />
+        ))}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ---- Damage Check: reticle locks on and ripples when a result appears ----
+const DAMAGE_COLOR = { ko: "#ef4444", hit: "#ffc72c", immune: "#94a3b8" } as const;
+const RETICLE_SIZE = "clamp(260px, 34vw, 520px)";
+
+function DamageGridMotif() {
+  const damage = useBackdropStore((s) => s.damage);
+  const color = damage ? DAMAGE_COLOR[damage.kind] : null;
+  const fade = "radial-gradient(ellipse at center, black 30%, transparent 75%)";
+  const gridLines = (c: string) =>
+    `linear-gradient(${c} 1px, transparent 1px), linear-gradient(90deg, ${c} 1px, transparent 1px)`;
+
+  return (
+    <MotionConfig reducedMotion="user">
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: gridLines("color-mix(in srgb, var(--screen) 6%, transparent)"),
+          backgroundSize: "48px 48px", maskImage: fade, WebkitMaskImage: fade,
+        }}
+      />
+
+      <AnimatePresence>
+        {damage && color && (
+          <motion.div
+            key={`grid-${damage.key}`}
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 0.3] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.2, times: [0, 0.2, 1] }}
+            style={{
+              backgroundImage: gridLines(`color-mix(in srgb, ${color} 30%, transparent)`),
+              backgroundSize: "48px 48px", maskImage: fade, WebkitMaskImage: fade,
+            }}
+          />
+        )}
+        {damage?.kind === "ko" && (
+          <motion.div
+            key={`ko-${damage.key}`}
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 0.35, 0.1] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.9, times: [0, 0.15, 1] }}
+            style={{ background: "radial-gradient(ellipse at 78% 50%, rgba(239,68,68,0.6), transparent 65%)" }}
+          />
+        )}
+      </AnimatePresence>
+
+      <div className="absolute" style={{ right: "4%", top: "50%", width: RETICLE_SIZE, aspectRatio: "1", transform: "translateY(-50%)" }}>
+        <AnimatePresence>
+          {!damage && (
+            <motion.div key="idle" className="absolute inset-0" {...SIGNAL_FADE}>
+              <div className="bg-spin h-full w-full" style={{ ["--dur" as string]: "120s" }}>
+                <svg viewBox="0 0 200 200" className="h-full w-full" fill="none" style={RETICLE_STYLE}>
+                  <circle cx="100" cy="100" r="90" strokeWidth="1" />
+                  <circle cx="100" cy="100" r="58" strokeWidth="1" strokeDasharray="6 6" />
+                  <path d="M100 0v40M100 160v40M0 100h40M160 100h40" strokeWidth="1.2" />
+                </svg>
+              </div>
+            </motion.div>
+          )}
+          {damage && color && (
+            <motion.div
+              key={`lock-${damage.kind}`}
+              className="absolute inset-0"
+              initial={{ scale: 1.45, opacity: 0, rotate: 35 }}
+              animate={{ scale: 1, opacity: 1, rotate: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ type: "spring", stiffness: 140, damping: 16 }}
+            >
+              <svg viewBox="0 0 200 200" className="h-full w-full" fill="none" style={{ stroke: color, strokeOpacity: 0.55 }}>
+                <circle cx="100" cy="100" r="90" strokeWidth="1.5" />
+                <circle cx="100" cy="100" r="58" strokeWidth="1.5" />
+                <path d="M100 0v40M100 160v40M0 100h40M160 100h40" strokeWidth="2" />
+                <circle cx="100" cy="100" r="5" fill={color} fillOpacity="0.8" stroke="none" />
+              </svg>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {damage && color &&
+          [0, 1, 2].map((i) => (
+            <motion.span
+              key={`${damage.key}-${i}`}
+              className="absolute inset-0 rounded-full"
+              style={{ border: `2px solid ${color}` }}
+              initial={{ scale: 0.25, opacity: 0.6 }}
+              animate={{ scale: 3.2, opacity: 0 }}
+              transition={{ duration: 2, ease: "easeOut", delay: i * 0.35 }}
+            />
+          ))}
+      </div>
+    </MotionConfig>
+  );
+}
+
 function MotifLayer({ motif }: { motif: SceneMotif }) {
   switch (motif) {
     case "cards":
@@ -491,49 +629,15 @@ function MotifLayer({ motif }: { motif: SceneMotif }) {
       );
 
     case "speedlines":
-      return (
-        <>
-          {STREAKS.map((s, i) => (
-            <span
-              key={i}
-              className="bg-streak absolute"
-              style={{
-                top: `${s.t}%`, left: 0, width: s.w, height: 2, borderRadius: 2,
-                background: "linear-gradient(90deg, transparent, var(--bg-accent))",
-                ["--dur" as string]: `${s.dur}s`, ["--delay" as string]: `${s.delay}s`, ["--o" as string]: `${s.o}`,
-              }}
-            />
-          ))}
-        </>
-      );
+      return <SpeedStreaks />;
 
     case "embers":
       return <BattleFieldMotif />;
 
-    case "grid": {
-      const line = "color-mix(in srgb, var(--screen) 6%, transparent)";
-      const fade = "radial-gradient(ellipse at center, black 30%, transparent 75%)";
-      return (
-        <>
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `linear-gradient(${line} 1px, transparent 1px), linear-gradient(90deg, ${line} 1px, transparent 1px)`,
-              backgroundSize: "48px 48px", maskImage: fade, WebkitMaskImage: fade,
-            }}
-          />
-          <div className="bg-spin absolute" style={{ right: "4%", top: "50%", width: "clamp(260px, 34vw, 520px)", aspectRatio: "1", marginTop: "calc(clamp(260px, 34vw, 520px) / -2)", ["--dur" as string]: "120s" }}>
-            <svg viewBox="0 0 200 200" className="h-full w-full" fill="none" style={RETICLE_STYLE}>
-              <circle cx="100" cy="100" r="90" strokeWidth="1" />
-              <circle cx="100" cy="100" r="58" strokeWidth="1" strokeDasharray="6 6" />
-              <path d="M100 0v40M100 160v40M0 100h40M160 100h40" strokeWidth="1.2" />
-            </svg>
-          </div>
-        </>
-      );
-    }
+    case "grid":
+      return <DamageGridMotif />;
 
-        case "arena": {
+    case "arena": {
       const you = "var(--shell-accent)";
       const opp = "#3b82f6";
       const beam = "linear-gradient(to bottom, color-mix(in srgb, var(--screen) 15%, transparent), transparent 80%)";
@@ -593,6 +697,7 @@ function MotifLayer({ motif }: { motif: SceneMotif }) {
               <svg viewBox="-100 -100 200 200" className="absolute inset-0 h-full w-full">
                 <polygon points={BURST_POINTS} style={{ fill: "var(--bg-accent)", fillOpacity: 0.16 }} />
               </svg>
+              <ArenaFlare />
               <span
                 className="font-logo absolute inset-0 flex select-none items-center justify-center"
                 style={{ fontSize: "clamp(56px, 8vw, 120px)", color: "color-mix(in srgb, var(--screen) 22%, transparent)" }}
@@ -636,6 +741,7 @@ function MotifLayer({ motif }: { motif: SceneMotif }) {
               />
             );
           })}
+          <ArenaRails />
         </>
       );
     }
@@ -644,41 +750,268 @@ function MotifLayer({ motif }: { motif: SceneMotif }) {
       return <TimelineMotif />;
 
     case "machinery":
-      return (
-        <div className="absolute inset-0" style={{ ["--g" as string]: "clamp(170px, 24vw, 340px)" }}>
-          <div className="absolute" style={{ left: "-5%", bottom: "8%", width: "var(--g)", height: "var(--g)" }}>
-            <Gear dur={80} />
-          </div>
-          <div
-            className="absolute"
-            style={{ left: "calc(-5% + var(--g) * 0.62)", bottom: "calc(8% + var(--g) * 0.62)", width: "var(--g)", height: "var(--g)" }}
-          >
-            <Gear dur={80} reverse offset={15} />
-          </div>
-          <div className="absolute" style={{ right: "-6%", top: "6%", width: "calc(var(--g) * 1.25)", height: "calc(var(--g) * 1.25)" }}>
-            <Gear dur={110} reverse offset={7} />
-          </div>
-          {FADERS.map((f, i) => (
-            <span
-              key={i}
-              className="absolute"
-              style={{ left: `${f.l}%`, bottom: "3%", width: 2, height: f.h, background: "color-mix(in srgb, var(--screen) 22%, transparent)" }}
-            >
-              <span
-                className="bg-fader absolute rounded-sm"
-                style={{
-                  left: -6, bottom: 0, width: 14, height: 8, background: "var(--bg-accent)", opacity: 0.55,
-                  ["--travel" as string]: `${-(f.h - 8)}px`, ["--dur" as string]: `${f.dur}s`, ["--delay" as string]: `${f.delay}s`,
-                }}
-              />
-            </span>
-          ))}
-        </div>
-      );
+      return <MachineryMotif />;
 
     default:
       return null; // "balls" / "ballTypes" are handled by BallLayer
   }
+}
+
+// ---- Settings: machinery reacts to the model test ----
+function MachineryMotif() {
+  const status = useBackdropStore((s) => s.aiTest);
+  const busy = status === "loading";
+  const flash = status === "ok" ? "#10b981" : status === "fail" ? "#ef4444" : null;
+
+  return (
+    <MotionConfig reducedMotion="user">
+      <div className="absolute inset-0" style={{ ["--g" as string]: "clamp(170px, 24vw, 340px)" }}>
+        <div className="absolute" style={{ left: "-5%", bottom: "8%", width: "var(--g)", height: "var(--g)" }}>
+          <Gear dur={80} />
+        </div>
+        <div
+          className="absolute"
+          style={{ left: "calc(-5% + var(--g) * 0.62)", bottom: "calc(8% + var(--g) * 0.62)", width: "var(--g)", height: "var(--g)" }}
+        >
+          <Gear dur={80} reverse offset={15} />
+        </div>
+        <div className="absolute" style={{ right: "-6%", top: "6%", width: "calc(var(--g) * 1.25)", height: "calc(var(--g) * 1.25)" }}>
+          <Gear dur={110} reverse offset={7} />
+        </div>
+
+        {FADERS.map((f, i) => (
+          <span
+            key={i}
+            className="absolute"
+            style={{ left: `${f.l}%`, bottom: "3%", width: 2, height: f.h, background: "color-mix(in srgb, var(--screen) 22%, transparent)" }}
+          >
+            <span
+              key={busy ? "busy" : "idle"} // remounting restarts the animation at the new speed
+              className="bg-fader absolute rounded-sm"
+              style={{
+                left: -6, bottom: 0, width: 14, height: 8, background: "var(--bg-accent)", opacity: busy ? 0.9 : 0.55,
+                ["--travel" as string]: `${-(f.h - 8)}px`,
+                ["--dur" as string]: `${busy ? f.dur * 0.25 : f.dur}s`,
+                ["--delay" as string]: `${f.delay}s`,
+              }}
+            />
+          </span>
+        ))}
+
+        {flash && (
+          <motion.div
+            key={status}
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 0.45, 0] }}
+            transition={{ duration: 1.6, times: [0, 0.2, 1] }}
+            style={{ background: `radial-gradient(ellipse at 50% 50%, ${flash}, transparent 70%)` }}
+          />
+        )}
+      </div>
+    </MotionConfig>
+  );
+}
+
+// ---- Optimizer: VS flare on ranking changes + scouting rails ----
+const ARENA_SPARKS = Array.from({ length: 12 }, (_, i) => {
+  const a = (i * Math.PI * 2) / 12 + 0.2;
+  const d = 90 + (i % 3) * 35;
+  return { x: Math.cos(a) * d, y: Math.sin(a) * d, c: i % 2 ? "#3b82f6" : "var(--shell-accent)" };
+});
+
+function ArenaFlare() {
+  const rankKey = useBackdropStore((s) => s.rankKey);
+  if (!rankKey) return null;
+  return (
+    <MotionConfig reducedMotion="user">
+      <motion.div key={rankKey} className="pointer-events-none absolute inset-0">
+        <motion.svg
+          viewBox="-100 -100 200 200"
+          className="absolute inset-0 h-full w-full"
+          initial={{ scale: 0.7, opacity: 0.9 }}
+          animate={{ scale: 2, opacity: 0 }}
+          transition={{ duration: 0.9, ease: "easeOut" }}
+        >
+          <polygon points={BURST_POINTS} style={{ fill: "var(--bg-accent)", fillOpacity: 0.5 }} />
+        </motion.svg>
+        <motion.span
+          className="absolute inset-0 rounded-full"
+          style={{ border: "3px solid var(--bg-accent)" }}
+          initial={{ scale: 0.5, opacity: 0.8 }}
+          animate={{ scale: 2.6, opacity: 0 }}
+          transition={{ duration: 1.1, ease: "easeOut" }}
+        />
+        {ARENA_SPARKS.map((s, i) => (
+          <motion.span
+            key={i}
+            className="absolute left-1/2 top-1/2 h-2 w-2 rounded-full"
+            style={{ marginLeft: -4, marginTop: -4, background: s.c, boxShadow: `0 0 8px ${s.c}` }}
+            initial={{ x: 0, y: 0, opacity: 0 }}
+            animate={{ x: s.x, y: s.y, opacity: [0, 1, 0] }}
+            transition={{ duration: 1.1, ease: "easeOut", times: [0, 0.15, 1] }}
+          />
+        ))}
+      </motion.div>
+    </MotionConfig>
+  );
+}
+
+function ArenaPip({ color, lit, i }: { color: string; lit: boolean; i: number }) {
+  return (
+    <motion.span
+      className="block"
+      style={{ width: PIP, height: PIP, filter: lit ? `drop-shadow(0 0 6px ${color})` : undefined }}
+      animate={{ scale: lit ? 1 : 0.8, opacity: lit ? 0.9 : 0.2 }}
+      transition={{ type: "spring", stiffness: 380, damping: 16, delay: lit ? i * 0.08 : 0 }}
+    >
+      <svg viewBox="0 0 20 20" className="h-full w-full text-[color:var(--screen)]" fill="none">
+        {lit && <path d="M2 10a8 8 0 0 1 16 0z" style={{ fill: color, fillOpacity: 0.9 }} />}
+        <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M2 10h16" stroke="currentColor" strokeWidth="1.2" />
+        <circle cx="10" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.2" />
+      </svg>
+    </motion.span>
+  );
+}
+
+function ArenaRails() {
+  const figures = useBackdropStore((s) => s.figures);
+  const counts = {
+    left: figures.filter((f) => f.side === "left").length,
+    right: figures.filter((f) => f.side === "right").length,
+  };
+  return (
+    <MotionConfig reducedMotion="user">
+      {(["left", "right"] as const).map((side) => {
+        const color = side === "left" ? "var(--shell-accent)" : "#3b82f6";
+        return (
+          <div
+            key={side}
+            className="absolute flex flex-col items-center"
+            style={{ [side]: "clamp(2px, 0.6vw, 14px)", top: "22%", width: PIP, gap: "clamp(10px, 2.4vh, 26px)" }}
+          >
+            <span className="absolute inset-y-2 left-1/2 w-px" style={{ background: `color-mix(in srgb, ${color} 45%, transparent)` }} />
+            {Array.from({ length: 6 }, (_, i) => (
+              <ArenaPip key={i} i={i} color={color} lit={i < counts[side]} />
+            ))}
+          </div>
+        );
+      })}
+    </MotionConfig>
+  );
+}
+
+// ---- Pokédex: radar sweep + blip per pick ----
+function DexRadar() {
+  const ping = useBackdropStore((s) => s.dexPing);
+  const color = ping ? TYPE_COLOR[ping.type] : null;
+  const n = ping?.n ?? 0;
+  const ang = (((n * 137.5) % 360) * Math.PI) / 180;
+  const r = 20 + ((n * 37) % 26);
+  const x = 50 + Math.cos(ang) * r;
+  const y = 50 + Math.sin(ang) * r;
+  const blipBase = { left: `${x}%`, top: `${y}%`, marginLeft: -5, marginTop: -5, width: 10, height: 10 } as const;
+
+  return (
+    <MotionConfig reducedMotion="user">
+      <div className="absolute" style={{ right: "-4%", top: "8%", width: "clamp(220px, 24vw, 360px)", aspectRatio: "1" }}>
+        <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full" fill="none" style={RETICLE_STYLE}>
+          <circle cx="100" cy="100" r="96" strokeWidth="1" />
+          <circle cx="100" cy="100" r="64" strokeWidth="0.8" strokeDasharray="4 6" />
+          <circle cx="100" cy="100" r="32" strokeWidth="0.8" />
+          <path d="M100 4v192M4 100h192" strokeWidth="0.5" />
+        </svg>
+        <div
+          className="bg-spin absolute inset-0 rounded-full"
+          style={{
+            ["--dur" as string]: "7s",
+            background: "conic-gradient(from 0deg, transparent 0deg 285deg, color-mix(in srgb, var(--bg-accent) 50%, transparent) 360deg)",
+          }}
+        />
+        {ping && color && (
+          <>
+            <motion.span
+              key={`blip-${ping.n}`}
+              className="absolute rounded-full"
+              style={{ ...blipBase, background: color, boxShadow: `0 0 12px ${color}` }}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: [0, 1.4, 1, 1], opacity: [0, 1, 1, 0] }}
+              transition={{ duration: 4, times: [0, 0.08, 0.2, 1], ease: "easeOut" }}
+            />
+            {[0, 1].map((i) => (
+              <motion.span
+                key={`ring-${ping.n}-${i}`}
+                className="absolute rounded-full"
+                style={{ ...blipBase, border: `2px solid ${color}` }}
+                initial={{ scale: 0.5, opacity: 0.8 }}
+                animate={{ scale: 5, opacity: 0 }}
+                transition={{ duration: 1.8, ease: "easeOut", delay: i * 0.5 }}
+              />
+            ))}
+          </>
+        )}
+      </div>
+    </MotionConfig>
+  );
+}
+
+// ---- Items: twinkles around the silhouette + rolling balls along the bottom ----
+const GLINTS = [
+  { x: 22, y: 28, s: 18, dur: 3.2, delay: 0 },
+  { x: 70, y: 18, s: 14, dur: 2.6, delay: -1.1 },
+  { x: 82, y: 52, s: 20, dur: 3.8, delay: -2 },
+  { x: 14, y: 62, s: 12, dur: 2.9, delay: -0.6 },
+  { x: 48, y: 40, s: 16, dur: 3.5, delay: -1.8 },
+  { x: 60, y: 76, s: 12, dur: 2.4, delay: -2.4 },
+];
+
+function ItemGlints({ side, size }: { side: "left" | "right"; size: string }) {
+  return (
+    <div className="absolute bottom-0" style={{ [side]: "-3%", width: size, height: size }}>
+      {GLINTS.map((g, i) => (
+        <span
+          key={i}
+          className="bg-twinkle absolute"
+          style={{
+            left: `${g.x}%`, top: `${g.y}%`, width: g.s, height: g.s,
+            ["--dur" as string]: `${g.dur}s`, ["--delay" as string]: `${g.delay}s`,
+          }}
+        >
+          <svg viewBox="0 0 20 20" className="h-full w-full" style={{ fill: "#fff6d6", filter: "drop-shadow(0 0 4px #ffc72c)" }}>
+            <path d="M10 0Q10 10 20 10Q10 10 10 20Q10 10 0 10Q10 10 10 0Z" />
+          </svg>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+const ROLLERS = [
+  { s: 34, dur: 58, delay: 0 },
+  { s: 26, dur: 72, delay: -19 },
+  { s: 40, dur: 66, delay: -38 },
+  { s: 30, dur: 80, delay: -52 },
+  { s: 36, dur: 62, delay: -27 },
+];
+
+function RollingBalls() {
+  return (
+    <div className="absolute inset-x-0 bottom-[5.5rem] h-12 lg:bottom-2">
+      {ROLLERS.map((b, i) => (
+        <span
+          key={i}
+          className="bg-roll absolute bottom-0 left-0"
+          style={{
+            ["--dur" as string]: `${b.dur}s`, ["--delay" as string]: `${b.delay}s`,
+            ["--turn" as string]: `${Math.round((1700 / (Math.PI * b.s)) * 360)}deg`,
+          }}
+        >
+          <PokeBallShape size={b.s} opacity={0.14} tint={BALL_TINTS[i % BALL_TINTS.length]} />
+        </span>
+      ))}
+    </div>
+  );
 }
 
 const DEFAULT_FIGURE = "clamp(240px, 36vw, 500px)";
@@ -781,16 +1114,29 @@ function gearPath(teeth: number, outer: number, inner: number): string {
 const GEAR_D = gearPath(12, 96, 80);
 
 function Gear({ dur, reverse, offset = 0 }: { dur: number; reverse?: boolean; offset?: number }) {
+  const busy = useBackdropStore((s) => s.aiTest === "loading");
+  const reduceMotion = useReducedMotion();
+  const rotate = useMotionValue(0);
+  const boost = useRef(1);
+  const degPerSec = (360 / dur) * (reverse ? -1 : 1);
+
+  useAnimationFrame((_, delta) => {
+    if (reduceMotion) return;
+    const dt = Math.min(delta, 100); // ignore the huge gap after a hidden tab
+    boost.current += ((busy ? 14 : 1) - boost.current) * Math.min(1, dt / 350);
+    rotate.set(rotate.get() + degPerSec * boost.current * (dt / 1000));
+  });
+
   return (
     <div className="h-full w-full" style={{ transform: `rotate(${offset}deg)` }}>
-      <div className="bg-spin h-full w-full" style={{ ["--dur" as string]: `${dur}s`, animationDirection: reverse ? "reverse" : "normal" }}>
+      <motion.div className="h-full w-full" style={{ rotate }}>
         <svg viewBox="-100 -100 200 200" className="h-full w-full" fill="none" style={RETICLE_STYLE}>
           <path d={GEAR_D} strokeWidth="1.4" />
           <circle r="58" strokeWidth="1" strokeDasharray="3 5" />
           <circle r="26" strokeWidth="1.4" />
           <circle r="8" strokeWidth="1.4" />
         </svg>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -926,6 +1272,11 @@ export default function AppBackground() {
       ) : (
         <AnimatePresence>{defaultSilhouettes}</AnimatePresence>
       )}
+
+      {scene.motif === "ballTypes" && figures.length > 0 &&
+        (["left", "right"] as const).map((side) => <ItemGlints key={side} side={side} size={figureSize} />)}
+      {scene.motif === "ballTypes" && <RollingBalls />}
+      {pathname === "/" && <DexRadar />}
 
       {scene.vignette && (
         <div

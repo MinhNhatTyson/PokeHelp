@@ -91,6 +91,11 @@ export default function BattleOptimizer() {
     [opponentSlots]
   );
 
+  const setRankKey = useBackdropStore((s) => s.setRankKey);
+  const topKey = results ? `${results[0].indices.join("-")}:${results[0].breakdown.total.toFixed(1)}` : null;
+  useEffect(() => { setRankKey(topKey); }, [topKey, setRankKey]);
+  useEffect(() => () => setRankKey(null), [setRankKey]);
+
   async function handleGetStrategy() {
     if (!results || results.length === 0) return;
     setStrategyStatus("loading");

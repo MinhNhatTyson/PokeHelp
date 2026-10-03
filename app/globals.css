@@ -105,6 +105,21 @@
   .bg-rain, .bg-snow, .bg-sand { animation: none; }
 }
 
+@keyframes bg-twinkle {
+  0%, 100% { transform: scale(0) rotate(0deg); opacity: 0; }
+  50%      { transform: scale(1) rotate(45deg); opacity: var(--o, 0.9); }
+}
+@keyframes bg-roll {
+  from { transform: translateX(-14vw) rotate(0deg); }
+  to   { transform: translateX(114vw) rotate(var(--turn, 5000deg)); }
+}
+.bg-twinkle { opacity: 0; animation: bg-twinkle var(--dur, 3s) ease-in-out var(--delay, 0s) infinite; }
+.bg-roll    { animation: bg-roll var(--dur, 60s) linear var(--delay, 0s) infinite; will-change: transform; }
+@media (prefers-reduced-motion: reduce) {
+  .bg-twinkle { animation: none; opacity: 0.45; transform: scale(0.7); }
+  .bg-roll { animation: none; display: none; }
+}
+
 .bg-pulse { animation: bg-pulse var(--dur, 3.2s) ease-in-out infinite; }
 .bg-scan  { opacity: 0; animation: bg-scan var(--dur, 7s) linear var(--delay, 0s) infinite; }
 .bg-fader { animation: bg-fader var(--dur, 6s) ease-in-out var(--delay, 0s) infinite alternate; }

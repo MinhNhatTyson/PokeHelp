@@ -13,6 +13,7 @@ import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
 import { useListNav } from "@/lib/hooks/useListNav";
 import BackToOptimizer from "@/components/BackToOptimizer";
 import Skeleton from "@/components/Skeleton";
+import { useBackdropStore } from "@/lib/store/backdropStore";
 
 const MAX_SUGGESTIONS = 8;
 
@@ -96,6 +97,10 @@ export default function SpeedComparisonExplorer() {
           }, 0)
         )
       : null;
+
+  const setSpeedChance = useBackdropStore((s) => s.setSpeedChance);
+  useEffect(() => { setSpeedChance(chanceFaster); }, [chanceFaster, setSpeedChance]);
+  useEffect(() => () => setSpeedChance(null), [setSpeedChance]); // clear only when leaving the page
 
   return (
     <div className="w-full max-w-3xl rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
