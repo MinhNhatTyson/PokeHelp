@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { PokemonDetail, TeamSlot } from "@/lib/types";
 import { evToSp, MAX_SP_PER_STAT, NatureName } from "../logic/statCalc";
+import { normalizeTeamSlot } from "@/lib/store/slotMigration";
 
 export const TEAM_SIZE = 6;
 const EMPTY_SLOT: TeamSlot = {
@@ -106,6 +107,12 @@ export const useTeamStore = create<TeamState>()(
     }),
     {
       name: "pokehelp-active-team",
+      version: 1,
+      migrate: (persisted) => {
+        const s = (persisted ?? {}) as Partial<TeamState>;
+        if (Array.isArray(s.slots)) s.slots = s.slots.map(normalizeTeamSlot);
+        return s as TeamState;
+      },
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<TeamState> | undefined;
         if (!persisted?.slots) return { ...currentState, ...persisted };

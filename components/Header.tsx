@@ -43,6 +43,13 @@ function TabIcon({ href }: { href: string }) {
           <path d="M8 7a2 2 0 114 0" stroke="currentColor" strokeWidth="1.5" />
         </svg>
       );
+    case "/moves": 
+      return (
+        <svg {...common}>
+          <path d="M4 3.5h8.5a2 2 0 012 2V17H6a2 2 0 01-2-2V3.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+          <path d="M7.5 7.5h4M7.5 10.5h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      );
     case "/speed":
       return (
         <svg {...common}>
@@ -122,6 +129,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Battle History", href: "/history", themeType: SCENES["/history"].type, mobileLabel: "History" },
   { label: "Trainer Roster", href: "/trainers", themeType: SCENES["/trainers"].type, comingSoon: true },
   { label: "Settings", href: "/settings", themeType: SCENES["/settings"].type, mobileLabel: "Settings" },
+  { label: "Moves & Abilities", href: "/moves", themeType: SCENES["/moves"].type, mobileLabel: "Moves" },
 ];
 
 const MOBILE_TAB_HREFS = ["/", "/items", "/team", "/optimizer", "/history"];

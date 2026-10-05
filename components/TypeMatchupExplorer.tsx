@@ -10,6 +10,7 @@ import PokemonResultCard from "@/components/PokemonResultCard";
 import TypeChip from "./TypeChip";
 import { useBackdropStore } from "@/lib/store/backdropStore";
 import { useListNav } from "@/lib/hooks/useListNav";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const MAX_TYPE_SUGGESTIONS = 5;
 const MAX_NAME_SUGGESTIONS = 8;
@@ -44,8 +45,28 @@ function EffectGroup({
 export default function TypeMatchupExplorer() {
   const [query, setQuery] = useState("");
   const [selectedType, setSelectedType] = useState<PokemonTypeName>("fire");
-  const [selectedPokemon, setSelectedPokemon] = useState<PokemonDetail | null>(null);
-  const [pokemonStatus, setPokemonStatus] = useState<"idle" | "loading" | "error">("idle");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pokemonSlug = searchParams.get("pokemon");
+  const [pokemonResult, setPokemonResult] = useState<{ slug: string; detail: PokemonDetail | null } | null>(null);
+  // Derived from the URL, so there is no synchronous setState in an effect
+  const selectedPokemon = pokemonResult && pokemonResult.slug === pokemonSlug ? pokemonResult.detail : null;
+  const pokemonStatus: "idle" | "loading" | "error" = !pokemonSlug
+    ? "idle"
+    : pokemonResult?.slug !== pokemonSlug
+    ? "loading"
+    : pokemonResult?.detail
+    ? "idle"
+    : "error";
+
+  useEffect(() => {
+    if (!pokemonSlug) return;
+    let cancelled = false;
+    fetchPokemonDetail(pokemonSlug)
+      .catch(() => null)
+      .then((detail) => { if (!cancelled) setPokemonResult({ slug: pokemonSlug, detail }); });
+    return () => { cancelled = true; };
+  }, [pokemonSlug]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [nameList, setNameList] = useState<PokemonNameEntry[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -106,25 +127,17 @@ export default function TypeMatchupExplorer() {
 
   const matchup = useMemo(() => getTypeMatchup(selectedType), [selectedType]);
 
-  async function handleSelectPokemon(name: string) {
+  function handleSelectPokemon(name: string) {
     setQuery("");
     setShowDropdown(false);
-    setPokemonStatus("loading");
-    const detail = await fetchPokemonDetail(name);
-    if (detail) {
-      setSelectedPokemon(detail);
-      setPokemonStatus("idle");
-    } else {
-      setSelectedPokemon(null);
-      setPokemonStatus("error");
-    }
+    router.push(`/?pokemon=${name}`);
   }
 
   function handleSelectType(type: PokemonTypeName) {
     setQuery("");
     setShowDropdown(false);
-    setSelectedPokemon(null);
     setSelectedType(type);
+    if (pokemonSlug) router.push("/"); // leave the Pokémon view
   }
 
   const hasSuggestions = suggestions.length > 0;
@@ -210,7 +223,7 @@ export default function TypeMatchupExplorer() {
           <div className="mt-6">
             <button
               type="button"
-              onClick={() => setSelectedPokemon(null)}
+              onClick={() => router.push("/")}
               className="mb-4 text-sm text-[color:var(--ink)]/60 underline-offset-2 hover:underline"
             >
               ← Back to type matchups

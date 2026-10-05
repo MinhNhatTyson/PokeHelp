@@ -1,4 +1,4 @@
-import { Pokemon, PokemonTypeName, PokemonNameEntry, PokemonDetail, EvolutionStage, ItemDetail, ItemNameEntry, MoveDetail, MoveNameEntry } from "@/lib/types";
+import { Pokemon, PokemonTypeName, PokemonNameEntry, PokemonDetail, EvolutionStage, ItemDetail, ItemNameEntry, MoveDetail, MoveNameEntry, MoveInfo, AbilityInfo, AbilityNameEntry, POKEMON_TYPES } from "@/lib/types";
 
 const POKEAPI_BASE = "https://pokeapi.co/api/v2";
 
@@ -331,4 +331,107 @@ export async function fetchCompetitiveItemNameList(): Promise<ItemNameEntry[]> {
     });
   }
   return competitiveItemListPromise;
+}
+
+// ---------- Move & ability lookup pages ----------
+const moveInfoCache = new Map<string, MoveInfo>();
+const abilityInfoCache = new Map<string, AbilityInfo>();
+let abilityNameListPromise: Promise<AbilityNameEntry[]> | null = null;
+
+const slugKey = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "-");
+const cleanFlavor = (t: string) => t.replace(/\f|\n/g, " ");
+
+interface PokeApiMoveFullResponse {
+  name: string;
+  type: { name: string };
+  damage_class: { name: string } | null;
+  power: number | null;
+  accuracy: number | null;
+  pp: number | null;
+  priority: number;
+  effect_chance: number | null;
+  target: { name: string };
+  effect_entries: { effect: string; short_effect: string; language: { name: string } }[];
+  flavor_text_entries: { flavor_text: string; language: { name: string } }[];
+  learned_by_pokemon: { name: string }[];
+}
+
+export async function fetchMoveInfo(nameOrSlug: string): Promise<MoveInfo | null> {
+  const key = slugKey(nameOrSlug);
+  if (!key) return null;
+  const cached = moveInfoCache.get(key);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(`${POKEAPI_BASE}/move/${key}`);
+    if (!res.ok) return null;
+    const data: PokeApiMoveFullResponse = await res.json();
+    const en = data.effect_entries.find((e) => e.language.name === "en");
+    const flavor = [...data.flavor_text_entries].reverse().find((f) => f.language.name === "en");
+    const rawEffect = en?.short_effect ?? (flavor ? cleanFlavor(flavor.flavor_text) : null);
+    const typeName = data.type.name;
+
+    const info: MoveInfo = {
+      name: data.name,
+      type: (POKEMON_TYPES as readonly string[]).includes(typeName) ? (typeName as PokemonTypeName) : null,
+      damageClass: (data.damage_class?.name as MoveInfo["damageClass"]) ?? "status",
+      power: data.power,
+      accuracy: data.accuracy,
+      pp: data.pp,
+      priority: data.priority,
+      target: data.target.name,
+      effect: rawEffect ? rawEffect.replace(/\$effect_chance/g, String(data.effect_chance ?? "")) : null,
+      learnedBy: data.learned_by_pokemon.map((p) => p.name),
+    };
+    moveInfoCache.set(key, info);
+    return info;
+  } catch {
+    return null; // not cached, so a transient network error can be retried
+  }
+}
+
+interface PokeApiAbilityFullResponse {
+  name: string;
+  effect_entries: { effect: string; short_effect: string; language: { name: string } }[];
+  flavor_text_entries: { flavor_text: string; language: { name: string } }[];
+  pokemon: { is_hidden: boolean; pokemon: { name: string } }[];
+}
+
+export async function fetchAbilityInfo(nameOrSlug: string): Promise<AbilityInfo | null> {
+  const key = slugKey(nameOrSlug);
+  if (!key) return null;
+  const cached = abilityInfoCache.get(key);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(`${POKEAPI_BASE}/ability/${key}`);
+    if (!res.ok) return null;
+    const data: PokeApiAbilityFullResponse = await res.json();
+    const en = data.effect_entries.find((e) => e.language.name === "en");
+    const flavor = [...data.flavor_text_entries].reverse().find((f) => f.language.name === "en");
+
+    const info: AbilityInfo = {
+      name: data.name,
+      shortEffect: en?.short_effect ?? (flavor ? cleanFlavor(flavor.flavor_text) : null),
+      effect: en?.effect ?? null,
+      pokemon: data.pokemon.map((p) => ({ name: p.pokemon.name, isHidden: p.is_hidden })),
+    };
+    abilityInfoCache.set(key, info);
+    return info;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchAbilityNameList(): Promise<AbilityNameEntry[]> {
+  if (!abilityNameListPromise) {
+    abilityNameListPromise = fetch(`${POKEAPI_BASE}/ability?limit=100000`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error("ability list fetch failed"))))
+      .then((data: PokeApiListResponse) => data.results)
+      .catch(() => {
+        abilityNameListPromise = null;
+        return [];
+      });
+  }
+  return abilityNameListPromise;
 }

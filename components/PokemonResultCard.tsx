@@ -3,6 +3,7 @@ import { getDualAttackProfile, getDualDefenseProfile } from "@/lib/logic/effecti
 import TypeBadge from "@/components/TypeBadge";
 import { TYPE_COLOR } from "@/lib/typeMeta";
 import TypeChip from "./TypeChip";
+import Link from "next/link";
 
 const STAT_LABEL: Record<string, string> = {
   hp: "HP",
@@ -95,10 +96,13 @@ export default function PokemonResultCard({
         <div className="mt-1 space-y-1.5">
           {pokemon.abilities.map((a) => (
             <div key={a.name}>
-              <span className="capitalize font-medium">
+              <Link
+                href={`/moves?ability=${a.name}`}
+                className="capitalize font-medium underline decoration-dotted underline-offset-2 hover:text-[color:var(--shell-accent)]"
+              >
                 {a.name.replace(/-/g, " ")}
-                {a.isHidden && <span className="ml-1 text-xs opacity-50">(hidden)</span>}
-              </span>
+              </Link>
+              {a.isHidden && <span className="ml-1 text-xs opacity-50">(hidden)</span>}
               {a.description && (
                 <p className="text-xs opacity-70">{a.description}</p>
               )}
@@ -189,6 +193,33 @@ export default function PokemonResultCard({
           })}
         </div>
       </div>
+
+      {pokemon.moves.length > 0 && (
+        <details className="group mt-6">
+          <summary className="flex cursor-pointer list-none items-center justify-between font-heading text-base">
+            <span>
+              Moves <span className="font-dex text-xs opacity-50">({pokemon.moves.length})</span>
+            </span>
+            <span aria-hidden="true" className="text-sm opacity-50 transition-transform group-open:rotate-180">▾</span>
+          </summary>
+          <p className="mt-1 text-xs opacity-50">
+            Every move PokeAPI lists for this form, across all generations. Tap one for its details.
+          </p>
+          <div className="mt-2 flex max-h-72 flex-wrap gap-1.5 overflow-y-auto">
+            {[...pokemon.moves]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((m) => (
+                <Link
+                  key={m.name}
+                  href={`/moves?move=${m.name}`}
+                  className="btn-tactile rounded-full bg-black/10 px-2.5 py-1 text-xs capitalize hover:bg-black/20"
+                >
+                  {m.name.replace(/-/g, " ")}
+                </Link>
+              ))}
+          </div>
+        </details>
+      )}
 
       {pokemon.evolutionChain.length > 1 && (
         <div className="mt-6">

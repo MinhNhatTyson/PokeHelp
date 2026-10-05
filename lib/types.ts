@@ -220,3 +220,28 @@ export interface BattleHistoryEntry {
   reason: string;                // free text — what went right/wrong
   opponentLeads?: string[];
 }
+
+export interface MoveInfo {
+  name: string;
+  type: PokemonTypeName | null; // null for oddities like "stellar"
+  damageClass: "physical" | "special" | "status";
+  power: number | null;
+  accuracy: number | null;
+  pp: number | null;
+  priority: number;
+  target: string;
+  effect: string | null;
+  learnedBy: string[];
+}
+
+export interface AbilityInfo {
+  name: string;
+  shortEffect: string | null;
+  effect: string | null;
+  pokemon: { name: string; isHidden: boolean }[];
+}
+
+export interface AbilityNameEntry {
+  name: string;
+  url: string;
+}

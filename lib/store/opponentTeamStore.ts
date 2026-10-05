@@ -53,7 +53,23 @@ export const useOpponentTeamStore = create<OpponentTeamState>()(
         set({ slots: Array.from({ length: OPPONENT_TEAM_SIZE }, () => ({ ...EMPTY_SLOT })) }),
     }),
     {
-      name: "pokehelp-opponent-team" 
+      name: "pokehelp-opponent-team",
+      version: 1,
+      migrate: (persisted) => {
+        const s = (persisted ?? {}) as { slots?: Partial<OpponentSlot>[] };
+        const old = Array.isArray(s.slots) ? s.slots : [];
+        const withMoves = (d?: PokemonDetail | null) => (d ? { ...d, moves: d.moves ?? [] } : null);
+        const slots: OpponentSlot[] = Array.from({ length: OPPONENT_TEAM_SIZE }, (_, i) => {
+          const o = old[i] ?? {};
+          return {
+            pokemon: withMoves(o.pokemon),
+            abilityName: o.abilityName ?? null,
+            itemName: o.itemName ?? null,
+            megaFormDetail: withMoves(o.megaFormDetail),
+          };
+        });
+        return { ...s, slots } as OpponentTeamState;
+      },
     }
   )
 );

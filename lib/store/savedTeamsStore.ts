@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { SavedTeam, TeamSlot } from "@/lib/types";
+import { normalizeTeamSlot } from "@/lib/store/slotMigration";
 
 interface SavedTeamsState {
   teams: SavedTeam[];
@@ -28,6 +29,22 @@ export const useSavedTeamsStore = create<SavedTeamsState>()(
         })),
       deleteTeam: (id) => set((state) => ({ teams: state.teams.filter((t) => t.id !== id) })),
     }),
-    { name: "pokehelp-saved-teams" }
+    {
+      name: "pokehelp-saved-teams",
+      version: 1,
+      migrate: (persisted) => {
+        const s = (persisted ?? {}) as { teams?: Partial<SavedTeam>[] };
+        const teams = (Array.isArray(s.teams) ? s.teams : [])
+          .map((t) => ({
+            id: t.id ?? crypto.randomUUID(),
+            name: t.name ?? "Untitled team",
+            savedAt: t.savedAt ?? Date.now(),
+            slots: Array.isArray(t.slots) ? t.slots.map(normalizeTeamSlot) : [],
+            teamStrategy: t.teamStrategy ?? "",
+          }))
+          .filter((t) => t.slots.length > 0); // an empty team would crash TeamBuilder's slots.map
+        return { ...s, teams } as SavedTeamsState;
+      },
+    }
   )
 );
