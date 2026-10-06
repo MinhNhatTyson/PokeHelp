@@ -21,7 +21,7 @@ export default function BattleGuidance() {
   const opponentSlots = useOpponentTeamStore((s) => s.slots);
 
   const {
-    started, activeBattlers, yourTeamNames, opponentTeamNames, currentTurnEvents,
+    started, activeBattlers, fainted, yourTeamNames, opponentTeamNames, currentTurnEvents,
     conversation, turnNumber, adviceStatus,
     startSession, resetSession, addEvent, removeEvent, switchActiveBattler, submitTurn, initialLeads
   } = useBattleSessionStore();
@@ -164,9 +164,14 @@ export default function BattleGuidance() {
 
   // Only what's actually on the field right now — not the full brought/previewed rosters.
   const participants = [
-    ...activeBattlers.yours.filter((n): n is string => n !== null).map((name) => ({ name, side: "yours" as const })),
-    ...activeBattlers.opponent.filter((n): n is string => n !== null).map((name) => ({ name, side: "opponent" as const })),
+    ...activeBattlers.yours.filter((n): n is string => n !== null).map((name) => ({ name, side: "yours" as const, fainted: fainted.yours.includes(name) })),
+    ...activeBattlers.opponent.filter((n): n is string => n !== null).map((name) => ({ name, side: "opponent" as const, fainted: fainted.opponent.includes(name) })),
   ];
+
+  // All 4 of one side down = the battle is over. Both at once is ambiguous, so no suggestion.
+  const youOut = yourTeamNames.length > 0 && fainted.yours.length >= yourTeamNames.length;
+  const oppOut = fainted.opponent.length >= 4;
+  const wipeout: "win" | "loss" | null = youOut && oppOut ? null : youOut ? "loss" : oppOut ? "win" : null;
 
   return (
     <div className="w-full max-w-lg rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
@@ -227,6 +232,21 @@ export default function BattleGuidance() {
           </div>
         )}
 
+        {wipeout && !ending && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[color:var(--accent-gold)]/60 bg-[color:var(--accent-gold)]/25 px-3 py-2 text-sm text-[color:var(--ink)]">
+            <span>
+              {wipeout === "win" ? "All 4 of their Pokémon have fainted — that looks like a win." : "All 4 of your Pokémon have fainted — that looks like a loss."}
+            </span>
+            <button
+              type="button"
+              onClick={() => { setOutcome(wipeout); setEnding(true); }}
+              className="btn-tactile min-h-[40px] rounded-full bg-[color:var(--shell-accent)] px-4 text-xs font-semibold text-white"
+            >
+              End session as {wipeout === "win" ? "Win" : "Loss"}
+            </button>
+          </div>
+        )}
+
         <FieldStatusPanel />
 
         {conversation.length > 0 && (
@@ -252,15 +272,25 @@ export default function BattleGuidance() {
                 key={`${p.side}-${p.name}`}
                 type="button"
                 onClick={() => { setComposerPreset({ mode: "switch", actor: p.name }); setShowComposer(true); }}
-                className={`btn-tactile inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3 py-1 capitalize ${p.side === "yours" ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"}`}
+                className={`btn-tactile inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3 py-1 capitalize ${
+                  p.fainted
+                    ? "bg-black/5 text-[color:var(--ink)]/40 line-through"
+                    : p.side === "yours" ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"
+                }`}
               >
                 {p.name}
-                <span aria-hidden="true" className="opacity-60">⇄</span>
+                <span aria-hidden="true" className="no-underline opacity-70">{p.fainted ? "✕ replace" : "⇄"}</span>
               </button>
             ))}
           </div>
           <p className="mt-2 text-[11px] text-[color:var(--ink)]/50">
-            Your bench: <span className="capitalize">{yourTeamNames.filter((n) => !participants.some((p) => p.name === n)).join(", ") || "none"}</span>
+            Your bench: <span className="capitalize">{yourTeamNames.filter((n) => !participants.some((p) => p.name === n) && !fainted.yours.includes(n)).join(", ") || "none"}</span>
+          </p>
+          <p className="mt-0.5 text-[11px] text-[color:var(--ink)]/50">
+            Remaining — you: {Math.max(0, yourTeamNames.length - fainted.yours.length)}/{yourTeamNames.length} · opponent: {Math.max(0, 4 - fainted.opponent.length)}/4
+            {fainted.yours.length + fainted.opponent.length > 0 && (
+              <> · fainted: <span className="capitalize">{[...fainted.yours, ...fainted.opponent].join(", ")}</span></>
+            )}
           </p>
         </div>
 
@@ -326,7 +356,8 @@ export default function BattleGuidance() {
             opponentTeamNames={opponentTeamNames}
             initialMode={composerPreset.mode}
             initialActor={composerPreset.actor}
-            onConfirm={(fragment, sw) => { addEvent(fragment, sw); setShowComposer(false); }}
+            fainted={fainted}
+            onConfirm={(fragment, extra) => { addEvent(fragment, extra); setShowComposer(false); }}
             onSwitch={switchActiveBattler}
             onCancel={() => setShowComposer(false)}
           />

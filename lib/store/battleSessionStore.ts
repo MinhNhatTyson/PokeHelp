@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers } from "@/lib/types";
+import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers, FaintedMons } from "@/lib/types";
 import { useAiSettingsStore } from "./aiSettingsStore";
 import { useLiveSessionStore } from "./liveSessionStore";
 
@@ -20,6 +20,7 @@ interface BattleSessionState {
   yourTeamNames: string[];
   opponentTeamNames: string[];
   activeBattlers: ActiveBattlers;
+  fainted: FaintedMons;
   initialLeads: ActiveBattlers | null;
   fieldState: FieldState;
   currentTurnEvents: BattleEvent[];
@@ -30,7 +31,7 @@ interface BattleSessionState {
   startSession: (yourTeamNames: string[], opponentTeamNames: string[], activeBattlers: ActiveBattlers) => void;
   resetSession: () => void;
   setFieldState: (updates: Partial<FieldState>) => void;
-  addEvent: (fragment: string, sw?: BattleEvent["switch"]) => void;
+  addEvent: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint">) => void;
   removeEvent: (id: string) => void;
   switchActiveBattler: (side: "yours" | "opponent", outgoingName: string, incomingName: string) => void;
   submitTurn: () => Promise<void>;
@@ -42,6 +43,7 @@ const initialState = {
   yourTeamNames: [] as string[],
   opponentTeamNames: [] as string[],
   activeBattlers: EMPTY_ACTIVE_BATTLERS,
+  fainted: { yours: [], opponent: [] } as FaintedMons,
   initialLeads: null as ActiveBattlers | null,
   fieldState: EMPTY_FIELD_STATE,
   currentTurnEvents: [] as BattleEvent[],
@@ -66,16 +68,28 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
   setFieldState: (updates) =>
     set((state) => ({ fieldState: { ...state.fieldState, ...updates } })),
 
-  addEvent: (fragment, sw) =>
-    set((state) => ({
-      currentTurnEvents: [...state.currentTurnEvents, { id: crypto.randomUUID(), sentenceFragment: fragment, switch: sw }],
-    })),
+  addEvent: (fragment, extra) =>
+    set((state) => {
+      // Only newly fainted Pokémon are recorded on the event, so removing it revives exactly those.
+      const added = (extra?.faint ?? []).filter((f) => !state.fainted[f.side].includes(f.name));
+      let fainted = state.fainted;
+      for (const f of added) fainted = { ...fainted, [f.side]: [...fainted[f.side], f.name] };
+      return {
+        fainted,
+        currentTurnEvents: [
+          ...state.currentTurnEvents,
+          { id: crypto.randomUUID(), sentenceFragment: fragment, switch: extra?.switch, faint: added.length ? added : undefined },
+        ],
+      };
+    }),
 
-  // Removing a Switch event also puts the outgoing Pokémon back on the field.
+  // Removing an event also undoes what it did to the field: a Switch puts the outgoing Pokémon back,
+  // a KO / Faint revives the Pokémon. Remove the newest events first when undoing several.
   removeEvent: (id) =>
     set((state) => {
       const ev = state.currentTurnEvents.find((e) => e.id === id);
       let activeBattlers = state.activeBattlers;
+      let fainted = state.fainted;
       if (ev?.switch) {
         const { side, out, in: incoming } = ev.switch;
         const list = [...activeBattlers[side]];
@@ -85,7 +99,8 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
           activeBattlers = { ...activeBattlers, [side]: list };
         }
       }
-      return { currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id), activeBattlers };
+      for (const f of ev?.faint ?? []) fainted = { ...fainted, [f.side]: fainted[f.side].filter((n) => n !== f.name) };
+      return { currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id), activeBattlers, fainted };
     }),
 
   // Called when a Switch event is confirmed — swaps the outgoing mon for the
@@ -119,7 +134,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
           opponentTeam: state.opponentTeamNames,
           conversation: state.conversation,
           newTurnSentence: compiledSentence,
-          activeNote: describeBattlers(state.activeBattlers),
+          activeNote: describeBattlers(state.activeBattlers, state.fainted, state.yourTeamNames.length),
           model: useAiSettingsStore.getState().model,
         }),
       });
@@ -144,9 +159,15 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
   },
 }));
 
-function describeBattlers(a: ActiveBattlers): string {
-  const names = (l: (string | null)[]) => l.filter((n): n is string => n !== null).join(" + ") || "none";
-  return `On the field after this turn — yours: ${names(a.yours)}; opponent's: ${names(a.opponent)}`;
+function describeBattlers(a: ActiveBattlers, fainted: FaintedMons, yourTotal: number): string {
+  const live = (list: (string | null)[], down: string[]) =>
+    list.filter((n): n is string => n !== null && !down.includes(n)).join(" + ") || "none";
+  const names = (l: string[]) => (l.length ? l.join(", ") : "none");
+  return (
+    `On the field after this turn — yours: ${live(a.yours, fainted.yours)}; opponent's: ${live(a.opponent, fainted.opponent)}. ` +
+    `Fainted — yours: ${names(fainted.yours)}; opponent's: ${names(fainted.opponent)}. ` +
+    `Remaining — you: ${Math.max(0, yourTotal - fainted.yours.length)} of ${yourTotal}, opponent: ${Math.max(0, 4 - fainted.opponent.length)} of 4`
+  );
 }
 
 function describeFieldState(f: FieldState): string {

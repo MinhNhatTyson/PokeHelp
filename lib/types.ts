@@ -178,6 +178,12 @@ export interface BattleEvent {
   id: string;
   sentenceFragment: string; // e.g. "Swampert's Earthquake KO'd Kingambit" — composed by the UI, not typed
   switch?: { side: "yours" | "opponent"; out: string; in: string }; // set for Switch events so removing one can undo it
+  faint?: { side: "yours" | "opponent"; name: string }[];          // Pokémon this event knocked out, so removing it can revive them
+}
+
+export interface FaintedMons {
+  yours: string[];
+  opponent: string[];
 }
 
 export interface BattleConversationTurn {

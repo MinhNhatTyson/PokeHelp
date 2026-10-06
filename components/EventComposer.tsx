@@ -3,14 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { getCommonSet, describeMegaForm } from "@/lib/data/commonSets";
 import { fetchMoveDetail, fetchMoveNameList } from "@/lib/data/fetchAndCache";
-import { BattleEvent, FieldState, MoveDetail, MoveNameEntry } from "@/lib/types";
+import { BattleEvent, FaintedMons, FieldState, MoveDetail, MoveNameEntry } from "@/lib/types";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useBattleSessionStore } from "@/lib/store/battleSessionStore";
 import { useListNav } from "@/lib/hooks/useListNav";
 
 const MAX_MOVE_SUGGESTIONS = 8;
 type Side = "yours" | "opponent";
-interface Participant { name: string; side: Side; }
+interface Participant { name: string; side: Side; fainted?: boolean; }
 
 const RESULT_OPTIONS = [
   { key: "25", label: "25%" },
@@ -86,6 +86,7 @@ export default function EventComposer({
   participants,
   yourTeamNames,
   opponentTeamNames,
+  fainted,
   onConfirm,
   onSwitch,
   onCancel,
@@ -94,17 +95,18 @@ export default function EventComposer({
   participants: Participant[]; // currently active battlers only (2 + 2)
   yourTeamNames: string[]; // your bring-4
   opponentTeamNames: string[]; // opponent's known team-preview roster
-  onConfirm: (fragment: string, sw?: BattleEvent["switch"]) => void;
+  fainted: FaintedMons;
+  onConfirm: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint">) => void;
   onSwitch: (side: Side, outgoingName: string, incomingName: string) => void;
   onCancel: () => void;
-  initialMode?: "move" | "switch" | "mega";
+  initialMode?: "move" | "switch" | "mega" | "faint";
   initialActor?: string | null;
 }) {
   const teamSlots = useTeamStore((s) => s.slots);
   const fieldState = useBattleSessionStore((s) => s.fieldState);
   const setFieldState = useBattleSessionStore((s) => s.setFieldState);
 
-  const [mode, setMode] = useState<"move" | "switch" | "mega">(initialMode ?? "move");
+  const [mode, setMode] = useState<"move" | "switch" | "mega" | "faint">(initialMode ?? "move");
   const [actor, setActor] = useState<string | null>(initialActor ?? null);
   const [moveSlug, setMoveSlug] = useState("");
   const [detailResult, setDetailResult] = useState<{ slug: string; detail: MoveDetail | null } | null>(null);
@@ -118,7 +120,8 @@ export default function EventComposer({
   const [showMoveDropdown, setShowMoveDropdown] = useState(false);
 
   const actorP = participants.find((p) => p.name === actor) ?? null;
-  const others = participants.filter((p) => p.name !== actor);
+  const alive = participants.filter((p) => !p.fainted);
+  const others = alive.filter((p) => p.name !== actor);
   const fieldSetter = moveSlug ? FIELD_SETTER_MOVES[moveSlug] : undefined;
   const moveDetail = detailResult && detailResult.slug === moveSlug && !fieldSetter ? detailResult.detail : null;
   const moveDetailStatus: "idle" | "loading" | "error" =
@@ -142,6 +145,18 @@ export default function EventComposer({
     if (!q) return [];
     return moveNames.filter((m) => m.name.startsWith(q)).slice(0, MAX_MOVE_SUGGESTIONS);
   }, [moveText, moveNames]);
+
+  function changeMode(next: "move" | "switch" | "mega" | "faint") {
+    setMode(next);
+    // A fainted Pokémon can only be picked in Switch mode (to send in its replacement)
+    if (next !== "switch" && actorP?.fainted) {
+      resetMoveState();
+      setActor(null);
+      setMoveSlug("");
+      setMoveText("");
+      setSwitchTo(null);
+    }
+  }
 
   function resetMoveState() {
     setSelectedTargets([]);
@@ -210,7 +225,15 @@ export default function EventComposer({
     if (mode === "switch") {
       if (!switchTo) return;
       onSwitch(actorP.side, actor, switchTo);
-      onConfirm(`${cap(actor)} switched out for ${cap(switchTo)}`, { side: actorP.side, out: actor, in: switchTo });
+      const text = actorP.fainted
+        ? `${cap(switchTo)} was sent in to replace fainted ${cap(actor)}`
+        : `${cap(actor)} switched out for ${cap(switchTo)}`;
+      onConfirm(text, { switch: { side: actorP.side, out: actor, in: switchTo } });
+      return;
+    }
+
+    if (mode === "faint") {
+      onConfirm(`${cap(actor)} fainted`, { faint: [{ side: actorP.side, name: actor }] });
       return;
     }
 
@@ -256,7 +279,10 @@ export default function EventComposer({
 
     let fragment = `${cap(actor)}'s ${parts.join("; ")}`;
     if (effect) fragment += `, ${effect.toLowerCase()}`;
-    onConfirm(fragment);
+    const faint = selectedTargets
+      .filter((t) => targetResults[t] === "ko")
+      .flatMap((t) => { const p = participants.find((x) => x.name === t); return p ? [{ side: p.side, name: p.name }] : []; });
+    onConfirm(fragment, faint.length > 0 ? { faint } : undefined);
   }
 
   const moveNav = useListNav({
@@ -279,22 +305,32 @@ export default function EventComposer({
     <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center">
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-[color:var(--screen)] p-5 sm:rounded-2xl">
         <div className="flex gap-1 rounded-lg bg-black/5 p-1">
-          <button type="button" onClick={() => setMode("move")} className={`min-h-[44px] flex-1 rounded-md px-3 py-2 text-sm font-medium ${mode === "move" ? "bg-white shadow-sm" : "opacity-50"}`}>Move</button>
-          <button type="button" onClick={() => setMode("switch")} className={`min-h-[44px] flex-1 rounded-md px-3 py-2 text-sm font-medium ${mode === "switch" ? "bg-white shadow-sm" : "opacity-50"}`}>Switch</button>
-          <button type="button" onClick={() => setMode("mega")} className={`min-h-[44px] flex-1 rounded-md px-3 py-2 text-sm font-medium ${mode === "mega" ? "bg-white shadow-sm" : "opacity-50"}`}>Mega</button>
+          {([["move", "Move"], ["switch", "Switch"], ["mega", "Mega"], ["faint", "Faint"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => changeMode(key)}
+              className={`min-h-[44px] flex-1 rounded-md px-2 py-2 text-sm font-medium ${mode === key ? "bg-white shadow-sm" : "opacity-50"}`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         <div className="mt-4">
-          <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Who acted (currently on the field)</p>
+          <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">
+            {mode === "switch" ? "Who is leaving (tap a fainted one to send in its replacement)" : mode === "faint" ? "Who fainted" : "Who acted (currently on the field)"}
+          </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {participants.map((p) => (
+            {(mode === "switch" ? participants : alive).map((p) => (
               <button
                 key={p.name}
                 type="button"
                 onClick={() => { selectActor(p.name); setMoveSlug(""); setMoveText(""); setSwitchTo(null); }}
-                className={`min-h-[40px] rounded-full px-4 py-2 text-sm capitalize ${actor === p.name ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
+                className={`min-h-[40px] rounded-full px-4 py-2 text-sm capitalize ${actor === p.name ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"} ${p.fainted ? "line-through opacity-70" : ""}`}
               >
                 {p.name}
+                {p.fainted && <span className="ml-1.5 text-[10px] font-semibold uppercase no-underline">fainted</span>}
               </button>
             ))}
           </div>
@@ -422,9 +458,12 @@ export default function EventComposer({
             <div className="mt-4">
               <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Switched in</p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {(actorP.side === "yours" ? yourTeamNames : opponentTeamNames)
-                  .filter((name) => !participants.some((p) => p.name === name))
-                  .map((name) => (
+                {(() => {
+                  const bench = (actorP.side === "yours" ? yourTeamNames : opponentTeamNames).filter(
+                    (name) => !participants.some((p) => p.name === name) && !fainted[actorP.side].includes(name)
+                  );
+                  if (bench.length === 0) return <p className="text-xs text-[color:var(--ink)]/50">No Pokémon left to send in.</p>;
+                  return bench.map((name) => (
                     <button
                       key={name}
                       type="button"
@@ -433,9 +472,16 @@ export default function EventComposer({
                     >
                       {name}
                     </button>
-                  ))}
+                  ));
+                })()}
               </div>
             </div>
+          )
+        ) : mode === "faint" ? (
+          actor && (
+            <p className="mt-4 rounded-md bg-black/5 px-3 py-2 text-sm text-[color:var(--ink)]/70">
+              Marks {actor} as fainted. Use this for recoil, weather, status, Perish Song, or any faint not caused by a move you logged. A KO from a move is recorded automatically when you pick &quot;100% / KO&quot;.
+            </p>
           )
         ) : (
           actor && (
@@ -450,7 +496,7 @@ export default function EventComposer({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={mode === "switch" ? !switchTo : mode === "mega" ? !actor || !describeMegaForm(actor) : !canConfirmMove}
+            disabled={mode === "switch" ? !switchTo : mode === "faint" ? !actor : mode === "mega" ? !actor || !describeMegaForm(actor) : !canConfirmMove}
             className="btn-tactile btn-glow-accent min-h-[48px] flex-1 rounded-md bg-[color:var(--shell-accent)] px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Add event
