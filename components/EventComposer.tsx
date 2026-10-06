@@ -7,21 +7,39 @@ import { BattleEvent, FaintedMons, FieldState, MoveDetail, MoveNameEntry } from 
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useBattleSessionStore } from "@/lib/store/battleSessionStore";
 import { useListNav } from "@/lib/hooks/useListNav";
+import DamageSlider from "@/components/DamageSlider";
 
 const MAX_MOVE_SUGGESTIONS = 8;
 type Side = "yours" | "opponent";
 interface Participant { name: string; side: Side; fainted?: boolean; }
 
-const RESULT_OPTIONS = [
-  { key: "25", label: "25%" },
-  { key: "50", label: "50%" },
-  { key: "75", label: "75%" },
-  { key: "ko", label: "100% / KO" },
-  { key: "miss", label: "Missed" },
-  { key: "protect", label: "Protected" },
-  { key: "noeffect", label: "No effect" },
-] as const;
-type ResultKey = (typeof RESULT_OPTIONS)[number]["key"];
+type Outcome =
+  | { kind: "damage"; pct: number }
+  | { kind: "worked" | "miss" | "protect" | "noeffect" };
+type OutcomeKind = Outcome["kind"];
+
+const DAMAGE_KINDS: { key: OutcomeKind; label: string }[] = [
+  { key: "damage", label: "Damage" }, { key: "miss", label: "Missed" },
+  { key: "protect", label: "Protected" }, { key: "noeffect", label: "No effect" },
+];
+const STATUS_KINDS: { key: OutcomeKind; label: string }[] = [
+  { key: "worked", label: "Worked" }, { key: "miss", label: "Missed" },
+  { key: "protect", label: "Protected" }, { key: "noeffect", label: "No effect" },
+];
+function makeOutcome(kind: OutcomeKind, prev?: Outcome): Outcome {
+  if (kind === "damage") return { kind, pct: prev?.kind === "damage" ? prev.pct : 0 };
+  return { kind };
+}
+
+// Protect-style moves: the only question is "did it work or fail?"
+const GUARD_MOVES = new Set([
+  "protect", "detect", "spiky-shield", "kings-shield", "baneful-bunker", "obstruct",
+  "silk-trap", "burning-bulwark", "wide-guard", "quick-guard", "mat-block", "endure",
+]);
+// The user faints after using these
+const SELF_FAINT_MOVES = new Set([
+  "explosion", "self-destruct", "misty-explosion", "memento", "final-gambit", "healing-wish", "lunar-dance",
+]);
 
 const EFFECT_OPTIONS = [
   "Burn", "Paralysis", "Sleep", "Poison", "Freeze", "Confusion", "Flinch",
@@ -53,7 +71,7 @@ const FIELD_SETTER_MOVES: Record<string, FieldSetterEffect> = {
   tailwind: { kind: "tailwind" },
 };
 
-const NO_TARGET_API_VALUES = new Set(["user", "users-field", "entire-field", "all-pokemon"]);
+const NO_TARGET_API_VALUES = new Set(["user", "users-field", "entire-field", "all-pokemon", "opponents-field", "all-allies", "user-and-allies"]);
 const SINGLE_TARGET_API_VALUES = new Set(["selected-pokemon", "ally", "random-opponent"]);
 const AUTO_MULTI_TARGET_API_VALUES = new Set(["all-other-pokemon", "all-opponents", "all-adjacent-foes", "all-adjacent"]);
 
@@ -63,13 +81,16 @@ function cap(s: string) {
 function formatMoveName(slug: string) {
   return slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
-function describeResult(result: ResultKey, target: string): string {
-  switch (result) {
+function describeOutcome(o: Outcome, target: string, hpBefore: number): string {
+  switch (o.kind) {
     case "miss": return `missed ${cap(target)}`;
     case "protect": return `was blocked by ${cap(target)}'s Protect`;
     case "noeffect": return `had no effect on ${cap(target)}`;
-    case "ko": return `dealt enough damage to KO ${cap(target)}`;
-    default: return `dealt around ${result}% damage to ${cap(target)}`;
+    case "worked": return `landed on ${cap(target)}`;
+    case "damage":
+      return o.pct >= hpBefore
+        ? `dealt enough damage to KO ${cap(target)}`
+        : `took ${cap(target)} from ${hpBefore}% to ${hpBefore - o.pct}% HP`;
   }
 }
 function targetCandidates(apiTarget: string, actorSide: Side, others: Participant[]): Participant[] {
@@ -96,7 +117,7 @@ export default function EventComposer({
   yourTeamNames: string[]; // your bring-4
   opponentTeamNames: string[]; // opponent's known team-preview roster
   fainted: FaintedMons;
-  onConfirm: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint">) => void;
+  onConfirm: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage">) => void;
   onSwitch: (side: Side, outgoingName: string, incomingName: string) => void;
   onCancel: () => void;
   initialMode?: "move" | "switch" | "mega" | "faint";
@@ -106,12 +127,19 @@ export default function EventComposer({
   const fieldState = useBattleSessionStore((s) => s.fieldState);
   const setFieldState = useBattleSessionStore((s) => s.setFieldState);
 
+  const hp = useBattleSessionStore((s) => s.hp);
+  const hpOfName = (name: string) => {
+    const side = participants.find((p) => p.name === name)?.side;
+    return side ? hp[side][name] ?? 100 : 100;
+  };
+
   const [mode, setMode] = useState<"move" | "switch" | "mega" | "faint">(initialMode ?? "move");
   const [actor, setActor] = useState<string | null>(initialActor ?? null);
   const [moveSlug, setMoveSlug] = useState("");
   const [detailResult, setDetailResult] = useState<{ slug: string; detail: MoveDetail | null } | null>(null);
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
-  const [targetResults, setTargetResults] = useState<Record<string, ResultKey>>({});
+  const [targetOutcomes, setTargetOutcomes] = useState<Record<string, Outcome>>({});
+  const [selfOutcome, setSelfOutcome] = useState<"worked" | "failed">("worked");
   const [effectChoice, setEffectChoice] = useState<string | null>(null);
   const [effectOther, setEffectOther] = useState("");
   const [switchTo, setSwitchTo] = useState<string | null>(null);
@@ -123,6 +151,7 @@ export default function EventComposer({
   const alive = participants.filter((p) => !p.fainted);
   const others = alive.filter((p) => p.name !== actor);
   const fieldSetter = moveSlug ? FIELD_SETTER_MOVES[moveSlug] : undefined;
+  const isGuard = GUARD_MOVES.has(moveSlug);
   const moveDetail = detailResult && detailResult.slug === moveSlug && !fieldSetter ? detailResult.detail : null;
   const moveDetailStatus: "idle" | "loading" | "error" =
     !moveSlug || fieldSetter ? "idle"
@@ -160,7 +189,8 @@ export default function EventComposer({
 
   function resetMoveState() {
     setSelectedTargets([]);
-    setTargetResults({});
+    setTargetOutcomes({});
+    setSelfOutcome("worked");
     setEffectChoice(null);
     setEffectOther("");
   }
@@ -207,9 +237,12 @@ export default function EventComposer({
   }, []);
 
   const isStatusMove = !fieldSetter && moveDetail?.damageClass === "status";
-  const noTargetUI = !!fieldSetter || (moveDetail ? NO_TARGET_API_VALUES.has(moveDetail.target) : false);
+  const noTargetUI = !!fieldSetter || isGuard || (moveDetail ? NO_TARGET_API_VALUES.has(moveDetail.target) : false);
+  const isSelfMove = !fieldSetter && noTargetUI; 
   const singleTarget = moveDetail ? SINGLE_TARGET_API_VALUES.has(moveDetail.target) : false;
   const candidates = actorP && moveDetail ? targetCandidates(moveDetail.target, actorP.side, others) : others;
+  const outcomeOf = (t: string): Outcome =>
+    targetOutcomes[t] ?? (isStatusMove ? { kind: "worked" } : { kind: "damage", pct: 0 });
 
   function toggleTarget(name: string) {
     setSelectedTargets((prev) => {
@@ -259,30 +292,31 @@ export default function EventComposer({
     }
 
     const effect = effectChoice ?? (effectOther.trim() || null);
+    const selfFaint = SELF_FAINT_MOVES.has(moveSlug) ? [{ side: actorP.side, name: actor }] : [];
 
-    if (isStatusMove) {
-      const targetsText = selectedTargets.length > 0 ? ` on ${selectedTargets.map(cap).join(" and ")}` : "";
-      onConfirm(effect ? `${cap(actor)} used ${moveLabel}${targetsText}, causing ${effect}` : `${cap(actor)} used ${moveLabel}${targetsText}`);
-      return;
-    }
-
-    if (noTargetUI) {
-      onConfirm(`${cap(actor)} used ${moveLabel}`);
+    if (isSelfMove) {
+      const text =
+        selfOutcome === "failed" ? `${cap(actor)} used ${moveLabel} but it failed`
+        : isGuard ? `${cap(actor)} used ${moveLabel} and it worked`
+        : `${cap(actor)} used ${moveLabel}`;
+      onConfirm(text, selfFaint.length > 0 ? { faint: selfFaint } : undefined);
       return;
     }
 
     if (selectedTargets.length === 0) return;
-    const parts = selectedTargets
-      .map((t) => (targetResults[t] ? `${moveLabel} ${describeResult(targetResults[t], t)}` : null))
-      .filter((p): p is string => p !== null);
-    if (parts.length === 0) return;
+    const outcomes = selectedTargets.map((t) => ({ t, o: outcomeOf(t) }));
+    const parts = outcomes.map(({ t, o }) => `${moveLabel} ${describeOutcome(o, t, hpOfName(t))}`);
+    const landed = outcomes.some(({ o }) => o.kind === "damage" || o.kind === "worked");
 
     let fragment = `${cap(actor)}'s ${parts.join("; ")}`;
-    if (effect) fragment += `, ${effect.toLowerCase()}`;
-    const faint = selectedTargets
-      .filter((t) => targetResults[t] === "ko")
-      .flatMap((t) => { const p = participants.find((x) => x.name === t); return p ? [{ side: p.side, name: p.name }] : []; });
-    onConfirm(fragment, faint.length > 0 ? { faint } : undefined);
+    if (effect && landed) fragment += `, causing ${effect.toLowerCase()}`;
+    if (selfFaint.length > 0) fragment += `; ${cap(actor)} fainted`;
+
+    const damage = outcomes.flatMap(({ t, o }) => {
+      const side = participants.find((p) => p.name === t)?.side;
+      return o.kind === "damage" && side ? [{ side, name: t, pct: o.pct }] : [];
+    });
+    onConfirm(fragment, { damage, faint: selfFaint });
   }
 
   const moveNav = useListNav({
@@ -296,10 +330,13 @@ export default function EventComposer({
   const canConfirmMove =
     mode === "move" &&
     !!moveSlug &&
-    (fieldSetter ||
-      noTargetUI ||
-      isStatusMove ||
-      (selectedTargets.length > 0 && selectedTargets.every((t) => targetResults[t])));
+    (!!fieldSetter ||
+      isSelfMove ||
+      (selectedTargets.length > 0 &&
+        selectedTargets.every((t) => {
+          const o = outcomeOf(t);
+          return o.kind !== "damage" || o.pct > 0;
+        })));
 
   return (
     <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center">
@@ -405,28 +442,70 @@ export default function EventComposer({
                 </div>
               )}
 
-              {!isStatusMove && !fieldSetter && !noTargetUI && selectedTargets.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Result per target</p>
-                  {selectedTargets.map((t) => (
-                    <div key={t} className="flex flex-wrap items-center gap-1.5">
-                      <span className="w-20 shrink-0 text-xs capitalize text-[color:var(--ink)]/60">{t}</span>
-                      {RESULT_OPTIONS.map((r) => (
-                        <button
-                          key={r.key}
-                          type="button"
-                          onClick={() => setTargetResults((prev) => ({ ...prev, [t]: r.key }))}
-                          className={`min-h-[36px] rounded-full px-3 py-1.5 text-xs ${targetResults[t] === r.key ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}
-                        >
-                          {r.label}
-                        </button>
-                      ))}
-                    </div>
-                  ))}
+              {isSelfMove && moveSlug && (
+                <div className="mt-4">
+                  <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Result</p>
+                  <div role="radiogroup" className="mt-1.5 grid grid-cols-2 gap-2">
+                    {([["worked", isGuard ? "Protected" : "Worked"], ["failed", "Failed"]] as const).map(([key, label]) => (
+                      <button
+                        key={key} type="button" role="radio" aria-checked={selfOutcome === key}
+                        onClick={() => setSelfOutcome(key)}
+                        className={`btn-tactile min-h-[48px] rounded-xl text-sm font-semibold ${
+                          selfOutcome === key
+                            ? key === "worked" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+                            : "bg-black/10 text-[color:var(--ink)]"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {isGuard && (
+                    <p className="mt-1.5 text-[11px] text-[color:var(--ink)]/50">
+                      Protect-style moves fail when used on consecutive turns.
+                    </p>
+                  )}
                 </div>
               )}
 
-              {!fieldSetter && (isStatusMove || moveDetail?.ailment) && (
+              {!fieldSetter && !isSelfMove && selectedTargets.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Result per target</p>
+                  {selectedTargets.map((t) => {
+                    const o = outcomeOf(t);
+                    const current = hpOfName(t);
+                    return (
+                      <div key={t} className="rounded-lg border border-black/10 bg-white p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium capitalize text-[color:var(--ink)]">{t}</span>
+                          <span className="text-[11px] tabular-nums text-[color:var(--ink)]/50">{current}% HP</span>
+                        </div>
+                        <div role="radiogroup" aria-label={`Result on ${t}`} className="mt-2 flex flex-wrap gap-1.5">
+                          {(isStatusMove ? STATUS_KINDS : DAMAGE_KINDS).map((k) => (
+                            <button
+                              key={k.key} type="button" role="radio" aria-checked={o.kind === k.key}
+                              onClick={() => setTargetOutcomes((prev) => ({ ...prev, [t]: makeOutcome(k.key, prev[t]) }))}
+                              className={`min-h-[36px] rounded-full px-3 py-1.5 text-xs font-medium ${
+                                o.kind === k.key ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"
+                              }`}
+                            >
+                              {k.label}
+                            </button>
+                          ))}
+                        </div>
+                        {o.kind === "damage" && (
+                          <DamageSlider
+                            value={o.pct} max={current} targetName={t}
+                            onChange={(pct) => setTargetOutcomes((prev) => ({ ...prev, [t]: { kind: "damage", pct } }))}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {!fieldSetter && !isSelfMove && (isStatusMove || moveDetail?.ailment) && (
                 <div className="mt-4">
                   <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">
                     {isStatusMove ? "Effect applied" : "Secondary effect (optional)"}

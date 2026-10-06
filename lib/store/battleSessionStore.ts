@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers, FaintedMons } from "@/lib/types";
+import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers, FaintedMons, HpState, HpChange, BattleSide } from "@/lib/types";
 import { useAiSettingsStore } from "./aiSettingsStore";
 import { useLiveSessionStore } from "./liveSessionStore";
 
@@ -21,6 +21,7 @@ interface BattleSessionState {
   opponentTeamNames: string[];
   activeBattlers: ActiveBattlers;
   fainted: FaintedMons;
+  hp: HpState;
   initialLeads: ActiveBattlers | null;
   fieldState: FieldState;
   currentTurnEvents: BattleEvent[];
@@ -31,7 +32,7 @@ interface BattleSessionState {
   startSession: (yourTeamNames: string[], opponentTeamNames: string[], activeBattlers: ActiveBattlers) => void;
   resetSession: () => void;
   setFieldState: (updates: Partial<FieldState>) => void;
-  addEvent: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint">) => void;
+  addEvent: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage">) => void;
   removeEvent: (id: string) => void;
   switchActiveBattler: (side: "yours" | "opponent", outgoingName: string, incomingName: string) => void;
   submitTurn: () => Promise<void>;
@@ -44,6 +45,7 @@ const initialState = {
   opponentTeamNames: [] as string[],
   activeBattlers: EMPTY_ACTIVE_BATTLERS,
   fainted: { yours: [], opponent: [] } as FaintedMons,
+  hp: { yours: {}, opponent: {} } as HpState,
   initialLeads: null as ActiveBattlers | null,
   fieldState: EMPTY_FIELD_STATE,
   currentTurnEvents: [] as BattleEvent[],
@@ -70,15 +72,49 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
 
   addEvent: (fragment, extra) =>
     set((state) => {
-      // Only newly fainted Pokémon are recorded on the event, so removing it revives exactly those.
-      const added = (extra?.faint ?? []).filter((f) => !state.fainted[f.side].includes(f.name));
+      let hp = state.hp;
+      const changes: HpChange[] = [];
+      const currentHp = (side: BattleSide, name: string) => hp[side][name] ?? 100;
+      const setHp = (side: BattleSide, name: string, value: number) => {
+        hp = { ...hp, [side]: { ...hp[side], [name]: value } };
+      };
+
+      // Damage first; anything reaching 0 HP also counts as a faint.
+      const knockedOut: { side: BattleSide; name: string }[] = [...(extra?.faint ?? [])];
+      for (const d of extra?.damage ?? []) {
+        const cur = currentHp(d.side, d.name);
+        const dealt = Math.min(cur, Math.max(0, Math.round(d.pct)));
+        if (dealt <= 0) continue;
+        setHp(d.side, d.name, cur - dealt);
+        changes.push({ side: d.side, name: d.name, pct: dealt });
+        if (cur - dealt === 0) knockedOut.push({ side: d.side, name: d.name });
+      }
+
+      // Only newly fainted mons are recorded, so removing the event revives exactly those.
+      const added = knockedOut.filter(
+        (f, i) =>
+          knockedOut.findIndex((x) => x.side === f.side && x.name === f.name) === i &&
+          !state.fainted[f.side].includes(f.name)
+      );
       let fainted = state.fainted;
-      for (const f of added) fainted = { ...fainted, [f.side]: [...fainted[f.side], f.name] };
+      for (const f of added) {
+        fainted = { ...fainted, [f.side]: [...fainted[f.side], f.name] };
+        const cur = currentHp(f.side, f.name); // manual "Faint" events: drain whatever HP is left
+        if (cur > 0) { setHp(f.side, f.name, 0); changes.push({ side: f.side, name: f.name, pct: cur }); }
+      }
+
       return {
+        hp,
         fainted,
         currentTurnEvents: [
           ...state.currentTurnEvents,
-          { id: crypto.randomUUID(), sentenceFragment: fragment, switch: extra?.switch, faint: added.length ? added : undefined },
+          {
+            id: crypto.randomUUID(),
+            sentenceFragment: fragment,
+            switch: extra?.switch,
+            faint: added.length ? added : undefined,
+            damage: changes.length ? changes : undefined,
+          },
         ],
       };
     }),
@@ -90,6 +126,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
       const ev = state.currentTurnEvents.find((e) => e.id === id);
       let activeBattlers = state.activeBattlers;
       let fainted = state.fainted;
+      let hp = state.hp;
       if (ev?.switch) {
         const { side, out, in: incoming } = ev.switch;
         const list = [...activeBattlers[side]];
@@ -100,7 +137,10 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
         }
       }
       for (const f of ev?.faint ?? []) fainted = { ...fainted, [f.side]: fainted[f.side].filter((n) => n !== f.name) };
-      return { currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id), activeBattlers, fainted };
+      for (const d of ev?.damage ?? []) {
+        hp = { ...hp, [d.side]: { ...hp[d.side], [d.name]: (hp[d.side][d.name] ?? 100) + d.pct } };
+      }
+      return { currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id), activeBattlers, fainted, hp };
     }),
 
   // Called when a Switch event is confirmed — swaps the outgoing mon for the
@@ -134,7 +174,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
           opponentTeam: state.opponentTeamNames,
           conversation: state.conversation,
           newTurnSentence: compiledSentence,
-          activeNote: describeBattlers(state.activeBattlers, state.fainted, state.yourTeamNames.length),
+          activeNote: describeBattlers(state.activeBattlers, state.fainted, state.yourTeamNames.length, state.hp),
           model: useAiSettingsStore.getState().model,
         }),
       });
@@ -159,13 +199,20 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
   },
 }));
 
-function describeBattlers(a: ActiveBattlers, fainted: FaintedMons, yourTotal: number): string {
+function describeBattlers(a: ActiveBattlers, fainted: FaintedMons, yourTotal: number, hp: HpState): string {
   const live = (list: (string | null)[], down: string[]) =>
     list.filter((n): n is string => n !== null && !down.includes(n)).join(" + ") || "none";
   const names = (l: string[]) => (l.length ? l.join(", ") : "none");
+  const hurt = (side: BattleSide) => {
+    const list = Object.entries(hp[side])
+      .filter(([n, v]) => v > 0 && v < 100 && !fainted[side].includes(n))
+      .map(([n, v]) => `${n} ${v}%`);
+    return list.length ? list.join(", ") : "all at full HP";
+  };
   return (
     `On the field after this turn — yours: ${live(a.yours, fainted.yours)}; opponent's: ${live(a.opponent, fainted.opponent)}. ` +
     `Fainted — yours: ${names(fainted.yours)}; opponent's: ${names(fainted.opponent)}. ` +
+    `Remaining HP (% of max) — yours: ${hurt("yours")}; opponent's: ${hurt("opponent")}. ` +
     `Remaining — you: ${Math.max(0, yourTotal - fainted.yours.length)} of ${yourTotal}, opponent: ${Math.max(0, 4 - fainted.opponent.length)} of 4`
   );
 }

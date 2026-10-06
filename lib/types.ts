@@ -174,11 +174,16 @@ export interface FieldState {
   tailwindTurnsLeft: { yours: number; opponents: number };
 }
 
+export type BattleSide = "yours" | "opponent";
+export interface HpChange { side: BattleSide; name: string; pct: number } // pct = HP actually removed
+export type HpState = Record<BattleSide, Record<string, number>>;       // missing name = 100
+
 export interface BattleEvent {
   id: string;
   sentenceFragment: string; // e.g. "Swampert's Earthquake KO'd Kingambit" — composed by the UI, not typed
   switch?: { side: "yours" | "opponent"; out: string; in: string }; // set for Switch events so removing one can undo it
-  faint?: { side: "yours" | "opponent"; name: string }[];          // Pokémon this event knocked out, so removing it can revive them
+  faint?: { side: "yours" | "opponent"; name: string }[]; 
+  damage?: HpChange[];
 }
 
 export interface FaintedMons {

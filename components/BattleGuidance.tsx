@@ -10,6 +10,7 @@ import { useBattleSessionStore, captureLiveSession } from "@/lib/store/battleSes
 import EventComposer from "@/components/EventComposer";
 import FieldStatusPanel from "@/components/FieldStatusPanel";
 import BackToOptimizer from "@/components/BackToOptimizer";
+import HpBar from "@/components/HpBar";
 
 function toggleSelection(list: string[], setList: (v: string[]) => void, name: string, max: number) {
   if (list.includes(name)) setList(list.filter((n) => n !== name));
@@ -21,7 +22,7 @@ export default function BattleGuidance() {
   const opponentSlots = useOpponentTeamStore((s) => s.slots);
 
   const {
-    started, activeBattlers, fainted, yourTeamNames, opponentTeamNames, currentTurnEvents,
+    started, activeBattlers, fainted, hp, yourTeamNames, opponentTeamNames, currentTurnEvents,
     conversation, turnNumber, adviceStatus,
     startSession, resetSession, addEvent, removeEvent, switchActiveBattler, submitTurn, initialLeads
   } = useBattleSessionStore();
@@ -266,25 +267,37 @@ export default function BattleGuidance() {
 
         <div className="mt-4">
           <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Currently on the field — tap one to switch it out</p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5 text-xs">
-            {participants.map((p) => (
-              <button
-                key={`${p.side}-${p.name}`}
-                type="button"
-                onClick={() => { setComposerPreset({ mode: "switch", actor: p.name }); setShowComposer(true); }}
-                className={`btn-tactile inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3 py-1 capitalize ${
-                  p.fainted
-                    ? "bg-black/5 text-[color:var(--ink)]/40 line-through"
-                    : p.side === "yours" ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"
-                }`}
-              >
-                {p.name}
-                <span aria-hidden="true" className="no-underline opacity-70">{p.fainted ? "✕ replace" : "⇄"}</span>
-              </button>
-            ))}
+          <div className="mt-1.5 grid grid-cols-2 gap-2">
+            {participants.map((p) => {
+              const pct = hp[p.side][p.name] ?? 100;
+              return (
+                <button
+                  key={`${p.side}-${p.name}`}
+                  type="button"
+                  onClick={() => { setComposerPreset({ mode: "switch", actor: p.name }); setShowComposer(true); }}
+                  className={`btn-tactile rounded-lg border-2 p-2 text-left ${
+                    p.fainted ? "border-black/10 bg-black/5 opacity-60"
+                    : p.side === "yours" ? "border-[color:var(--accent-gold)] bg-white" : "border-black/10 bg-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className={`truncate text-sm font-medium capitalize text-[color:var(--ink)] ${p.fainted ? "line-through" : ""}`}>{p.name}</span>
+                    <span aria-hidden="true" className="shrink-0 text-[10px] text-[color:var(--ink)]/60">{p.fainted ? "✕ replace" : "⇄"}</span>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <span className="font-dex text-[10px] text-[color:var(--ink)]/50">HP</span>
+                    <HpBar pct={pct} className="h-2 flex-1" />
+                    <span className="w-9 text-right text-[11px] tabular-nums text-[color:var(--ink)]">{pct}%</span>
+                  </div>
+                  <span className="mt-1 block text-[10px] uppercase tracking-wide text-[color:var(--ink)]/40">
+                    {p.side === "yours" ? "You" : "Opponent"}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <p className="mt-2 text-[11px] text-[color:var(--ink)]/50">
-            Your bench: <span className="capitalize">{yourTeamNames.filter((n) => !participants.some((p) => p.name === n) && !fainted.yours.includes(n)).join(", ") || "none"}</span>
+            Your bench: <span className="capitalize">{yourTeamNames.filter((n) => !participants.some((p) => p.name === n) && !fainted.yours.includes(n)).map((n) => `${n} ${hp.yours[n] ?? 100}%`).join(", ") || "none"}</span>
           </p>
           <p className="mt-0.5 text-[11px] text-[color:var(--ink)]/50">
             Remaining — you: {Math.max(0, yourTeamNames.length - fainted.yours.length)}/{yourTeamNames.length} · opponent: {Math.max(0, 4 - fainted.opponent.length)}/4
