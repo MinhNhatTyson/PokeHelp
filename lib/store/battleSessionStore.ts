@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers } from "@/lib/types";
 import { useAiSettingsStore } from "./aiSettingsStore";
+import { useLiveSessionStore } from "./liveSessionStore";
 
 const EMPTY_FIELD_STATE: FieldState = {
   weather: "none",
@@ -15,6 +16,7 @@ const EMPTY_ACTIVE_BATTLERS: ActiveBattlers = { yours: [null, null], opponent: [
 
 interface BattleSessionState {
   started: boolean;
+  sessionId: string | null;
   yourTeamNames: string[];
   opponentTeamNames: string[];
   activeBattlers: ActiveBattlers;
@@ -28,7 +30,7 @@ interface BattleSessionState {
   startSession: (yourTeamNames: string[], opponentTeamNames: string[], activeBattlers: ActiveBattlers) => void;
   resetSession: () => void;
   setFieldState: (updates: Partial<FieldState>) => void;
-  addEvent: (fragment: string) => void;
+  addEvent: (fragment: string, sw?: BattleEvent["switch"]) => void;
   removeEvent: (id: string) => void;
   switchActiveBattler: (side: "yours" | "opponent", outgoingName: string, incomingName: string) => void;
   submitTurn: () => Promise<void>;
@@ -36,6 +38,7 @@ interface BattleSessionState {
 
 const initialState = {
   started: false,
+  sessionId: null as string | null,
   yourTeamNames: [] as string[],
   opponentTeamNames: [] as string[],
   activeBattlers: EMPTY_ACTIVE_BATTLERS,
@@ -51,20 +54,39 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
   ...initialState,
 
   startSession: (yourTeamNames, opponentTeamNames, activeBattlers) =>
-    set({ ...initialState, started: true, yourTeamNames, opponentTeamNames, activeBattlers, initialLeads: activeBattlers }),
+    set({ ...initialState, started: true, sessionId: crypto.randomUUID(), yourTeamNames, opponentTeamNames, activeBattlers, initialLeads: activeBattlers }),
 
-  resetSession: () => set({ ...initialState }),
+  resetSession: () => {
+    const s = get();
+    const prev = useLiveSessionStore.getState().snapshot;
+    if (s.started && s.sessionId && prev?.sessionId !== s.sessionId) captureLiveSession();
+    set({ ...initialState });
+  },
 
   setFieldState: (updates) =>
     set((state) => ({ fieldState: { ...state.fieldState, ...updates } })),
 
-  addEvent: (fragment) =>
+  addEvent: (fragment, sw) =>
     set((state) => ({
-      currentTurnEvents: [...state.currentTurnEvents, { id: crypto.randomUUID(), sentenceFragment: fragment }],
+      currentTurnEvents: [...state.currentTurnEvents, { id: crypto.randomUUID(), sentenceFragment: fragment, switch: sw }],
     })),
 
+  // Removing a Switch event also puts the outgoing Pokémon back on the field.
   removeEvent: (id) =>
-    set((state) => ({ currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id) })),
+    set((state) => {
+      const ev = state.currentTurnEvents.find((e) => e.id === id);
+      let activeBattlers = state.activeBattlers;
+      if (ev?.switch) {
+        const { side, out, in: incoming } = ev.switch;
+        const list = [...activeBattlers[side]];
+        const idx = list.indexOf(incoming);
+        if (idx !== -1) {
+          list[idx] = out;
+          activeBattlers = { ...activeBattlers, [side]: list };
+        }
+      }
+      return { currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id), activeBattlers };
+    }),
 
   // Called when a Switch event is confirmed — swaps the outgoing mon for the
   // incoming one in that side's active pair. No-op if outgoingName isn't
@@ -97,6 +119,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
           opponentTeam: state.opponentTeamNames,
           conversation: state.conversation,
           newTurnSentence: compiledSentence,
+          activeNote: describeBattlers(state.activeBattlers),
           model: useAiSettingsStore.getState().model,
         }),
       });
@@ -121,6 +144,11 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
   },
 }));
 
+function describeBattlers(a: ActiveBattlers): string {
+  const names = (l: (string | null)[]) => l.filter((n): n is string => n !== null).join(" + ") || "none";
+  return `On the field after this turn — yours: ${names(a.yours)}; opponent's: ${names(a.opponent)}`;
+}
+
 function describeFieldState(f: FieldState): string {
   const parts: string[] = [];
   if (f.weather !== "none") parts.push(`Weather is ${f.weather}${f.weatherTurnsLeft > 0 ? ` (${f.weatherTurnsLeft} turns left)` : ""}`);
@@ -142,4 +170,29 @@ function decrementCounters(f: FieldState): FieldState {
       opponents: Math.max(0, f.tailwindTurnsLeft.opponents - 1),
     },
   };
+}
+
+/** Copies the running session into liveSessionStore so Battle Optimizer can pre-fill its result logger. */
+export function captureLiveSession(extra: { outcome?: "win" | "loss" | null; reason?: string; logged?: boolean } = {}) {
+  const s = useBattleSessionStore.getState();
+  if (!s.started || !s.sessionId) return;
+
+  const log = s.conversation.filter((t) => t.role === "user").map((t) => t.text);
+  if (s.currentTurnEvents.length > 0) log.push(s.currentTurnEvents.map((e) => e.sentenceFragment).join(". ") + ".");
+  if (!extra.logged && log.length === 0) return; // nothing worth keeping
+
+  const named = (list: (string | null)[]) => list.filter((n): n is string => n !== null);
+  useLiveSessionStore.getState().setSnapshot({
+    sessionId: s.sessionId,
+    endedAt: Date.now(),
+    yourTeamNames: s.yourTeamNames,
+    opponentTeamNames: s.opponentTeamNames,
+    yourLeads: named(s.initialLeads?.yours ?? []),
+    opponentLeads: named(s.initialLeads?.opponent ?? []),
+    turnsPlayed: log.length,
+    log,
+    outcome: extra.outcome ?? null,
+    reason: extra.reason ?? "",
+    logged: !!extra.logged,
+  });
 }

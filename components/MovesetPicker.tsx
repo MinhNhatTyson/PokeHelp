@@ -80,7 +80,7 @@ function MoveSlot({
               type="button"
               onMouseDown={() => onSelect(m.name)}
               {...nav.optionProps(matches.indexOf(m))}
-              className="block w-full rounded-md px-2 py-1 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/10"
+              className={`block w-full rounded-md px-2 py-1 text-left text-sm capitalize text-[color:var(--ink)] ${nav.activeIndex === matches.indexOf(m) ? "bg-black/10" : "hover:bg-black/5"}`}
             >
               {formatMoveName(m.name)}
             </button>

@@ -6,7 +6,7 @@ import { useBattleHistoryStore } from "@/lib/store/battleHistoryStore";
 import Link from "next/link";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
-import { useBattleSessionStore } from "@/lib/store/battleSessionStore";
+import { useBattleSessionStore, captureLiveSession } from "@/lib/store/battleSessionStore";
 import EventComposer from "@/components/EventComposer";
 import FieldStatusPanel from "@/components/FieldStatusPanel";
 import BackToOptimizer from "@/components/BackToOptimizer";
@@ -27,15 +27,19 @@ export default function BattleGuidance() {
   } = useBattleSessionStore();
 
   const [showComposer, setShowComposer] = useState(false);
+  const [composerPreset, setComposerPreset] = useState<{ mode: "move" | "switch"; actor: string | null }>({ mode: "move", actor: null });
   const logBattle = useBattleHistoryStore((s) => s.logBattle);
   const [ending, setEnding] = useState(false);
   const [outcome, setOutcome] = useState<"win" | "loss" | null>(null);
   const [reason, setReason] = useState("");
 
-  function endWithoutSaving() {
+    function closeSession(logged: boolean) {
+    captureLiveSession({ outcome, reason: reason.trim(), logged });
     setEnding(false); setOutcome(null); setReason("");
     resetSession();
   }
+
+  function endWithoutSaving() { closeSession(false); }
 
   function finishSession() {
     if (!outcome) return;
@@ -48,7 +52,7 @@ export default function BattleGuidance() {
       reason: reason.trim(),
       opponentLeads: opp.length === 2 && opp.every(Boolean) ? (opp as string[]) : undefined,
     });
-    endWithoutSaving();
+    closeSession(true);
   }
   const [yourBringFour, setYourBringFour] = useState<string[]>([]);
   const [yourLeads, setYourLeads] = useState<string[]>([]);
@@ -241,17 +245,23 @@ export default function BattleGuidance() {
         )}
 
         <div className="mt-4">
-          <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Currently on the field</p>
+          <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Currently on the field — tap one to switch it out</p>
           <div className="mt-1.5 flex flex-wrap gap-1.5 text-xs">
             {participants.map((p) => (
-              <span
+              <button
                 key={`${p.side}-${p.name}`}
-                className={`rounded-full px-2.5 py-1 capitalize ${p.side === "yours" ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"}`}
+                type="button"
+                onClick={() => { setComposerPreset({ mode: "switch", actor: p.name }); setShowComposer(true); }}
+                className={`btn-tactile inline-flex min-h-[36px] items-center gap-1.5 rounded-full px-3 py-1 capitalize ${p.side === "yours" ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"}`}
               >
                 {p.name}
-              </span>
+                <span aria-hidden="true" className="opacity-60">⇄</span>
+              </button>
             ))}
           </div>
+          <p className="mt-2 text-[11px] text-[color:var(--ink)]/50">
+            Your bench: <span className="capitalize">{yourTeamNames.filter((n) => !participants.some((p) => p.name === n)).join(", ") || "none"}</span>
+          </p>
         </div>
 
         <div className="mt-4">
@@ -286,7 +296,7 @@ export default function BattleGuidance() {
               <div className="mx-auto flex max-w-lg items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowComposer(true)}
+                  onClick={() => { setComposerPreset({ mode: "move", actor: null }); setShowComposer(true); }}
                   className="btn-tactile btn-glow-gold flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-[color:var(--accent-gold)] px-3 text-sm font-semibold text-black"
                 >
                   + Add event
@@ -314,7 +324,9 @@ export default function BattleGuidance() {
             participants={participants}
             yourTeamNames={yourTeamNames}
             opponentTeamNames={opponentTeamNames}
-            onConfirm={(fragment) => { addEvent(fragment); setShowComposer(false); }}
+            initialMode={composerPreset.mode}
+            initialActor={composerPreset.actor}
+            onConfirm={(fragment, sw) => { addEvent(fragment, sw); setShowComposer(false); }}
             onSwitch={switchActiveBattler}
             onCancel={() => setShowComposer(false)}
           />

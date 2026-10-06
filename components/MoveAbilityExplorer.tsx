@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AbilityInfo, AbilityNameEntry, MoveInfo, MoveNameEntry } from "@/lib/types";
 import { fetchAbilityInfo, fetchAbilityNameList, fetchMoveInfo, fetchMoveNameList } from "@/lib/data/fetchAndCache";
-import { TYPE_COLOR } from "@/lib/typeMeta";
+import { TYPE_COLOR, TYPE_LABEL } from "@/lib/typeMeta";
+import { MOVE_FLAG_META, getMoveQuickInfo, moveFlagsTrusted } from "@/lib/logic/moveFlags";
 import { useListNav } from "@/lib/hooks/useListNav";
 import { useBackdropStore } from "@/lib/store/backdropStore";
 import TypeBadge from "@/components/TypeBadge";
@@ -63,6 +64,95 @@ function NameChips({ items }: { items: { name: string; hidden?: boolean }[] }) {
         </button>
       )}
     </>
+  );
+}
+
+const TONE = {
+  on: "bg-[color:var(--shell-accent)] text-white",
+  off: "bg-black/10 text-[color:var(--ink)]/70",
+  info: "bg-[color:var(--shell)] text-[color:var(--screen)]",
+} as const;
+const SPREAD_TARGETS = new Set(["all-opponents", "all-other-pokemon"]);
+const CLASS_SHORT = { physical: "Physical", special: "Special", status: "Status" } as const;
+
+interface PropRow { key: string; label: string; note: string; tone: keyof typeof TONE }
+
+function MoveProperties({ move }: { move: MoveInfo }) {
+  const damaging = move.damageClass !== "status";
+  const quick = getMoveQuickInfo(move.name);
+  const flagsKnown = !!quick && moveFlagsTrusted();
+  const rows: PropRow[] = [];
+
+  if (quick && flagsKnown) {
+    if (damaging && !quick.flags.includes("contact")) {
+      rows.push({ key: "nocontact", label: "No contact", tone: "off", note: "Doesn't trigger Rough Skin, Rocky Helmet or other contact punishers." });
+    }
+    for (const f of quick.flags) {
+      rows.push({ key: f, ...MOVE_FLAG_META[f], tone: f === "contact" ? "on" : "info" });
+    }
+  }
+  if (damaging && SPREAD_TARGETS.has(move.target)) {
+    rows.push({ key: "spread", label: "Spread", tone: "info", note: "Hits several targets; damage is ×0.75 when it connects with two or more." });
+  }
+  if (move.maxHits && move.maxHits > 1) {
+    const min = move.minHits ?? move.maxHits;
+    rows.push({
+      key: "multi", tone: "info",
+      label: min === move.maxHits ? `Hits ${move.maxHits}×` : `Hits ${min}–${move.maxHits}×`,
+      note: "Each hit is rolled separately, so it gets through a Focus Sash or Sturdy and can trigger contact effects every hit.",
+    });
+  }
+  if (move.drain > 0) rows.push({ key: "drain", label: `Drains ${move.drain}%`, tone: "info", note: "The user recovers that share of the damage dealt (Big Root boosts it)." });
+  if (move.drain < 0) rows.push({ key: "recoil", label: `Recoil ${-move.drain}%`, tone: "off", note: "The user takes that share of the damage dealt. Rock Head and Magic Guard prevent it." });
+  if (move.healing > 0) rows.push({ key: "heal", label: `Heals ${move.healing}%`, tone: "info", note: "Restores that share of the user's max HP." });
+  if (move.critRate > 0) rows.push({ key: "crit", label: "High crit", tone: "info", note: "Raised critical-hit ratio." });
+  if (move.flinchChance > 0) rows.push({ key: "flinch", label: `Flinch ${move.flinchChance}%`, tone: "info", note: "Can make a slower target flinch. Inner Focus, Shield Dust and Covert Cloak block it." });
+  if (move.ailment) {
+    rows.push({
+      key: "ailment", tone: "info",
+      label: `${pretty(move.ailment)}${move.ailmentChance > 0 ? ` ${move.ailmentChance}%` : ""}`,
+      note: damaging ? "Secondary effect on the target." : "Applies the status to the target unless it is immune or protected.",
+    });
+  }
+
+  if (rows.length === 0 && flagsKnown) return null;
+  return (
+    <div className="mt-4 border-t border-black/10 pt-3">
+      <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Properties</p>
+      {!flagsKnown && (
+        <p className="mt-1.5 text-xs italic text-[color:var(--ink)]/50">
+          Contact / sound / ball-bomb flags aren&apos;t available for this move.
+        </p>
+      )}
+      <ul className="mt-2 space-y-1.5">
+        {rows.map((r) => (
+          <li key={r.key} className="flex items-start gap-2">
+            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${TONE[r.tone]}`}>
+              {r.label}
+            </span>
+            <span className="pt-0.5 text-xs text-[color:var(--ink)]/70">{r.note}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Offline hint shown in the search dropdown: type dot, category and flags, before a move is even opened.
+function MoveHint({ slug }: { slug: string }) {
+  const q = getMoveQuickInfo(slug);
+  if (!q) return null;
+  const parts = [
+    ...(q.category ? [CLASS_SHORT[q.category]] : []),
+    ...(moveFlagsTrusted() ? q.flags.map((f) => MOVE_FLAG_META[f].label) : []),
+  ];
+  return (
+    <span className="ml-3 flex shrink-0 items-center gap-1.5 text-[10px] font-medium uppercase text-[color:var(--ink)]/50">
+      {q.type && (
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: TYPE_COLOR[q.type] }} title={TYPE_LABEL[q.type]} />
+      )}
+      {parts.join(" · ")}
+    </span>
   );
 }
 
@@ -208,9 +298,10 @@ export default function MoveAbilityExplorer() {
                       type="button"
                       onClick={() => select(m.name)}
                       {...nav.optionProps(i)}
-                      className={`block w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] ${nav.activeIndex === i ? "bg-black/10" : "hover:bg-black/5"}`}
+                      className={`flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] ${nav.activeIndex === i ? "bg-black/10" : "hover:bg-black/5"}`}
                     >
-                      {pretty(m.name)}
+                      <span>{pretty(m.name)}</span>
+                      {tab === "move" && <MoveHint slug={m.name} />}
                     </button>
                   ))}
                 </div>
@@ -280,6 +371,7 @@ export default function MoveAbilityExplorer() {
                 Data from PokeAPI. Pokémon Champions balance changes may not be reflected.
               </p>
             </div>
+            <MoveProperties move={move} />
           </div>
         )}
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getCommonSet, describeMegaForm } from "@/lib/data/commonSets";
 import { fetchMoveDetail, fetchMoveNameList } from "@/lib/data/fetchAndCache";
-import { FieldState, MoveDetail, MoveNameEntry } from "@/lib/types";
+import { BattleEvent, FieldState, MoveDetail, MoveNameEntry } from "@/lib/types";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useBattleSessionStore } from "@/lib/store/battleSessionStore";
 import { useListNav } from "@/lib/hooks/useListNav";
@@ -89,20 +89,23 @@ export default function EventComposer({
   onConfirm,
   onSwitch,
   onCancel,
+  initialMode, initialActor,
 }: {
   participants: Participant[]; // currently active battlers only (2 + 2)
   yourTeamNames: string[]; // your bring-4
   opponentTeamNames: string[]; // opponent's known team-preview roster
-  onConfirm: (fragment: string) => void;
+  onConfirm: (fragment: string, sw?: BattleEvent["switch"]) => void;
   onSwitch: (side: Side, outgoingName: string, incomingName: string) => void;
   onCancel: () => void;
+  initialMode?: "move" | "switch" | "mega";
+  initialActor?: string | null;
 }) {
   const teamSlots = useTeamStore((s) => s.slots);
   const fieldState = useBattleSessionStore((s) => s.fieldState);
   const setFieldState = useBattleSessionStore((s) => s.setFieldState);
 
-  const [mode, setMode] = useState<"move" | "switch" | "mega">("move");
-  const [actor, setActor] = useState<string | null>(null);
+  const [mode, setMode] = useState<"move" | "switch" | "mega">(initialMode ?? "move");
+  const [actor, setActor] = useState<string | null>(initialActor ?? null);
   const [moveSlug, setMoveSlug] = useState("");
   const [detailResult, setDetailResult] = useState<{ slug: string; detail: MoveDetail | null } | null>(null);
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
@@ -207,7 +210,7 @@ export default function EventComposer({
     if (mode === "switch") {
       if (!switchTo) return;
       onSwitch(actorP.side, actor, switchTo);
-      onConfirm(`${cap(actor)} switched out for ${cap(switchTo)}`);
+      onConfirm(`${cap(actor)} switched out for ${cap(switchTo)}`, { side: actorP.side, out: actor, in: switchTo });
       return;
     }
 
@@ -329,7 +332,7 @@ export default function EventComposer({
                           key={m.name}
                           type="button"
                           onMouseDown={() => { selectMove(m.name); setMoveText(""); setShowMoveDropdown(false); }}
-                          className="block w-full rounded-md px-2 py-1 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/10"
+                          className={`block w-full rounded-md px-2 py-1 text-left text-sm capitalize text-[color:var(--ink)] ${moveNav.activeIndex === moveMatches.indexOf(m) ? "bg-black/10" : "hover:bg-black/5"}`}
                         >
                           {formatMoveName(m.name)}
                         </button>

@@ -177,6 +177,7 @@ export interface FieldState {
 export interface BattleEvent {
   id: string;
   sentenceFragment: string; // e.g. "Swampert's Earthquake KO'd Kingambit" — composed by the UI, not typed
+  switch?: { side: "yours" | "opponent"; out: string; in: string }; // set for Switch events so removing one can undo it
 }
 
 export interface BattleConversationTurn {
@@ -232,6 +233,14 @@ export interface MoveInfo {
   target: string;
   effect: string | null;
   learnedBy: string[];
+  minHits: number | null;
+  maxHits: number | null;
+  drain: number;          // % of damage dealt: positive = heals the user, negative = recoil
+  healing: number;        // % of max HP restored
+  critRate: number;       // 0 = normal, 1+ = raised crit stage
+  flinchChance: number;   // %
+  ailment: string | null; // e.g. "paralysis"
+  ailmentChance: number;  // % (0 = no roll, for status moves)
 }
 
 export interface AbilityInfo {

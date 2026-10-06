@@ -354,6 +354,16 @@ interface PokeApiMoveFullResponse {
   effect_entries: { effect: string; short_effect: string; language: { name: string } }[];
   flavor_text_entries: { flavor_text: string; language: { name: string } }[];
   learned_by_pokemon: { name: string }[];
+  meta: {
+    ailment: { name: string };
+    min_hits: number | null;
+    max_hits: number | null;
+    drain: number;
+    healing: number;
+    crit_rate: number;
+    ailment_chance: number;
+    flinch_chance: number;
+  } | null;
 }
 
 export async function fetchMoveInfo(nameOrSlug: string): Promise<MoveInfo | null> {
@@ -382,6 +392,14 @@ export async function fetchMoveInfo(nameOrSlug: string): Promise<MoveInfo | null
       target: data.target.name,
       effect: rawEffect ? rawEffect.replace(/\$effect_chance/g, String(data.effect_chance ?? "")) : null,
       learnedBy: data.learned_by_pokemon.map((p) => p.name),
+      minHits: data.meta?.min_hits ?? null,
+      maxHits: data.meta?.max_hits ?? null,
+      drain: data.meta?.drain ?? 0,
+      healing: data.meta?.healing ?? 0,
+      critRate: data.meta?.crit_rate ?? 0,
+      flinchChance: data.meta?.flinch_chance ?? 0,
+      ailment: data.meta && data.meta.ailment.name !== "none" ? data.meta.ailment.name : null,
+      ailmentChance: data.meta?.ailment_chance ?? 0,
     };
     moveInfoCache.set(key, info);
     return info;

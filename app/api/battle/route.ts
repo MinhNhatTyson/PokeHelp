@@ -12,12 +12,13 @@ interface BattleRequestBody {
   opponentTeam: string[];
   conversation: GeminiTurn[]; // prior turns, NOT including the new one
   newTurnSentence: string;
+  activeNote?: string;
   model?: string;
 }
 
 function buildSystemInstruction(megaLines: string[]) {
   return `You are a live Pokémon Champions doubles (VGC) in-battle assistant. Rules: Level 50, bring 4 of 6, and Mega Evolution is the ONLY battle gimmick this season. There is NO Terastallization or Dynamax, so never suggest them. Each side may Mega Evolve at most one Pokémon per battle. A Mega Evolution happens before that Pokémon moves; its new typing, ability and Speed apply immediately, so re-evaluate weaknesses, immunities and turn order once a Mega is logged. Before it Mega Evolves, a Pokémon keeps its base typing and ability.
-${megaLines.length ? `Possible Mega forms in this match:\n${megaLines.join("\n")}\n` : ""}After each turn, give SHORT, actionable advice (2-4 sentences max) for next turn: move choices, targeting, switches, Protect timing, and when to Mega Evolve. Be direct and specific. Do not restate the turn log. Do not invent moves/abilities not shown in the log.`;
+${megaLines.length ? `Possible Mega forms in this match:\n${megaLines.join("\n")}\n` : ""}After each turn, give SHORT, actionable advice (2-4 sentences max) for next turn: move choices, targeting, switches (name the exact bench Pokémon to bring in and why), Protect timing, and when to Mega Evolve. Be direct and specific. Do not restate the turn log. Do not invent moves/abilities not shown in the log.`;
 }
 
 export async function POST(req: NextRequest) {
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body: BattleRequestBody = await req.json();
-  const { yourTeam, opponentTeam, conversation, newTurnSentence, model } = body;
+  const { yourTeam, opponentTeam, conversation, newTurnSentence, activeNote, model } = body;  
 
   const contents = [
     ...(conversation.length === 0
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
         }]
       : []),
     ...conversation.map((t) => ({ role: t.role, parts: [{ text: t.text }] })),
-    { role: "user" as const, parts: [{ text: newTurnSentence }] },
+    { role: "user" as const, parts: [{ text: activeNote ? `${newTurnSentence} (${activeNote}.)` : newTurnSentence }] },    
   ];
   const megaLines = [...yourTeam, ...opponentTeam]
   .map((n) => { const d = describeMegaForm(n); return d ? `${n} -> ${d}` : null; })

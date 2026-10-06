@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PokemonTypeName } from "@/lib/types";
@@ -124,13 +124,16 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Type & Pokédex", href: "/", themeType: SCENES["/"].type, mobileLabel: "Dex" },
   { label: "Items", href: "/items", themeType: SCENES["/items"].type },
+  { label: "Moves & Abilities", href: "/moves", themeType: SCENES["/moves"].type, mobileLabel: "Moves" },
   { label: "Team Builder", href: "/team", themeType: SCENES["/team"].type, mobileLabel: "Team" },
   { label: "Battle Optimizer", href: "/optimizer", themeType: SCENES["/optimizer"].type, mobileLabel: "Matchups" },
   { label: "Battle History", href: "/history", themeType: SCENES["/history"].type, mobileLabel: "History" },
   { label: "Trainer Roster", href: "/trainers", themeType: SCENES["/trainers"].type, comingSoon: true },
   { label: "Settings", href: "/settings", themeType: SCENES["/settings"].type, mobileLabel: "Settings" },
-  { label: "Moves & Abilities", href: "/moves", themeType: SCENES["/moves"].type, mobileLabel: "Moves" },
 ];
+
+// The desktop nav draws a thin divider before these: Reference | Build & Battle | Settings
+const DIVIDE_BEFORE = ["/team", "/settings"];
 
 const MOBILE_TAB_HREFS = ["/", "/items", "/team", "/optimizer", "/history"];
 
@@ -165,41 +168,45 @@ function NavIconBadge({
   );
 }
 
-function NavLink({
-  item,
-  isActive,
-  onClick,
-}: {
-  item: NavItem;
-  isActive: boolean;
-  onClick?: () => void;
-}) {
+function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
   const color = TYPE_COLOR[item.themeType];
+  const content = (
+    <>
+      <span className="relative">
+        <NavIconBadge href={item.href} themeType={item.themeType} active={isActive} size="sm" />
+        {item.comingSoon && (
+          <span className="absolute -right-3 -top-1 rounded-full bg-[color:var(--accent-gold)] px-1 text-[8px] font-bold uppercase leading-[1.4] text-black">
+            Soon
+          </span>
+        )}
+      </span>
+      <span className="max-w-[5.5rem] text-center text-[10px] font-medium uppercase leading-[1.15] tracking-wide">
+        {item.label}
+      </span>
+      {isActive && (
+        <span aria-hidden="true" className="absolute inset-x-2 bottom-0 h-[3px] rounded-full" style={{ background: color }} />
+      )}
+    </>
+  );
+
+  const base = "relative flex min-w-[4.75rem] flex-col items-center gap-1 rounded-lg px-2 pb-2 pt-1.5";
 
   if (item.comingSoon) {
     return (
-      <span
-        className="flex cursor-not-allowed items-center gap-2 rounded-full px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-[color:var(--screen)]/30 sm:text-xs"
-        title="Coming soon"
-      >
-        <NavIconBadge href={item.href} themeType={item.themeType} active={false} size="sm" />
-        {item.label}
+      <span className={`${base} cursor-not-allowed text-[color:var(--screen)]/30`} title="Coming soon">
+        {content}
       </span>
     );
   }
   return (
     <Link
       href={item.href}
-      onClick={onClick}
       aria-current={isActive ? "page" : undefined}
-      className="flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-[11px] font-medium uppercase tracking-wide transition-colors sm:text-xs"
-      style={{
-        background: isActive ? `${color}26` : "transparent",
-        color: isActive ? "var(--screen)" : "var(--screen)aa",
-      }}
+      className={`${base} transition-colors hover:bg-white/5 ${
+        isActive ? "text-[color:var(--screen)]" : "text-[color:var(--screen)]/60 hover:text-[color:var(--screen)]"
+      }`}
     >
-      <NavIconBadge href={item.href} themeType={item.themeType} active={isActive} size="sm" />
-      {item.label}
+      {content}
     </Link>
   );
 }
@@ -214,7 +221,7 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-20 overflow-hidden bg-gradient-to-b from-[#26282c] to-[color:var(--shell)]">
       <HeaderEmblem />
-      <div className="relative z-10 mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <div className="relative z-10 mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:py-1.5">
         <Link
           href="/"
           onClick={() => setMenuOpen(false)}

@@ -122,7 +122,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
                   type="button"
                   onClick={() => handleSelectPokemon(p.name)}
                   {...pokeNav.optionProps(pokeMatches.indexOf(p))}
-                  className="block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/10"
+                  className={`block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] ${pokeNav.activeIndex === pokeMatches.indexOf(p) ? "bg-black/10" : "hover:bg-black/5"}`}
                 >
                   {p.name}
                 </button>
@@ -164,7 +164,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
                     {...itemNav.optionProps(itemMatches.indexOf(i))}
                     type="button"
                     onClick={() => handleSelectItem(i.name)}
-                    className="block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/10"
+                    className={`block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] ${itemNav.activeIndex === itemMatches.indexOf(i) ? "bg-black/10" : "hover:bg-black/5"}`}
                   >
                     {i.name.replace(/-/g, " ")}
                   </button>

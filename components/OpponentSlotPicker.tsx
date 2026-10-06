@@ -6,6 +6,7 @@ import { fetchPokemonNameList, fetchPokemonDetail, fetchCompetitiveItemNameList 
 import { ItemNameEntry, PokemonNameEntry } from "@/lib/types";
 import TypeBadge from "@/components/TypeBadge";
 import { getCommonSet, synthesizeMegaDetail } from "@/lib/data/commonSets";
+import { useListNav } from "@/lib/hooks/useListNav";
 
 
 const MAX_SUGGESTIONS = 8;
@@ -29,7 +30,7 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
   const setSlotItem = useOpponentTeamStore((s) => s.setSlotItem);
 
   const itemMatches = useMemo(() => {
-  const q = itemQuery.trim().toLowerCase();
+  const q = itemQuery.trim().toLowerCase().replace(/ /g, "-");
   if (!q) return [];
   return itemNames.filter((i) => i.name.startsWith(q)).slice(0, MAX_SUGGESTIONS);
 }, [itemQuery, itemNames]);
@@ -55,6 +56,21 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
     if (!q) return [];
     return pokeNames.filter((p) => p.name.startsWith(q)).slice(0, MAX_SUGGESTIONS);
   }, [pokeQuery, pokeNames]);
+
+  const pokeNav = useListNav({
+    items: pokeMatches,
+    isOpen: showPokeDropdown,
+    onSelect: (p) => handleSelectPokemon(p.name),
+    onClose: () => setShowPokeDropdown(false),
+    onOpen: () => setShowPokeDropdown(true),
+  });
+  const itemNav = useListNav({
+    items: itemMatches,
+    isOpen: showItemDropdown,
+    onSelect: (i) => handleSelectItem(i.name),
+    onClose: () => setShowItemDropdown(false),
+    onOpen: () => setShowItemDropdown(true),
+  });
 
   async function handleSelectPokemon(name: string) {
   setPokeQuery("");
@@ -125,8 +141,9 @@ async function handleSelectItem(name: string) {
       {!slot.pokemon ? (
         <div className="relative mt-2">
           <input
+            {...pokeNav.inputProps}
             value={pokeQuery}
-            onChange={(e) => { setPokeQuery(e.target.value); setShowPokeDropdown(true); }}
+            onChange={(e) => { setPokeQuery(e.target.value); setShowPokeDropdown(true); pokeNav.resetActive(); }}
             onFocus={() => setShowPokeDropdown(true)}
             placeholder="Search Pokémon…"
             autoComplete="off"
@@ -135,12 +152,13 @@ async function handleSelectItem(name: string) {
           {pokeLoading && <p className="mt-1 text-xs opacity-60">Loading…</p>}
           {showPokeDropdown && pokeMatches.length > 0 && (
             <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-black/10 bg-white p-1 shadow-lg">
-              {pokeMatches.map((p) => (
+              {pokeMatches.map((p, i) => (
                 <button
                   key={p.name}
                   type="button"
                   onClick={() => handleSelectPokemon(p.name)}
-                  className="block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] hover:bg-black/5"
+                  {...pokeNav.optionProps(i)}
+                  className={`block w-full rounded-md px-2 py-1.5 text-left text-sm capitalize text-[color:var(--ink)] ${pokeNav.activeIndex === i ? "bg-black/10" : "hover:bg-black/5"}`}
                 >
                   {p.name}
                 </button>
