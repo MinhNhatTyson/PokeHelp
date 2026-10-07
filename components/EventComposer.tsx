@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getCommonSet, describeMegaForm } from "@/lib/data/commonSets";
 import { fetchMoveDetail, fetchMoveNameList } from "@/lib/data/fetchAndCache";
-import { BattleEvent, FaintedMons, FieldState, MoveDetail, MoveNameEntry } from "@/lib/types";
+import { BattleEvent, FaintedMons, FieldState, MoveDetail, MoveNameEntry, StatusChange, StatusKind } from "@/lib/types";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useBattleSessionStore } from "@/lib/store/battleSessionStore";
 import { useListNav } from "@/lib/hooks/useListNav";
@@ -11,6 +11,7 @@ import DamageSlider from "@/components/DamageSlider";
 
 const MAX_MOVE_SUGGESTIONS = 8;
 type Side = "yours" | "opponent";
+type Mode = "move" | "switch" | "mega" | "faint" | "hp" | "status";
 interface Participant { name: string; side: Side; fainted?: boolean; }
 
 type Outcome =
@@ -41,8 +42,43 @@ const SELF_FAINT_MOVES = new Set([
   "explosion", "self-destruct", "misty-explosion", "memento", "final-gambit", "healing-wish", "lunar-dance",
 ]);
 
+const SELF_HEAL_MOVES: Record<string, number> = {
+  recover: 50, roost: 50, "soft-boiled": 50, "slack-off": 50, "milk-drink": 50, "shore-up": 50,
+  "heal-order": 50, synthesis: 50, moonlight: 50, "morning-sun": 50, rest: 100,
+};
+// Quick presets for the HP tab (% of max HP). pct null = you type the amount (e.g. recoil depends on damage dealt).
+const HP_PRESETS = {
+  heal: [
+    { label: "Recover / Roost", pct: 50 }, { label: "Leftovers", pct: 6 }, { label: "Sitrus Berry", pct: 25 },
+    { label: "Grassy Terrain", pct: 6 }, { label: "Drain move", pct: null }, { label: "Other", pct: null },
+  ],
+  loss: [
+    { label: "Life Orb", pct: 10 }, { label: "Rocky Helmet", pct: 17 }, { label: "Rough Skin / Iron Barbs", pct: 13 },
+    { label: "Sandstorm / Burn", pct: 6 }, { label: "Poison", pct: 13 }, { label: "Recoil", pct: null }, { label: "Other", pct: null },
+  ],
+} as const;
+
+// Chip-damage statuses tracked by the store (confusion/flinch/etc. have no end-of-turn HP effect)
+const STATUS_FROM_EFFECT: Record<string, StatusKind> = {
+  Burn: "burn", Poison: "poison", Toxic: "toxic", Paralysis: "paralysis", Sleep: "sleep", Freeze: "freeze",
+};
+const TOXIC_MOVES = new Set(["toxic", "poison-fang"]); // PokeAPI lists these as plain "poison"
+function statusFromEffect(effect: string, moveSlug: string): StatusKind | null {
+  const k = STATUS_FROM_EFFECT[cap(effect.trim().toLowerCase())];
+  if (!k) return null;
+  return k === "poison" && TOXIC_MOVES.has(moveSlug) ? "toxic" : k;
+}
+const STATUS_OPTIONS: { key: StatusKind | "none"; label: string }[] = [
+  { key: "burn", label: "Burn" }, { key: "poison", label: "Poison" }, { key: "toxic", label: "Bad poison" },
+  { key: "paralysis", label: "Paralysis" }, { key: "sleep", label: "Sleep" }, { key: "freeze", label: "Freeze" },
+  { key: "none", label: "Cure" },
+];
+const STATUS_VERB: Record<StatusKind, string> = {
+  burn: "burned", poison: "poisoned", toxic: "badly poisoned", paralysis: "paralyzed", sleep: "put to sleep", freeze: "frozen",
+};
+
 const EFFECT_OPTIONS = [
-  "Burn", "Paralysis", "Sleep", "Poison", "Freeze", "Confusion", "Flinch",
+  "Burn", "Paralysis", "Sleep", "Poison", "Toxic", "Freeze", "Confusion", "Flinch",
   "Helping Hand boost", "Skill Swap (abilities swapped)", "Redirected (Follow Me/Rage Powder)",
   "Protected", "Healed", "Stat change",
 ] as const;
@@ -117,10 +153,10 @@ export default function EventComposer({
   yourTeamNames: string[]; // your bring-4
   opponentTeamNames: string[]; // opponent's known team-preview roster
   fainted: FaintedMons;
-  onConfirm: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage">) => void;
+  onConfirm: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status">) => void;
   onSwitch: (side: Side, outgoingName: string, incomingName: string) => void;
   onCancel: () => void;
-  initialMode?: "move" | "switch" | "mega" | "faint";
+  initialMode?: Mode;
   initialActor?: string | null;
 }) {
   const teamSlots = useTeamStore((s) => s.slots);
@@ -132,14 +168,21 @@ export default function EventComposer({
     const side = participants.find((p) => p.name === name)?.side;
     return side ? hp[side][name] ?? 100 : 100;
   };
+  const statusState = useBattleSessionStore((s) => s.status);
+  const statusOf = (side: Side, name: string): StatusKind | null => statusState[side][name] ?? null;
 
-  const [mode, setMode] = useState<"move" | "switch" | "mega" | "faint">(initialMode ?? "move");
+  const [mode, setMode] = useState<Mode>(initialMode ?? "move");
   const [actor, setActor] = useState<string | null>(initialActor ?? null);
   const [moveSlug, setMoveSlug] = useState("");
   const [detailResult, setDetailResult] = useState<{ slug: string; detail: MoveDetail | null } | null>(null);
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
   const [targetOutcomes, setTargetOutcomes] = useState<Record<string, Outcome>>({});
   const [selfOutcome, setSelfOutcome] = useState<"worked" | "failed">("worked");
+  const [selfHeal, setSelfHeal] = useState(0);
+  const [hpDir, setHpDir] = useState<"heal" | "loss">("heal");
+  const [hpAmount, setHpAmount] = useState(0);
+  const [hpSource, setHpSource] = useState<string | null>(null);
+  const [statusPick, setStatusPick] = useState<StatusKind | "none" | null>(null);
   const [effectChoice, setEffectChoice] = useState<string | null>(null);
   const [effectOther, setEffectOther] = useState("");
   const [switchTo, setSwitchTo] = useState<string | null>(null);
@@ -148,6 +191,8 @@ export default function EventComposer({
   const [showMoveDropdown, setShowMoveDropdown] = useState(false);
 
   const actorP = participants.find((p) => p.name === actor) ?? null;
+  const curStatus = actorP ? statusOf(actorP.side, actorP.name) : null;
+  const canConfirmStatus = !!statusPick && (statusPick === "none" ? !!curStatus : statusPick !== curStatus);
   const alive = participants.filter((p) => !p.fainted);
   const others = alive.filter((p) => p.name !== actor);
   const fieldSetter = moveSlug ? FIELD_SETTER_MOVES[moveSlug] : undefined;
@@ -175,7 +220,7 @@ export default function EventComposer({
     return moveNames.filter((m) => m.name.startsWith(q)).slice(0, MAX_MOVE_SUGGESTIONS);
   }, [moveText, moveNames]);
 
-  function changeMode(next: "move" | "switch" | "mega" | "faint") {
+  function changeMode(next: Mode) {
     setMode(next);
     // A fainted Pokémon can only be picked in Switch mode (to send in its replacement)
     if (next !== "switch" && actorP?.fainted) {
@@ -193,9 +238,15 @@ export default function EventComposer({
     setSelfOutcome("worked");
     setEffectChoice(null);
     setEffectOther("");
+    setSelfHeal(0);
   }
-  function selectMove(slug: string) { resetMoveState(); setMoveSlug(slug); }
-  function selectActor(name: string) { resetMoveState(); setActor(name); setMoveSlug(""); setMoveText(""); setSwitchTo(null); }
+  function selectMove(slug: string) {
+    resetMoveState();
+    setMoveSlug(slug);
+    const cur = actor ? hpOfName(actor) : 100;
+    setSelfHeal(Math.min(SELF_HEAL_MOVES[slug] ?? 0, 100 - cur));
+  }
+  function selectActor(name: string) { resetMoveState(); setActor(name); setMoveSlug(""); setMoveText(""); setSwitchTo(null); setHpAmount(0); setHpSource(null); setStatusPick(null);}
 
   useEffect(() => {
     if (!moveSlug || FIELD_SETTER_MOVES[moveSlug]) return;
@@ -204,7 +255,7 @@ export default function EventComposer({
       .then((detail) => {
         if (cancelled) return;
         setDetailResult({ slug: moveSlug, detail });
-        if (detail?.ailment) {
+        if (detail?.ailment && detail.damageClass === "status") {
           const match = EFFECT_OPTIONS.find((o) => o.toLowerCase() === detail.ailment);
           setEffectChoice(match ?? cap(detail.ailment));
         }
@@ -270,6 +321,30 @@ export default function EventComposer({
       return;
     }
 
+    if (mode === "hp") {
+      if (hpAmount <= 0) return;
+      const heal = hpDir === "heal";
+      const before = hpOfName(actor);
+      const after = heal ? before + hpAmount : before - hpAmount;
+      const src = hpSource ? ` (${hpSource})` : "";
+      const text = heal
+        ? `${cap(actor)} recovered HP${src}, going from ${before}% to ${after}%`
+        : after <= 0
+        ? `${cap(actor)} fainted from HP loss${src}`
+        : `${cap(actor)} lost HP${src}, going from ${before}% to ${after}%`;
+      onConfirm(text, { damage: [{ side: actorP.side, name: actor, pct: heal ? -hpAmount : hpAmount }] });
+      return;
+    }
+
+    if (mode === "status") {
+      if (!statusPick) return;
+      const next = statusPick === "none" ? null : statusPick;
+      if (next === curStatus) return;
+      const text = next ? `${cap(actor)} was ${STATUS_VERB[next]}` : `${cap(actor)}'s ${curStatus} was cured`;
+      onConfirm(text, { status: [{ side: actorP.side, name: actor, prev: curStatus, next }] });
+      return;
+    }
+
     if (mode === "mega") {
       const form = describeMegaForm(actor);
       if (form) onConfirm(`${cap(actor)} Mega Evolved into ${form}`);
@@ -295,11 +370,17 @@ export default function EventComposer({
     const selfFaint = SELF_FAINT_MOVES.has(moveSlug) ? [{ side: actorP.side, name: actor }] : [];
 
     if (isSelfMove) {
+      const heal = selfOutcome === "worked" && SELF_HEAL_MOVES[moveSlug] ? selfHeal : 0;
+      const before = hpOfName(actor);
       const text =
         selfOutcome === "failed" ? `${cap(actor)} used ${moveLabel} but it failed`
         : isGuard ? `${cap(actor)} used ${moveLabel} and it worked`
+        : heal > 0 ? `${cap(actor)} used ${moveLabel}, restoring HP from ${before}% to ${before + heal}%`
         : `${cap(actor)} used ${moveLabel}`;
-      onConfirm(text, selfFaint.length > 0 ? { faint: selfFaint } : undefined);
+      onConfirm(text, {
+        ...(selfFaint.length > 0 ? { faint: selfFaint } : {}),
+        ...(heal > 0 ? { damage: [{ side: actorP.side, name: actor, pct: -heal }] } : {}),
+      });
       return;
     }
 
@@ -308,15 +389,29 @@ export default function EventComposer({
     const parts = outcomes.map(({ t, o }) => `${moveLabel} ${describeOutcome(o, t, hpOfName(t))}`);
     const landed = outcomes.some(({ o }) => o.kind === "damage" || o.kind === "worked");
 
+    const statusKind = effect ? statusFromEffect(effect, moveSlug) : null;
+    const statusChanges: StatusChange[] = [];
+    const alreadyStatused: string[] = [];
+    if (statusKind) {
+      for (const { t, o } of outcomes) {
+        if (o.kind !== "damage" && o.kind !== "worked") continue;
+        const side = participants.find((p) => p.name === t)?.side;
+        if (!side) continue;
+        if (statusOf(side, t)) alreadyStatused.push(t);
+        else statusChanges.push({ side, name: t, prev: null, next: statusKind });
+      }
+    }
+
     let fragment = `${cap(actor)}'s ${parts.join("; ")}`;
     if (effect && landed) fragment += `, causing ${effect.toLowerCase()}`;
+    if (alreadyStatused.length > 0) fragment += ` (${alreadyStatused.map((n) => cap(n)).join(", ")} already had a status condition)`;
     if (selfFaint.length > 0) fragment += `; ${cap(actor)} fainted`;
 
     const damage = outcomes.flatMap(({ t, o }) => {
       const side = participants.find((p) => p.name === t)?.side;
       return o.kind === "damage" && side ? [{ side, name: t, pct: o.pct }] : [];
     });
-    onConfirm(fragment, { damage, faint: selfFaint });
+    onConfirm(fragment, { damage, faint: selfFaint, status: statusChanges });
   }
 
   const moveNav = useListNav({
@@ -342,12 +437,12 @@ export default function EventComposer({
     <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 sm:items-center">
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-[color:var(--screen)] p-5 sm:rounded-2xl">
         <div className="flex gap-1 rounded-lg bg-black/5 p-1">
-          {([["move", "Move"], ["switch", "Switch"], ["mega", "Mega"], ["faint", "Faint"]] as const).map(([key, label]) => (
+          {([["move", "Move"], ["switch", "Switch"], ["mega", "Mega"], ["hp", "HP"], ["status", "Status"], ["faint", "Faint"]] as const).map(([key, label]) => (
             <button
               key={key}
               type="button"
               onClick={() => changeMode(key)}
-              className={`min-h-[44px] flex-1 rounded-md px-2 py-2 text-sm font-medium ${mode === key ? "bg-white shadow-sm" : "opacity-50"}`}
+              className={`min-h-[44px] flex-1 rounded-md px-1 py-2 text-xs sm:text-sm font-medium ${mode === key ? "bg-white shadow-sm" : "opacity-50"}`}
             >
               {label}
             </button>
@@ -356,7 +451,7 @@ export default function EventComposer({
 
         <div className="mt-4">
           <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">
-            {mode === "switch" ? "Who is leaving (tap a fainted one to send in its replacement)" : mode === "faint" ? "Who fainted" : "Who acted (currently on the field)"}
+            {mode === "switch" ? "Who is leaving (tap a fainted one to send in its replacement)" : mode === "faint" ? "Who fainted" : mode === "hp" ? "Whose HP changed" : mode === "status" ? "Whose status changed" : "Who acted (currently on the field)"}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {(mode === "switch" ? participants : alive).map((p) => (
@@ -465,6 +560,13 @@ export default function EventComposer({
                       Protect-style moves fail when used on consecutive turns.
                     </p>
                   )}
+                  {selfOutcome === "worked" && SELF_HEAL_MOVES[moveSlug] && actor && (
+                    hpOfName(actor) >= 100 ? (
+                      <p className="mt-2 text-[11px] text-[color:var(--ink)]/50">{cap(actor)} is already at full HP.</p>
+                    ) : (
+                      <DamageSlider heal current={hpOfName(actor)} max={100 - hpOfName(actor)} value={selfHeal} onChange={setSelfHeal} targetName={actor} />
+                    )
+                  )}
                 </div>
               )}
 
@@ -532,7 +634,7 @@ export default function EventComposer({
               )}
             </>
           )
-        ) : mode === "switch" ? (
+        ) : mode === "switch" ? (          
           actor && actorP && (
             <div className="mt-4">
               <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Switched in</p>
@@ -556,6 +658,81 @@ export default function EventComposer({
               </div>
             </div>
           )
+        ) : mode === "status" ? (
+          actor && actorP && (
+            <div className="mt-4">
+              <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">
+                Status condition{curStatus ? ` · currently ${curStatus === "toxic" ? "badly poisoned" : curStatus}` : ""}
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {STATUS_OPTIONS.filter((o) => o.key !== "none" || curStatus).map((o) => (
+                  <button
+                    key={o.key} type="button" aria-pressed={statusPick === o.key}
+                    onClick={() => setStatusPick(o.key)}
+                    className={`min-h-[40px] rounded-full px-4 py-2 text-sm ${
+                      statusPick === o.key ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"
+                    } ${o.key === curStatus ? "opacity-40" : ""}`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-[color:var(--ink)]/50">
+                Status from a logged move is recorded automatically. Use this tab for anything else (Toxic Spikes, Flame Orb, Natural Cure, Lum Berry…).
+                Burn and poison tick at the end of every turn.
+              </p>
+            </div>
+          )
+        ) : mode === "hp" ? (
+          actor && actorP && (
+            <div className="mt-4">
+              <div role="radiogroup" className="grid grid-cols-2 gap-2">
+                {([["heal", "Heal"], ["loss", "Lose HP"]] as const).map(([key, label]) => (
+                  <button
+                    key={key} type="button" role="radio" aria-checked={hpDir === key}
+                    onClick={() => { setHpDir(key); setHpAmount(0); setHpSource(null); }}
+                    className={`btn-tactile min-h-[44px] rounded-xl text-sm font-semibold ${
+                      hpDir === key ? (key === "heal" ? "bg-emerald-600 text-white" : "bg-red-600 text-white") : "bg-black/10 text-[color:var(--ink)]"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <p className="mt-3 text-xs font-medium uppercase text-[color:var(--ink)]/40">Source (optional)</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {HP_PRESETS[hpDir].map((p) => {
+                  const cur = hpOfName(actor);
+                  const room = hpDir === "heal" ? 100 - cur : cur;
+                  return (
+                    <button
+                      key={p.label} type="button"
+                      onClick={() => { setHpSource(p.label); if (p.pct !== null) setHpAmount(Math.min(p.pct, room)); }}
+                      className={`min-h-[36px] rounded-full px-3 py-1.5 text-xs ${hpSource === p.label ? "bg-[color:var(--accent-gold)] text-black" : "bg-black/10 text-[color:var(--ink)]"}`}
+                    >
+                      {p.label}{p.pct !== null && <span className="ml-1 opacity-60">{p.pct}%</span>}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {(hpDir === "heal" ? 100 - hpOfName(actor) : hpOfName(actor)) <= 0 ? (
+                <p className="mt-3 rounded-md bg-black/5 px-3 py-2 text-sm text-[color:var(--ink)]/70">
+                  {cap(actor)} is already at full HP.
+                </p>
+              ) : (
+                <DamageSlider
+                  heal={hpDir === "heal"} current={hpOfName(actor)}
+                  max={hpDir === "heal" ? 100 - hpOfName(actor) : hpOfName(actor)}
+                  value={hpAmount} onChange={setHpAmount} targetName={actor}
+                />
+              )}
+              <p className="mt-2 text-[11px] text-[color:var(--ink)]/50">
+                Recoil and drain depend on the damage dealt, so slide the amount. Leftovers, Black Sludge, Sitrus-type berries, status and weather chip are automatic. Only log them here if the item isn&apos;t set, or you&apos;ll double count.
+              </p>
+            </div>
+          )
         ) : mode === "faint" ? (
           actor && (
             <p className="mt-4 rounded-md bg-black/5 px-3 py-2 text-sm text-[color:var(--ink)]/70">
@@ -575,7 +752,7 @@ export default function EventComposer({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={mode === "switch" ? !switchTo : mode === "faint" ? !actor : mode === "mega" ? !actor || !describeMegaForm(actor) : !canConfirmMove}
+            disabled={mode === "switch" ? !switchTo : mode === "faint" ? !actor : mode === "status" ? !actor || !canConfirmStatus : mode === "hp" ? !actor || hpAmount <= 0 : mode === "mega" ? !actor || !describeMegaForm(actor) : !canConfirmMove}
             className="btn-tactile btn-glow-accent min-h-[48px] flex-1 rounded-md bg-[color:var(--shell-accent)] px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Add event

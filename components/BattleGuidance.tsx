@@ -6,7 +6,8 @@ import { useBattleHistoryStore } from "@/lib/store/battleHistoryStore";
 import Link from "next/link";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
-import { useBattleSessionStore, captureLiveSession } from "@/lib/store/battleSessionStore";
+import { useBattleSessionStore, captureLiveSession, previewEndOfTurn } from "@/lib/store/battleSessionStore";
+import StatusBadge from "@/components/StatusBadge";
 import EventComposer from "@/components/EventComposer";
 import FieldStatusPanel from "@/components/FieldStatusPanel";
 import BackToOptimizer from "@/components/BackToOptimizer";
@@ -22,7 +23,7 @@ export default function BattleGuidance() {
   const opponentSlots = useOpponentTeamStore((s) => s.slots);
 
   const {
-    started, activeBattlers, fainted, hp, yourTeamNames, opponentTeamNames, currentTurnEvents,
+    started, activeBattlers, fainted, hp, status, lastResiduals, yourTeamNames, opponentTeamNames, currentTurnEvents,
     conversation, turnNumber, adviceStatus,
     startSession, resetSession, addEvent, removeEvent, switchActiveBattler, submitTurn, initialLeads
   } = useBattleSessionStore();
@@ -173,6 +174,7 @@ export default function BattleGuidance() {
   const youOut = yourTeamNames.length > 0 && fainted.yours.length >= yourTeamNames.length;
   const oppOut = fainted.opponent.length >= 4;
   const wipeout: "win" | "loss" | null = youOut && oppOut ? null : youOut ? "loss" : oppOut ? "win" : null;
+  const eotPreview = previewEndOfTurn();
 
   return (
     <div className="w-full max-w-lg rounded-2xl border-4 border-[color:var(--shell)] bg-[color:var(--shell)] shadow-none">
@@ -265,6 +267,15 @@ export default function BattleGuidance() {
           </div>
         )}
 
+        {lastResiduals.length > 0 && (
+          <div className="mt-2 rounded-lg border border-black/10 bg-white p-3">
+            <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">End of turn {turnNumber - 1}</p>
+            <ul className="mt-1.5 space-y-1 text-xs text-[color:var(--ink)]/80">
+              {lastResiduals.map((n, i) => <li key={i}>{n}</li>)}
+            </ul>
+          </div>
+        )}
+
         <div className="mt-4">
           <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Currently on the field — tap one to switch it out</p>
           <div className="mt-1.5 grid grid-cols-2 gap-2">
@@ -282,6 +293,7 @@ export default function BattleGuidance() {
                 >
                   <div className="flex items-center justify-between gap-1">
                     <span className={`truncate text-sm font-medium capitalize text-[color:var(--ink)] ${p.fainted ? "line-through" : ""}`}>{p.name}</span>
+                    <StatusBadge status={status[p.side][p.name]} />
                     <span aria-hidden="true" className="shrink-0 text-[10px] text-[color:var(--ink)]/60">{p.fainted ? "✕ replace" : "⇄"}</span>
                   </div>
                   <div className="mt-1.5 flex items-center gap-1.5">
@@ -326,7 +338,15 @@ export default function BattleGuidance() {
                 </button>
               </div>
             ))}
-          </div>          
+          </div>     
+          {eotPreview.length > 0 && (
+            <div className="mt-2 rounded-md border border-dashed border-black/20 px-3 py-2">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-[color:var(--ink)]/40">Applied automatically at end of turn</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-[color:var(--ink)]/70">
+                {eotPreview.map((n, i) => <li key={i}>{n}</li>)}
+              </ul>
+            </div>
+          )}     
         </div>
 
         {adviceStatus === "error" && (

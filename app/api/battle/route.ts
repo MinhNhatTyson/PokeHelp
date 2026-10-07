@@ -25,6 +25,7 @@ function buildSystemInstruction(megaLines: string[]) {
   After each turn, give SHORT, actionable advice (2-4 sentences max) for next turn: move choices, targeting, switches (name the exact bench Pokémon to bring in and why), Protect timing, and when to Mega Evolve. 
   Fainted Pokémon can never be targeted or switched back in, so only suggest bench Pokémon that have not fainted. A side loses once all 4 of its Pokémon have fainted, so weigh the remaining counts in your advice. 
   HP values are percentages of max HP: use them to judge KO ranges, Focus Sash/Sturdy, and when to Protect or switch. 
+  Status conditions (burn, poison, bad poison) and item/weather/terrain residual HP effects are applied automatically at the end of each turn and listed in the turn log as "End of turn: …"; trust the HP values given and do not count those effects twice. Burn halves physical damage and paralysis cuts Speed, so factor active status conditions into your advice.
   Be direct and specific. Do not restate the turn log. Do not invent moves/abilities not shown in the log.`;
 }
 

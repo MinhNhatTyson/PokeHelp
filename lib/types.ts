@@ -175,8 +175,13 @@ export interface FieldState {
 }
 
 export type BattleSide = "yours" | "opponent";
-export interface HpChange { side: BattleSide; name: string; pct: number } // pct = HP actually removed
+export interface HpChange { side: BattleSide; name: string; pct: number } // pct > 0 = HP removed, pct < 0 = HP restored
 export type HpState = Record<BattleSide, Record<string, number>>;       // missing name = 100
+export type PerMon<T> = Record<BattleSide, Record<string, T>>;
+export type StatusKind = "burn" | "poison" | "toxic" | "paralysis" | "sleep" | "freeze";
+export type StatusState = PerMon<StatusKind>; // missing name = healthy
+export interface StatusChange { side: BattleSide; name: string; prev: StatusKind | null; next: StatusKind | null }
+export interface MonRef { side: BattleSide; name: string }
 
 export interface BattleEvent {
   id: string;
@@ -184,6 +189,8 @@ export interface BattleEvent {
   switch?: { side: "yours" | "opponent"; out: string; in: string }; // set for Switch events so removing one can undo it
   faint?: { side: "yours" | "opponent"; name: string }[]; 
   damage?: HpChange[];
+  status?: StatusChange[];  // so deleting the event restores the previous status
+  consumed?: MonRef[]; 
 }
 
 export interface FaintedMons {

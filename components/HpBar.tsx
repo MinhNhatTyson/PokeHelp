@@ -3,9 +3,10 @@ export function hpColor(pct: number) {
   return pct > 50 ? "#10b981" : pct > 20 ? "#f59e0b" : "#ef4444";
 }
 
-export default function HpBar({ pct, lost = 0, className = "h-2.5" }: {
-  pct: number;   // HP before the pending damage
-  lost?: number; // pending damage, drawn as a striped "ghost" segment
+export default function HpBar({ pct, lost = 0, gain = 0, className = "h-2.5" }: {
+  pct: number;   // HP before the pending change
+  lost?: number; // pending damage, striped red "ghost" segment
+  gain?: number; // pending healing, striped green segment
   className?: string;
 }) {
   const now = Math.max(0, Math.min(100, pct));
@@ -23,6 +24,15 @@ export default function HpBar({ pct, lost = 0, className = "h-2.5" }: {
           style={{
             left: `${left}%`, width: `${loss}%`,
             background: "repeating-linear-gradient(45deg, rgba(239,68,68,.9) 0 4px, rgba(239,68,68,.45) 4px 8px)",
+          }}
+        />
+      )}
+      {gain > 0 && (
+        <div
+          className="absolute inset-y-0 transition-[left,width] duration-150 motion-reduce:transition-none"
+          style={{
+            left: `${now}%`, width: `${Math.min(gain, 100 - now)}%`,
+            background: "repeating-linear-gradient(45deg, rgba(16,185,129,.9) 0 4px, rgba(16,185,129,.45) 4px 8px)",
           }}
         />
       )}

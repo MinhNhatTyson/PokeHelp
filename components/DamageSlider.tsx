@@ -5,45 +5,50 @@ import HpBar, { hpColor } from "@/components/HpBar";
 const MILESTONES = [25, 50, 75];
 const THUMB = 28; // px, keep in sync with .dmg-range in globals.css
 
-export default function DamageSlider({ value, max, onChange, targetName }: {
+export default function DamageSlider({ value, max, onChange, targetName, heal = false, current = 100 }: {
   value: number; max: number; onChange: (v: number) => void; targetName: string;
+  heal?: boolean;   // heal mode: max = room left up to 100%
+  current?: number; // HP right now (only needed in heal mode)
 }) {
   if (max <= 0) return null;
   const set = (n: number) => onChange(Math.max(0, Math.min(max, Math.round(Number.isFinite(n) ? n : 0))));
-  const after = max - value;
-  const isKo = value >= max;
+  const now = heal ? current : max; // HP before the change
+  const after = heal ? now + value : now - value;
+  const isKo = !heal && value >= max;
   const fill = (value / max) * 100;
   const marks = MILESTONES.filter((m) => m < max);
   // The thumb centre travels (width - THUMB), so offset everything by the same amount
   const offset = (p: number) => `calc(${p}% + ${(THUMB / 2 - (p * THUMB) / 100).toFixed(2)}px)`;
-  const track = `linear-gradient(to right, #fbbf24 0, #ef4444 ${offset(fill)}, rgba(0,0,0,0.14) ${offset(fill)})`;
+  const from = heal ? "#34d399" : "#fbbf24";
+  const to = heal ? "#10b981" : "#ef4444";
+  const track = `linear-gradient(to right, ${from} 0, ${to} ${offset(fill)}, rgba(0,0,0,0.14) ${offset(fill)})`;
 
   return (
     <div className="mt-3 rounded-xl bg-gradient-to-b from-black/[0.04] to-black/[0.08] p-3">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <p className="text-[10px] font-medium uppercase tracking-wide text-[color:var(--ink)]/40">Damage dealt</p>
+          <p className="text-[10px] font-medium uppercase tracking-wide text-[color:var(--ink)]/40">{heal ? "HP restored" : "Damage dealt"}</p>
           <p className="font-heading text-3xl leading-none tabular-nums text-[color:var(--ink)]">
-            {value}<span className="text-lg">%</span>
+            {heal && value > 0 ? "+" : ""}{value}<span className="text-lg">%</span>
           </p>
         </div>
         <div className="text-right">
           {isKo ? (
             <span className="inline-block rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-white">KO</span>
           ) : (
-            <p className="text-sm font-semibold tabular-nums" style={{ color: hpColor(after) }}>{max}% → {after}%</p>
+            <p className="text-sm font-semibold tabular-nums" style={{ color: hpColor(after) }}>{now}% → {after}%</p>
           )}
           <p className="mt-0.5 text-[10px] capitalize text-[color:var(--ink)]/50">{targetName} HP</p>
         </div>
       </div>
 
-      <HpBar pct={max} lost={value} className="mt-2.5 h-3" />
+      <HpBar pct={now} lost={heal ? 0 : value} gain={heal ? value : 0} className="mt-2.5 h-3" />
 
       <div className="mt-1">
         <input
           type="range" min={0} max={max} step={1} value={value}
           onChange={(e) => set(Number(e.target.value))}
-          aria-label={`Damage to ${targetName}`}
+          aria-label={`${heal ? "Healing for" : "Damage to"} ${targetName}`}
           aria-valuetext={`${value}% of max HP`}
           className="dmg-range"
           style={{ ["--track" as string]: track }}
@@ -66,7 +71,7 @@ export default function DamageSlider({ value, max, onChange, targetName }: {
               value === m ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"
             }`}
           >
-            {m === max ? `KO · ${m}%` : `${m}%`}
+            {m === max ? (heal ? `Full · +${m}%` : `KO · ${m}%`) : `${m}%`}
           </button>
         ))}
         <div className="ml-auto flex items-center gap-1">
