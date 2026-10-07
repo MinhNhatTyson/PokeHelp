@@ -36,7 +36,6 @@ export interface ResidualMon {
   status: StatusKind | null;
   toxicTurns: number;         // end-of-turn ticks already taken while badly poisoned
   itemUsed: boolean;          // berry already eaten
-  assumed: boolean;           // item/ability is a scouting guess (opponent)
 }
 
 export interface ResidualOutcome {
@@ -61,7 +60,6 @@ export function computeEndOfTurn(
     let hp = m.hp;
     const ability = m.ability ?? "";
     const magicGuard = ability === "magic-guard";
-    const tag = m.assumed ? " (assumed item)" : "";
 
     const apply = (delta: number, why: string) => {
       if (hp <= 0) return;
@@ -94,10 +92,10 @@ export function computeEndOfTurn(
     }
 
     // Held items
-    if (m.item === "leftovers") apply(-pct(1 / 16), `Leftovers${tag}`);
+    if (m.item === "leftovers") apply(-pct(1 / 16), "Leftovers");
     if (m.item === "black-sludge") {
-      if (m.types.includes("poison")) apply(-pct(1 / 16), `Black Sludge${tag}`);
-      else if (!magicGuard) apply(pct(1 / 8), `Black Sludge${tag}`);
+      if (m.types.includes("poison")) apply(-pct(1 / 16), "Black Sludge");
+      else if (!magicGuard) apply(pct(1 / 8), "Black Sludge");
     }
 
     // Status chip
@@ -117,7 +115,7 @@ export function computeEndOfTurn(
     // Berries (also checked right after hits, in the store's addEvent)
     const berry = checkBerry(m.item, hp, m.itemUsed);
     if (berry && hp > 0) {
-      apply(-berry.heal, `its ${berry.label}${tag}`);
+      apply(-berry.heal, `its ${berry.label}`);
       out.consumed.push({ side: m.side, name: m.name });
     }
 

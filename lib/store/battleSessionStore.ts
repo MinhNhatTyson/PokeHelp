@@ -120,7 +120,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
         changes.push({ side: c.side, name: c.name, pct: -heal });
         itemUsed = { ...itemUsed, [c.side]: { ...itemUsed[c.side], [c.name]: true } };
         consumed.push({ side: c.side, name: c.name });
-        berryNotes.push(`${cap(c.name)} ate its ${berry.label}${c.side === "opponent" ? " (assumed)" : ""} and recovered to ${cur + heal}%`);
+        berryNotes.push(`${cap(c.name)} ate its ${berry.label} and recovered to ${cur + heal}%`);
       }
 
       for (const sc of extra?.status ?? []) {
@@ -310,7 +310,6 @@ function projectEndOfTurn(s: BattleSessionState) {
         status: s.status[side][name] ?? null,
         toxicTurns: s.toxicTurns[side][name] ?? 0,
         itemUsed: !!s.itemUsed[side][name],
-        assumed: side === "opponent",
       });
     }
   }

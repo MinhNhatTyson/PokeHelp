@@ -12,6 +12,7 @@ import EventComposer from "@/components/EventComposer";
 import FieldStatusPanel from "@/components/FieldStatusPanel";
 import BackToOptimizer from "@/components/BackToOptimizer";
 import HpBar from "@/components/HpBar";
+import OpponentLoadoutPanel from "@/components/OpponentLoadoutPanel";
 
 function toggleSelection(list: string[], setList: (v: string[]) => void, name: string, max: number) {
   if (list.includes(name)) setList(list.filter((n) => n !== name));
@@ -149,6 +150,10 @@ export default function BattleGuidance() {
                 ))}
               </div>
 
+              <div className="mt-4">
+                <OpponentLoadoutPanel defaultOpen />
+              </div>
+
               <button
                 type="button"
                 disabled={!readyToConfirm}
@@ -251,6 +256,10 @@ export default function BattleGuidance() {
         )}
 
         <FieldStatusPanel />
+
+        <div className="mt-3">
+          <OpponentLoadoutPanel />
+        </div>
 
         {conversation.length > 0 && (
           <div
