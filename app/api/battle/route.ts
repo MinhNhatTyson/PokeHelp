@@ -14,7 +14,7 @@ interface BattleRequestBody {
   newTurnSentence: string;
   activeNote?: string;
   yourLoadouts?: { name: string; item: string | null; ability: string | null; nature: string | null; moves: string[] }[];
-  opponentGuesses?: { name: string; types: string[]; item: string | null; ability: string | null }[];
+  opponentGuesses?: { name: string; types: string[]; item: string | null; ability: string | null; itemConfirmed?: boolean; abilityConfirmed?: boolean }[];
   model?: string;
 }
 
@@ -50,7 +50,10 @@ export async function POST(req: NextRequest) {
       : yourTeam.map((n) => `- ${n}`)),
     "Opponent's team preview (they bring only 4 of these; items/abilities are GUESSES from common sets):",
     ...(opponentGuesses?.length
-      ? opponentGuesses.map((m) => `- ${m.name} [${m.types.join("/")}]: ability ${fmt(m.ability)}, item ${fmt(m.item)}`)
+      ? opponentGuesses.map((m) => {
+        const item = m.itemConfirmed && m.item === null ? "none (confirmed)" : `${fmt(m.item)} (${m.itemConfirmed ? "confirmed" : "guess"})`;
+        return `- ${m.name} [${m.types.join("/")}]: ability ${fmt(m.ability)} (${m.abilityConfirmed ? "confirmed" : "guess"}), item ${item}`;
+      })
       : opponentTeam.map((n) => `- ${n}`)),
   ].join("\n");
 

@@ -19,6 +19,7 @@ const EMPTY_FIELD_STATE: FieldState = {
 };
 
 const EMPTY_ACTIVE_BATTLERS: ActiveBattlers = { yours: [null, null], opponent: [null, null] };
+export type OpponentReveal = { item?: string | null; ability?: string }; // item: null = confirmed no item; key absent = still a guess
 
 interface BattleSessionState {
   started: boolean;
@@ -34,6 +35,9 @@ interface BattleSessionState {
   lastResiduals: string[];
   megaUsed: Record<BattleSide, string | null>;   // one Mega per side per battle
   megaDetails: Record<string, PokemonDetail>; 
+  opponentReveals: Record<string, OpponentReveal>;
+  revealItem: (name: string, item: string | null | undefined) => void;   // undefined = back to guess
+  revealAbility: (name: string, ability: string | undefined) => void;
   initialLeads: ActiveBattlers | null;
   fieldState: FieldState;
   currentTurnEvents: BattleEvent[];
@@ -65,6 +69,7 @@ const initialState = {
   lastResiduals: [] as string[],
   megaUsed: { yours: null, opponent: null } as Record<BattleSide, string | null>,
   megaDetails: {} as Record<string, PokemonDetail>,
+  opponentReveals: {} as Record<string, OpponentReveal>,
   initialLeads: null as ActiveBattlers | null,
   fieldState: EMPTY_FIELD_STATE,
   currentTurnEvents: [] as BattleEvent[],
@@ -283,7 +288,14 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
               moves: slot?.moves.filter((m): m is string => m !== null) ?? [],
             };
           }),
-          opponentGuesses: state.opponentTeamNames.map((name) => ({ name, ...loadoutOf("opponent", name) })),
+          opponentGuesses: state.opponentTeamNames.map((name) => {
+            const rev = state.opponentReveals[name];
+            return {
+              name, ...loadoutOf("opponent", name),
+              itemConfirmed: !!rev && "item" in rev,
+              abilityConfirmed: !!rev?.ability || state.megaUsed.opponent === name,
+            };
+          }),
           model: useAiSettingsStore.getState().model,
         }),
       });
@@ -323,6 +335,22 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
     // Ignore the result if the Mega event was undone while the request was running
     set((s) => (s.megaUsed[side] === name ? { megaDetails: { ...s.megaDetails, [`${side}:${name}`]: detail } } : s));
   },
+
+  revealItem: (name, item) =>
+    set((s) => {
+      const cur: OpponentReveal = { ...s.opponentReveals[name] };
+      if (item === undefined) delete cur.item;
+      else cur.item = item;
+      return { opponentReveals: { ...s.opponentReveals, [name]: cur } };
+    }),
+
+  revealAbility: (name, ability) =>
+    set((s) => {
+      const cur: OpponentReveal = { ...s.opponentReveals[name] };
+      if (ability === undefined) delete cur.ability;
+      else cur.ability = ability;
+      return { opponentReveals: { ...s.opponentReveals, [name]: cur } };
+    }),
 }));
 
 function describeBattlers(a: ActiveBattlers, fainted: FaintedMons, yourTotal: number, hp: HpState, status: StatusState, megaUsed: Record<BattleSide, string | null>): string {
@@ -358,18 +386,31 @@ function describeBattlers(a: ActiveBattlers, fainted: FaintedMons, yourTotal: nu
 }
 
 /** Loadout BEFORE any Mega Evolution. Scouting pre-fills the Mega ability on opponents, so that guess is undone here. */
-export function baseLoadoutOf(side: BattleSide, name: string): { types: PokemonTypeName[]; item: string | null; ability: string | null } {
-  if (side === "yours") {
-    const s = useTeamStore.getState().slots.find((x) => x.pokemon?.name === name);
-    return { types: s?.pokemon?.types ?? [], item: s?.itemName ?? null, ability: s?.abilityName ?? null };
-  }
+/** Opponent loadout straight from scouting (common-set guesses), before in-battle reveals or Mega. */
+export function scoutedOpponentLoadout(name: string): { types: PokemonTypeName[]; item: string | null; ability: string | null } {
   const o = useOpponentTeamStore.getState().slots.find((x) => x.pokemon?.name === name);
   const cs = getCommonSet(name);
+  // Scouting pre-fills the Mega ability when the stone is guessed; before the Mega happens that is wrong
   const ability =
     cs?.megaForm && o?.abilityName === cs.megaForm.formAbility
       ? (o.pokemon?.abilities.some((a) => a.name === cs.likelyAbility) ? cs.likelyAbility : null)
       : o?.abilityName ?? null;
   return { types: o?.pokemon?.types ?? [], item: o?.itemName ?? null, ability };
+}
+
+/** Loadout BEFORE any Mega Evolution, with what the player has confirmed in battle layered over the guess. */
+export function baseLoadoutOf(side: BattleSide, name: string): { types: PokemonTypeName[]; item: string | null; ability: string | null } {
+  if (side === "yours") {
+    const s = useTeamStore.getState().slots.find((x) => x.pokemon?.name === name);
+    return { types: s?.pokemon?.types ?? [], item: s?.itemName ?? null, ability: s?.abilityName ?? null };
+  }
+  const scouted = scoutedOpponentLoadout(name);
+  const rev = useBattleSessionStore.getState().opponentReveals[name];
+  return {
+    types: scouted.types,
+    item: rev && "item" in rev ? rev.item ?? null : scouted.item,
+    ability: rev?.ability ?? scouted.ability,
+  };
 }
 
 /** What a mon is RIGHT NOW: once it has Mega Evolved, the Mega's ability (and typing) replace the base ones. */

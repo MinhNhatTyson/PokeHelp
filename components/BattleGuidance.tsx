@@ -25,7 +25,7 @@ export default function BattleGuidance() {
   const opponentSlots = useOpponentTeamStore((s) => s.slots);
 
   const {
-    started, activeBattlers, fainted, hp, status, lastResiduals, yourTeamNames, opponentTeamNames, currentTurnEvents,
+    started, activeBattlers, fainted, hp, status, lastResiduals, megaUsed, yourTeamNames, opponentTeamNames, currentTurnEvents,
     conversation, turnNumber, adviceStatus,
     startSession, resetSession, addEvent, removeEvent, switchActiveBattler, submitTurn, initialLeads
   } = useBattleSessionStore();
@@ -151,9 +151,9 @@ export default function BattleGuidance() {
                 ))}
               </div>
 
-              <div className="mt-4">
-                <OpponentLoadoutPanel defaultOpen />
-              </div>
+              <p className="mt-4 rounded-md bg-black/5 px-3 py-2 text-xs text-[color:var(--ink)]/60">
+                Opponent items and abilities are unknown at team preview. Record them as you spot them during the battle (Opponent intel).
+              </p>
 
               <button
                 type="button"
@@ -258,10 +258,6 @@ export default function BattleGuidance() {
 
         <FieldStatusPanel />
 
-        <div className="mt-3">
-          <OpponentLoadoutPanel />
-        </div>
-
         {conversation.length > 0 && (
           <div
             className={`pokecard mt-4 transition-opacity ${adviceStatus === "loading" ? "opacity-60" : ""}`}
@@ -304,6 +300,9 @@ export default function BattleGuidance() {
                   <div className="flex items-center justify-between gap-1">
                     <span className={`truncate text-sm font-medium capitalize text-[color:var(--ink)] ${p.fainted ? "line-through" : ""}`}>{p.name}</span>
                     <StatusBadge status={status[p.side][p.name]} />
+                    {megaUsed[p.side] === p.name && (
+                      <span className="shrink-0 rounded bg-[color:var(--accent-gold)] px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-black">Mega</span>
+                    )}
                     <span aria-hidden="true" className="shrink-0 text-[10px] text-[color:var(--ink)]/60">{p.fainted ? "✕ replace" : "⇄"}</span>
                   </div>
                   <div className="mt-1.5 flex items-center gap-1.5">
@@ -311,6 +310,11 @@ export default function BattleGuidance() {
                     <HpBar pct={pct} className="h-2 flex-1" />
                     <span className="w-9 text-right text-[11px] tabular-nums text-[color:var(--ink)]">{pct}%</span>
                   </div>
+                  {megaUsed[p.side] === p.name && (
+                    <span className="mt-1 block text-[10px] capitalize text-[color:var(--ink)]/60">
+                      Ability: {(loadoutOf(p.side, p.name).ability ?? "unknown").replace(/-/g, " ")}
+                    </span>
+                  )}
                   <span className="mt-1 block text-[10px] uppercase tracking-wide text-[color:var(--ink)]/40">
                     {p.side === "yours" ? "You" : "Opponent"}
                   </span>
@@ -330,6 +334,9 @@ export default function BattleGuidance() {
         </div>
 
         <SpeedOrderPanel />
+        <div className="mt-3">
+          <OpponentLoadoutPanel />
+        </div>
 
         <div className="mt-4">
           <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">This turn</p>
@@ -409,5 +416,22 @@ export default function BattleGuidance() {
         )}
       </div>
     </div>
+  );
+}
+
+function OpponentIntelLine({ name }: { name: string }) {
+  const reveal = useBattleSessionStore((s) => s.opponentReveals[name]);
+  const megaOn = useBattleSessionStore((s) => s.megaUsed.opponent === name);
+  const l = loadoutOf("opponent", name);
+  const itemKnown = !!reveal && "item" in reveal;
+  const abilityKnown = !!reveal?.ability || megaOn;
+  const known = "text-[color:var(--ink)]/70";
+  const guess = "italic text-[color:var(--ink)]/40";
+  return (
+    <span className="mt-1 block truncate text-[10px] capitalize">
+      <span className={itemKnown ? known : guess}>{l.item ? l.item.replace(/-/g, " ") : "no item"}{itemKnown ? "" : "?"}</span>
+      <span className="text-[color:var(--ink)]/30"> · </span>
+      <span className={abilityKnown ? known : guess}>{l.ability ? l.ability.replace(/-/g, " ") : "ability"}{abilityKnown ? "" : "?"}</span>
+    </span>
   );
 }

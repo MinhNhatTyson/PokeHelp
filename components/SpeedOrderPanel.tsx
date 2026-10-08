@@ -30,6 +30,7 @@ export default function SpeedOrderPanel() {
   const oppSlots = useOpponentTeamStore((s) => s.slots);
   const megaUsed = useBattleSessionStore((s) => s.megaUsed);
   const megaDetails = useBattleSessionStore((s) => s.megaDetails);
+  const opponentReveals = useBattleSessionStore((s) => s.opponentReveals);
 
   const trickRoom = field.trickRoomTurnsLeft > 0;
   const rows: Row[] = [];
@@ -55,8 +56,16 @@ export default function SpeedOrderPanel() {
         const detail = oppSlots.find((s) => s.pokemon?.name === name)?.pokemon;
         if (!detail) continue;
         const effective = md ? { ...detail, stats: md.stats, types: md.types } : detail; // keeps the base name for the curated-set lookup
-        const variants = getSpeedVariants(effective, cond);
-        if (variants.length === 0) continue;
+        const allVariants = getSpeedVariants(effective, cond);
+        if (allVariants.length === 0) continue;
+        // A confirmed item narrows the likely spreads: Scarf seen = only Scarf spreads, any other item seen = no Scarf spreads
+        const rev = opponentReveals[name];
+        let variants = allVariants;
+        if (rev && "item" in rev) {
+          const scarf = rev.item === "choice-scarf";
+          const narrowed = allVariants.filter((v) => (scarf ? v.itemName === "choice-scarf" : v.itemName !== "choice-scarf"));
+          if (narrowed.length > 0) variants = narrowed;
+        }
         const speeds = variants.map((v) => v.speed);
         rows.push({
           key: `o-${name}`, name, side,
