@@ -4,6 +4,7 @@ import {
   applyPreset, configFromOpponent, configFromTeamSlot, configToSetup, runDamageCalc,
   type DamageOutcome, type FieldSetup, type MonConfig,
 } from "@/lib/logic/damageCalc";
+import { baseLoadoutOf } from "@/lib/store/battleSessionStore";
 
 export type CalcExtras = Pick<FieldSetup, "crit" | "helpingHand" | "reflect" | "lightScreen" | "auroraVeil">;
 export const DEFAULT_EXTRAS: CalcExtras = { crit: false, helpingHand: false, reflect: false, lightScreen: false, auroraVeil: false };
@@ -34,6 +35,10 @@ function buildConfig(
   } else {
     const slot = oppSlots.find((s) => s.pokemon?.name === who.name);
     cfg = slot ? configFromOpponent(slot) : null;
+    if (cfg) {
+      const l = baseLoadoutOf("opponent", who.name); 
+      cfg = { ...cfg, item: l.item, ability: l.ability };
+    }
     if (cfg && role === "attacker") cfg = applyPreset(cfg, "offense");
   }
   if (!cfg) return null;

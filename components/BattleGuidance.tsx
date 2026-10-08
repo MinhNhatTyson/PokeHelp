@@ -315,6 +315,7 @@ export default function BattleGuidance() {
                       Ability: {(loadoutOf(p.side, p.name).ability ?? "unknown").replace(/-/g, " ")}
                     </span>
                   )}
+                  {p.side === "opponent" && <OpponentIntelLine name={p.name} />}
                   <span className="mt-1 block text-[10px] uppercase tracking-wide text-[color:var(--ink)]/40">
                     {p.side === "yours" ? "You" : "Opponent"}
                   </span>
