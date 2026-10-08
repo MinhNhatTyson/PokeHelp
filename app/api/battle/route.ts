@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     ...(yourLoadouts?.length
       ? yourLoadouts.map((m) => `- ${m.name}: ability ${fmt(m.ability)}, item ${fmt(m.item)}, ${m.nature ?? "neutral"} nature, moves: ${m.moves.join(", ") || "unknown"}`)
       : yourTeam.map((n) => `- ${n}`)),
-    "Opponent's team preview (they bring only 4 of these; items/abilities are GUESSES from common sets):",
+    "Opponent's team preview (they bring only 4 of these; anything not marked confirmed is a GUESS from common sets, and the player records real reveals during the battle, so trust confirmed info over guesses):",
     ...(opponentGuesses?.length
       ? opponentGuesses.map((m) => {
         const item = m.itemConfirmed && m.item === null ? "none (confirmed)" : `${fmt(m.item)} (${m.itemConfirmed ? "confirmed" : "guess"})`;
