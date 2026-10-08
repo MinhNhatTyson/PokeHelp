@@ -191,6 +191,7 @@ export interface BattleEvent {
   damage?: HpChange[];
   status?: StatusChange[];  // so deleting the event restores the previous status
   consumed?: MonRef[]; 
+  mega?: { side: BattleSide; name: string; prevWeather?: { weather: FieldState["weather"]; turnsLeft: number } };
 }
 
 export interface FaintedMons {

@@ -6,13 +6,14 @@ import { useBattleHistoryStore } from "@/lib/store/battleHistoryStore";
 import Link from "next/link";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
-import { useBattleSessionStore, captureLiveSession, previewEndOfTurn } from "@/lib/store/battleSessionStore";
+import { useBattleSessionStore, captureLiveSession, previewEndOfTurn, loadoutOf } from "@/lib/store/battleSessionStore";
 import StatusBadge from "@/components/StatusBadge";
 import EventComposer from "@/components/EventComposer";
 import FieldStatusPanel from "@/components/FieldStatusPanel";
 import BackToOptimizer from "@/components/BackToOptimizer";
 import HpBar from "@/components/HpBar";
 import OpponentLoadoutPanel from "@/components/OpponentLoadoutPanel";
+import SpeedOrderPanel from "@/components/SpeedOrderPanel";
 
 function toggleSelection(list: string[], setList: (v: string[]) => void, name: string, max: number) {
   if (list.includes(name)) setList(list.filter((n) => n !== name));
@@ -327,6 +328,8 @@ export default function BattleGuidance() {
             )}
           </p>
         </div>
+
+        <SpeedOrderPanel />
 
         <div className="mt-4">
           <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">This turn</p>

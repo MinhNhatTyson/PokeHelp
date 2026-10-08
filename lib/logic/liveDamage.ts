@@ -1,0 +1,61 @@
+import type { FieldState, OpponentSlot, TeamSlot } from "@/lib/types";
+import { getCommonSet } from "@/lib/data/commonSets";
+import {
+  applyPreset, configFromOpponent, configFromTeamSlot, configToSetup, runDamageCalc,
+  type DamageOutcome, type FieldSetup, type MonConfig,
+} from "@/lib/logic/damageCalc";
+
+export type CalcExtras = Pick<FieldSetup, "crit" | "helpingHand" | "reflect" | "lightScreen" | "auroraVeil">;
+export const DEFAULT_EXTRAS: CalcExtras = { crit: false, helpingHand: false, reflect: false, lightScreen: false, auroraVeil: false };
+
+const WEATHER: Record<FieldState["weather"], FieldSetup["weather"]> = { none: "", sun: "Sun", rain: "Rain", sand: "Sand", snow: "Snow" };
+const TERRAIN: Record<FieldState["terrain"], FieldSetup["terrain"]> = { none: "", electric: "Electric", grassy: "Grassy", misty: "Misty", psychic: "Psychic" };
+
+export function fieldForCalc(f: FieldState, extras: CalcExtras): FieldSetup {
+  return { weather: WEATHER[f.weather], terrain: TERRAIN[f.terrain], ...extras };
+}
+
+export interface LiveSide {
+  side: "yours" | "opponent";
+  name: string;
+  mega: boolean;     // has this Pokémon actually Mega Evolved yet?
+  burned?: boolean;
+}
+
+function buildConfig(
+  who: LiveSide, role: "attacker" | "defender", teamSlots: TeamSlot[], oppSlots: OpponentSlot[]
+): MonConfig | null {
+  let cfg: MonConfig | null;
+  if (who.side === "yours") {
+    const slot = teamSlots.find((s) => s.pokemon?.name === who.name);
+    cfg = slot ? configFromTeamSlot(slot) : null;
+    // Team Builder only stores Speed SP, so a mon that is being hit gets a balanced bulk guess
+    if (cfg && role === "defender") cfg = applyPreset(cfg, "balanced");
+  } else {
+    const slot = oppSlots.find((s) => s.pokemon?.name === who.name);
+    cfg = slot ? configFromOpponent(slot) : null;
+    if (cfg && role === "attacker") cfg = applyPreset(cfg, "offense");
+  }
+  if (!cfg) return null;
+
+  const cs = getCommonSet(who.name);
+  const megaForm = cs?.megaForm;
+  const useMega = who.mega && !!megaForm;
+  // Scouting pre-fills the Mega ability on opponents; don't hand it to a base form
+  let ability = cfg.ability;
+  if (!useMega && megaForm && ability === megaForm.formAbility) ability = cs?.likelyAbility ?? null;
+
+  return { ...cfg, useMega, ability, burned: !!who.burned };
+}
+
+export function liveDamage(a: {
+  attacker: LiveSide; defender: LiveSide; move: string; field: FieldSetup;
+  teamSlots: TeamSlot[]; oppSlots: OpponentSlot[];
+}): DamageOutcome | null {
+  const atk = buildConfig(a.attacker, "attacker", a.teamSlots, a.oppSlots);
+  const def = buildConfig(a.defender, "defender", a.teamSlots, a.oppSlots);
+  const atkSetup = atk && configToSetup(atk);
+  const defSetup = def && configToSetup(def);
+  if (!atkSetup || !defSetup) return null;
+  return runDamageCalc(atkSetup, defSetup, a.move.replace(/-/g, " "), a.field);
+}

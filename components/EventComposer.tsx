@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getCommonSet, describeMegaForm } from "@/lib/data/commonSets";
+import { getCommonSet, describeMegaForm, getActiveMega } from "@/lib/data/commonSets";
+import { baseLoadoutOf } from "@/lib/store/battleSessionStore";
+import { getAbilitySignal } from "@/lib/logic/abilitySignals";
 import { fetchMoveDetail, fetchMoveNameList } from "@/lib/data/fetchAndCache";
 import { BattleEvent, FaintedMons, FieldState, MoveDetail, MoveNameEntry, StatusChange, StatusKind } from "@/lib/types";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useBattleSessionStore } from "@/lib/store/battleSessionStore";
 import { useListNav } from "@/lib/hooks/useListNav";
 import DamageSlider from "@/components/DamageSlider";
+import LiveDamagePreview from "@/components/LiveDamagePreview";
+import { useOpponentTeamStore } from "@/lib/store/opponentTeamStore";
+import { liveDamage, fieldForCalc, DEFAULT_EXTRAS, type CalcExtras } from "@/lib/logic/liveDamage";
+import type { DamageOutcome } from "@/lib/logic/damageCalc";
 
 const MAX_MOVE_SUGGESTIONS = 8;
 type Side = "yours" | "opponent";
@@ -82,6 +88,10 @@ const EFFECT_OPTIONS = [
   "Helping Hand boost", "Skill Swap (abilities swapped)", "Redirected (Follow Me/Rage Powder)",
   "Protected", "Healed", "Stat change",
 ] as const;
+const CALC_TOGGLES: { key: keyof CalcExtras; label: string }[] = [
+  { key: "crit", label: "Crit" }, { key: "helpingHand", label: "Helping Hand" },
+  { key: "reflect", label: "Reflect" }, { key: "lightScreen", label: "Light Screen" }, { key: "auroraVeil", label: "Aurora Veil" },
+];
 
 
 // Field-setting moves update FieldStatusPanel's state directly instead of
@@ -153,7 +163,7 @@ export default function EventComposer({
   yourTeamNames: string[]; // your bring-4
   opponentTeamNames: string[]; // opponent's known team-preview roster
   fainted: FaintedMons;
-  onConfirm: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status">) => void;
+  onConfirm: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status" | "mega">) => void;
   onSwitch: (side: Side, outgoingName: string, incomingName: string) => void;
   onCancel: () => void;
   initialMode?: Mode;
@@ -170,6 +180,12 @@ export default function EventComposer({
   };
   const statusState = useBattleSessionStore((s) => s.status);
   const statusOf = (side: Side, name: string): StatusKind | null => statusState[side][name] ?? null;
+
+  const oppSlots = useOpponentTeamStore((s) => s.slots);
+  const [calcExtras, setCalcExtras] = useState<CalcExtras>(DEFAULT_EXTRAS);
+  // Stopgap until Mega state is tracked properly (#3): a Mega counts as active once a "Mega Evolved" event was logged for it
+  const megaUsed = useBattleSessionStore((s) => s.megaUsed);
+  const hasMegaEvolved = (side: Side, name: string) => megaUsed[side] === name;
 
   const [mode, setMode] = useState<Mode>(initialMode ?? "move");
   const [actor, setActor] = useState<string | null>(initialActor ?? null);
@@ -193,6 +209,20 @@ export default function EventComposer({
   const actorP = participants.find((p) => p.name === actor) ?? null;
   const curStatus = actorP ? statusOf(actorP.side, actorP.name) : null;
   const canConfirmStatus = !!statusPick && (statusPick === "none" ? !!curStatus : statusPick !== curStatus);
+  const megaInfo = (() => {
+    if (!actorP) return null;
+    const form = getCommonSet(actorP.name)?.megaForm;
+    if (!form) return null;
+    const base = baseLoadoutOf(actorP.side, actorP.name);
+    const used = megaUsed[actorP.side];
+    const block =
+      used === actorP.name ? `${cap(actorP.name)} has already Mega Evolved.`
+      : used ? `${cap(used)} already Mega Evolved. Each side gets one Mega per battle.`
+      : actorP.side === "yours" && !getActiveMega(actorP.name, base.item) ? `${cap(actorP.name)} isn't holding its Mega Stone (check the item in Team Builder).`
+      : null;
+    const weather = getAbilitySignal(form.formAbility)?.weatherSets ?? null;
+    return { form, baseAbility: base.ability, weather, weatherChange: !!weather && fieldState.weather !== weather, block };
+  })();
   const alive = participants.filter((p) => !p.fainted);
   const others = alive.filter((p) => p.name !== actor);
   const fieldSetter = moveSlug ? FIELD_SETTER_MOVES[moveSlug] : undefined;
@@ -295,6 +325,21 @@ export default function EventComposer({
   const outcomeOf = (t: string): Outcome =>
     targetOutcomes[t] ?? (isStatusMove ? { kind: "worked" } : { kind: "damage", pct: 0 });
 
+  const damagePreviews: Record<string, DamageOutcome> = {};
+  if (mode === "move" && actorP && moveDetail && moveSlug && !fieldSetter && !isSelfMove && !isStatusMove) {
+    const field = fieldForCalc(fieldState, calcExtras);
+    for (const t of selectedTargets) {
+      const tp = participants.find((p) => p.name === t);
+      if (!tp) continue;
+      const res = liveDamage({
+        attacker: { side: actorP.side, name: actorP.name, mega: hasMegaEvolved(actorP.side, actorP.name), burned: statusOf(actorP.side, actorP.name) === "burn" },
+        defender: { side: tp.side, name: tp.name, mega: hasMegaEvolved(tp.side, tp.name) },
+        move: moveSlug, field, teamSlots, oppSlots,
+      });
+      if (res) damagePreviews[t] = res;
+    }
+  }
+
   function toggleTarget(name: string) {
     setSelectedTargets((prev) => {
       if (prev.includes(name)) return prev.filter((n) => n !== name);
@@ -346,8 +391,16 @@ export default function EventComposer({
     }
 
     if (mode === "mega") {
-      const form = describeMegaForm(actor);
-      if (form) onConfirm(`${cap(actor)} Mega Evolved into ${form}`);
+      if (!megaInfo || megaInfo.block) return;
+      const formText = describeMegaForm(actor);
+      if (!formText) return;
+      const pretty = (s: string) => s.replace(/-/g, " ");
+      const lost = megaInfo.baseAbility && megaInfo.baseAbility !== megaInfo.form.formAbility
+        ? ` (it no longer has ${pretty(megaInfo.baseAbility)})` : "";
+      const sets = megaInfo.weather && megaInfo.weatherChange
+        ? `, and ${pretty(megaInfo.form.formAbility)} set ${megaInfo.weather}` : "";
+      onConfirm(`${cap(actor)} Mega Evolved into ${formText}${lost}${sets}`, { mega: { side: actorP.side, name: actor } });
+      void useBattleSessionStore.getState().loadMegaDetail(actorP.side, actor);
       return;
     }
 
@@ -355,14 +408,17 @@ export default function EventComposer({
     const moveLabel = formatMoveName(moveSlug);
 
     if (fieldSetter) {
+      const endingTR = fieldSetter.kind === "trick-room" && fieldState.trickRoomTurnsLeft > 0;
       if (fieldSetter.kind === "weather") setFieldState({ weather: fieldSetter.value, weatherTurnsLeft: 5 });
       else if (fieldSetter.kind === "terrain") setFieldState({ terrain: fieldSetter.value, terrainTurnsLeft: 5 });
-      else if (fieldSetter.kind === "trick-room") setFieldState({ trickRoomTurnsLeft: 5 });
+      else if (fieldSetter.kind === "trick-room") setFieldState({ trickRoomTurnsLeft: endingTR ? 0 : 5 });
       else if (fieldSetter.kind === "tailwind") {
         const key = actorP.side === "yours" ? "yours" : "opponents";
         setFieldState({ tailwindTurnsLeft: { ...fieldState.tailwindTurnsLeft, [key]: 4 } });
       }
-      onConfirm(`${cap(actor)} used ${moveLabel}, setting up the field`);
+      onConfirm(endingTR
+        ? `${cap(actor)} used ${moveLabel}, which ended Trick Room`
+        : `${cap(actor)} used ${moveLabel}, setting up the field`);
       return;
     }
 
@@ -386,7 +442,11 @@ export default function EventComposer({
 
     if (selectedTargets.length === 0) return;
     const outcomes = selectedTargets.map((t) => ({ t, o: outcomeOf(t) }));
-    const parts = outcomes.map(({ t, o }) => `${moveLabel} ${describeOutcome(o, t, hpOfName(t))}`);
+    const parts = outcomes.map(({ t, o }) => {
+      const p = damagePreviews[t];
+      const calcNote = o.kind === "damage" && p?.ok && p.kind === "damage" ? ` (calc expected ${p.minPct}–${p.maxPct}%)` : "";
+      return `${moveLabel} ${describeOutcome(o, t, hpOfName(t))}${calcNote}`;
+    });
     const landed = outcomes.some(({ o }) => o.kind === "damage" || o.kind === "worked");
 
     const statusKind = effect ? statusFromEffect(effect, moveSlug) : null;
@@ -573,6 +633,22 @@ export default function EventComposer({
               {!fieldSetter && !isSelfMove && selectedTargets.length > 0 && (
                 <div className="mt-4 space-y-3">
                   <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Result per target</p>
+                  {Object.keys(damagePreviews).length > 0 && (
+                    <>
+                      <div className="flex flex-wrap gap-1.5">
+                        {CALC_TOGGLES.map((c) => (
+                          <button key={c.key} type="button" aria-pressed={calcExtras[c.key]}
+                            onClick={() => setCalcExtras((prev) => ({ ...prev, [c.key]: !prev[c.key] }))}
+                            className={`min-h-[32px] rounded-full px-3 text-xs font-medium ${calcExtras[c.key] ? "bg-[color:var(--shell-accent)] text-white" : "bg-black/10 text-[color:var(--ink)]"}`}>
+                            {c.label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-[color:var(--ink)]/50">
+                        Estimates use the Gen 9 formula at Lv50. Your mon&apos;s bulk and the foe&apos;s spread, item and ability are guessed, and stat stages aren&apos;t tracked yet.
+                      </p>
+                    </>
+                  )}
                   {selectedTargets.map((t) => {
                     const o = outcomeOf(t);
                     const current = hpOfName(t);
@@ -595,6 +671,13 @@ export default function EventComposer({
                             </button>
                           ))}
                         </div>
+                        {damagePreviews[t] && (
+                          <LiveDamagePreview
+                            outcome={damagePreviews[t]}
+                            currentHp={current}
+                            onUse={(pct) => setTargetOutcomes((prev) => ({ ...prev, [t]: { kind: "damage", pct } }))}
+                          />
+                        )}
                         {o.kind === "damage" && (
                           <DamageSlider
                             value={o.pct} max={current} targetName={t}
@@ -741,9 +824,25 @@ export default function EventComposer({
           )
         ) : (
           actor && (
-            <p className="mt-4 rounded-md bg-black/5 px-3 py-2 text-sm text-[color:var(--ink)]/70">
-              {describeMegaForm(actor) ?? "No known Mega form for this Pokémon."}
-            </p>
+            !megaInfo ? (
+              <p className="mt-4 rounded-md bg-black/5 px-3 py-2 text-sm text-[color:var(--ink)]/70">No known Mega form for this Pokémon.</p>
+            ) : (
+              <div className="mt-4 space-y-2 rounded-md bg-black/5 px-3 py-2 text-sm text-[color:var(--ink)]/80">
+                <p>{describeMegaForm(actor)}</p>
+                <p className="text-xs">
+                  Ability: <span className="capitalize">{(megaInfo.baseAbility ?? "unknown").replace(/-/g, " ")}</span> →{" "}
+                  <span className="font-semibold capitalize">{megaInfo.form.formAbility.replace(/-/g, " ")}</span>. The old ability stops applying once it Mega Evolves.
+                </p>
+                {megaInfo.weather && (
+                  <p className="text-xs">
+                    {megaInfo.weatherChange
+                      ? `${megaInfo.form.formAbility.replace(/-/g, " ")} will set ${megaInfo.weather} (5 turns).`
+                      : `${megaInfo.weather} is already active, so the weather stays as it is.`}
+                  </p>
+                )}
+                {megaInfo.block && <p className="rounded bg-red-100 px-2 py-1 text-xs text-red-900">{megaInfo.block}</p>}
+              </div>
+            )
           )
         )}
 
@@ -752,7 +851,7 @@ export default function EventComposer({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={mode === "switch" ? !switchTo : mode === "faint" ? !actor : mode === "status" ? !actor || !canConfirmStatus : mode === "hp" ? !actor || hpAmount <= 0 : mode === "mega" ? !actor || !describeMegaForm(actor) : !canConfirmMove}
+            disabled={mode === "switch" ? !switchTo : mode === "faint" ? !actor : mode === "status" ? !actor || !canConfirmStatus : mode === "hp" ? !actor || hpAmount <= 0 : mode === "mega" ? !actor || !megaInfo || !!megaInfo.block : !canConfirmMove}
             className="btn-tactile btn-glow-accent min-h-[48px] flex-1 rounded-md bg-[color:var(--shell-accent)] px-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             Add event

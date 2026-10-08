@@ -1,10 +1,13 @@
 import { create } from "zustand";
-import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers, FaintedMons, HpState, HpChange, BattleSide, MonRef, PerMon, PokemonTypeName, StatusKind, StatusState } from "@/lib/types";
+import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers, FaintedMons, HpState, HpChange, BattleSide, MonRef, PerMon, PokemonTypeName, StatusKind, StatusState, PokemonDetail } from "@/lib/types";
 import { useTeamStore } from "./teamStore";
 import { useOpponentTeamStore } from "./opponentTeamStore";
 import { cap, checkBerry, computeEndOfTurn, ResidualMon } from "@/lib/logic/residualEffects";
 import { useAiSettingsStore } from "./aiSettingsStore";
 import { useLiveSessionStore } from "./liveSessionStore";
+import { getCommonSet, synthesizeMegaDetail } from "@/lib/data/commonSets";
+import { getAbilitySignal } from "@/lib/logic/abilitySignals";
+import { fetchPokemonDetail } from "@/lib/data/fetchAndCache";
 
 const EMPTY_FIELD_STATE: FieldState = {
   weather: "none",
@@ -29,6 +32,8 @@ interface BattleSessionState {
   toxicTurns: PerMon<number>;
   itemUsed: PerMon<boolean>;
   lastResiduals: string[];
+  megaUsed: Record<BattleSide, string | null>;   // one Mega per side per battle
+  megaDetails: Record<string, PokemonDetail>; 
   initialLeads: ActiveBattlers | null;
   fieldState: FieldState;
   currentTurnEvents: BattleEvent[];
@@ -39,10 +44,11 @@ interface BattleSessionState {
   startSession: (yourTeamNames: string[], opponentTeamNames: string[], activeBattlers: ActiveBattlers) => void;
   resetSession: () => void;
   setFieldState: (updates: Partial<FieldState>) => void;
-  addEvent: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status">) => void;
+  addEvent: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status" | "mega">) => void;
   removeEvent: (id: string) => void;
   switchActiveBattler: (side: "yours" | "opponent", outgoingName: string, incomingName: string) => void;
   submitTurn: () => Promise<void>;
+  loadMegaDetail: (side: BattleSide, name: string) => Promise<void>;
 }
 
 const initialState = {
@@ -57,6 +63,8 @@ const initialState = {
   toxicTurns: { yours: {}, opponent: {} } as PerMon<number>,
   itemUsed: { yours: {}, opponent: {} } as PerMon<boolean>,
   lastResiduals: [] as string[],
+  megaUsed: { yours: null, opponent: null } as Record<BattleSide, string | null>,
+  megaDetails: {} as Record<string, PokemonDetail>,
   initialLeads: null as ActiveBattlers | null,
   fieldState: EMPTY_FIELD_STATE,
   currentTurnEvents: [] as BattleEvent[],
@@ -143,11 +151,31 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
         if (cur > 0) { setHp(f.side, f.name, 0); changes.push({ side: f.side, name: f.name, pct: cur }); }
       }
 
+      let megaUsed = state.megaUsed;
+      let fieldState = state.fieldState;
+      let megaEvent: BattleEvent["mega"];
+      if (extra?.mega) {
+        const { side, name } = extra.mega;
+        const form = getCommonSet(name)?.megaForm;
+        if (form && !megaUsed[side]) {
+          megaUsed = { ...megaUsed, [side]: name };
+          // The Mega's ability activates on evolving (Drought etc.); it can't change weather that is already up
+          const kind = getAbilitySignal(form.formAbility)?.weatherSets;
+          let prevWeather: { weather: FieldState["weather"]; turnsLeft: number } | undefined;
+          if (kind && fieldState.weather !== kind) {
+            prevWeather = { weather: fieldState.weather, turnsLeft: fieldState.weatherTurnsLeft };
+            fieldState = { ...fieldState, weather: kind, weatherTurnsLeft: 5 };
+          }
+          megaEvent = { side, name, prevWeather };
+        }
+      }
+
       return {
         hp,
         fainted,
         status,
         itemUsed,
+        megaUsed, fieldState,
         currentTurnEvents: [
           ...state.currentTurnEvents,
           {
@@ -158,6 +186,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
             damage: changes.length ? changes : undefined,
             status: extra?.status,
             consumed: consumed.length ? consumed : undefined,
+            mega: megaEvent,
           },
         ],
       };
@@ -173,6 +202,17 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
       let hp = state.hp;
       let status = state.status;
       let itemUsed = state.itemUsed;
+      let megaUsed = state.megaUsed;
+      let megaDetails = state.megaDetails;
+      let fieldState = state.fieldState;
+      if (ev?.mega) {
+        const key = `${ev.mega.side}:${ev.mega.name}`;
+        megaUsed = { ...megaUsed, [ev.mega.side]: null };
+        megaDetails = Object.fromEntries(Object.entries(megaDetails).filter(([k]) => k !== key));
+        if (ev.mega.prevWeather) {
+          fieldState = { ...fieldState, weather: ev.mega.prevWeather.weather, weatherTurnsLeft: ev.mega.prevWeather.turnsLeft };
+        }
+      }
       if (ev?.switch) {
         const { side, out, in: incoming } = ev.switch;
         const list = [...activeBattlers[side]];
@@ -195,7 +235,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
       for (const c of ev?.consumed ?? []) {
         itemUsed = { ...itemUsed, [c.side]: { ...itemUsed[c.side], [c.name]: false } };
       }
-      return { currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id), activeBattlers, fainted, hp, status, itemUsed };
+      return { currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id), activeBattlers, fainted, hp, status, itemUsed, megaUsed, megaDetails, fieldState };
     }),
 
   // Called when a Switch event is confirmed — swaps the outgoing mon for the
@@ -232,7 +272,18 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
           opponentTeam: state.opponentTeamNames,
           conversation: state.conversation,
           newTurnSentence: compiledSentence,
-          activeNote: describeBattlers(state.activeBattlers, eot.fainted, state.yourTeamNames.length, eot.hp, state.status),
+          activeNote: describeBattlers(state.activeBattlers, eot.fainted, state.yourTeamNames.length, eot.hp, state.status, state.megaUsed),
+          yourLoadouts: state.yourTeamNames.map((name) => {
+            const slot = useTeamStore.getState().slots.find((x) => x.pokemon?.name === name);
+            return {
+              name,
+              item: slot?.itemName ?? null,
+              ability: slot?.abilityName ?? null,
+              nature: slot?.nature ?? null,
+              moves: slot?.moves.filter((m): m is string => m !== null) ?? [],
+            };
+          }),
+          opponentGuesses: state.opponentTeamNames.map((name) => ({ name, ...loadoutOf("opponent", name) })),
           model: useAiSettingsStore.getState().model,
         }),
       });
@@ -260,9 +311,21 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
       set({ adviceStatus: "error" });
     }
   },
+
+  loadMegaDetail: async (side, name) => {
+    const form = getCommonSet(name)?.megaForm;
+    if (!form) return;
+    const base = side === "yours"
+      ? useTeamStore.getState().slots.find((x) => x.pokemon?.name === name)?.pokemon
+      : useOpponentTeamStore.getState().slots.find((x) => x.pokemon?.name === name)?.pokemon;
+    const detail = (await fetchPokemonDetail(form.formSpecies)) ?? (base ? synthesizeMegaDetail(base, form) : null);
+    if (!detail) return;
+    // Ignore the result if the Mega event was undone while the request was running
+    set((s) => (s.megaUsed[side] === name ? { megaDetails: { ...s.megaDetails, [`${side}:${name}`]: detail } } : s));
+  },
 }));
 
-function describeBattlers(a: ActiveBattlers, fainted: FaintedMons, yourTotal: number, hp: HpState, status: StatusState): string {
+function describeBattlers(a: ActiveBattlers, fainted: FaintedMons, yourTotal: number, hp: HpState, status: StatusState, megaUsed: Record<BattleSide, string | null>): string {
   const live = (list: (string | null)[], down: string[]) =>
     list.filter((n): n is string => n !== null && !down.includes(n)).join(" + ") || "none";
   const names = (l: string[]) => (l.length ? l.join(", ") : "none");
@@ -278,24 +341,47 @@ function describeBattlers(a: ActiveBattlers, fainted: FaintedMons, yourTotal: nu
       .map(([n, k]) => `${n} (${k === "toxic" ? "badly poisoned" : k})`);
     return list.length ? list.join(", ") : "none";
   };
+  const megaLine = (side: BattleSide) => {
+    const n = megaUsed[side];
+    if (!n) return "not used yet";
+    const f = getCommonSet(n)?.megaForm;
+    return f ? `${n} became ${f.formShowdownName} (ability now ${f.formAbility.replace(/-/g, " ")}; its old ability no longer applies)` : `${n} Mega Evolved`;
+  };
   return (
     `On the field after this turn — yours: ${live(a.yours, fainted.yours)}; opponent's: ${live(a.opponent, fainted.opponent)}. ` +
     `Fainted — yours: ${names(fainted.yours)}; opponent's: ${names(fainted.opponent)}. ` +
     `Remaining HP (% of max) — yours: ${hurt("yours")}; opponent's: ${hurt("opponent")}. ` +
     `Status conditions — yours: ${afflicted("yours")}; opponent's: ${afflicted("opponent")}. ` +
+    `Mega Evolution — yours: ${megaLine("yours")}; opponent's: ${megaLine("opponent")}. A side that has used its Mega cannot Mega again. ` +
     `Remaining — you: ${Math.max(0, yourTotal - fainted.yours.length)} of ${yourTotal}, opponent: ${Math.max(0, 4 - fainted.opponent.length)} of 4`
   );
 }
 
-/** Types / held item / ability for a mon: from Team Builder for yours, from scouting (a guess) for the opponent. */
-function loadoutOf(side: BattleSide, name: string): { types: PokemonTypeName[]; item: string | null; ability: string | null } {
+/** Loadout BEFORE any Mega Evolution. Scouting pre-fills the Mega ability on opponents, so that guess is undone here. */
+export function baseLoadoutOf(side: BattleSide, name: string): { types: PokemonTypeName[]; item: string | null; ability: string | null } {
   if (side === "yours") {
     const s = useTeamStore.getState().slots.find((x) => x.pokemon?.name === name);
     return { types: s?.pokemon?.types ?? [], item: s?.itemName ?? null, ability: s?.abilityName ?? null };
   }
   const o = useOpponentTeamStore.getState().slots.find((x) => x.pokemon?.name === name);
-  const effective = o?.megaFormDetail ?? o?.pokemon;
-  return { types: effective?.types ?? [], item: o?.itemName ?? null, ability: o?.abilityName ?? null };
+  const cs = getCommonSet(name);
+  const ability =
+    cs?.megaForm && o?.abilityName === cs.megaForm.formAbility
+      ? (o.pokemon?.abilities.some((a) => a.name === cs.likelyAbility) ? cs.likelyAbility : null)
+      : o?.abilityName ?? null;
+  return { types: o?.pokemon?.types ?? [], item: o?.itemName ?? null, ability };
+}
+
+/** What a mon is RIGHT NOW: once it has Mega Evolved, the Mega's ability (and typing) replace the base ones. */
+export function loadoutOf(side: BattleSide, name: string): { types: PokemonTypeName[]; item: string | null; ability: string | null } {
+  const base = baseLoadoutOf(side, name);
+  const st = useBattleSessionStore.getState();
+  const form = st.megaUsed[side] === name ? getCommonSet(name)?.megaForm : undefined;
+  if (!form) return base;
+  const scouted = side === "opponent"
+    ? useOpponentTeamStore.getState().slots.find((x) => x.pokemon?.name === name)?.megaFormDetail?.types
+    : undefined;
+  return { ...base, ability: form.formAbility, types: form.formTypes ?? st.megaDetails[`${side}:${name}`]?.types ?? scouted ?? base.types };
 }
 
 /** What the end of this turn would do right now, without committing anything. */
