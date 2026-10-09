@@ -15,6 +15,7 @@ interface Row {
   likely: number;  // used for ordering
   tailwind: boolean;
   paralyzed: boolean;
+  stage: number;
   mega: boolean;
 }
 
@@ -31,6 +32,7 @@ export default function SpeedOrderPanel() {
   const megaUsed = useBattleSessionStore((s) => s.megaUsed);
   const megaDetails = useBattleSessionStore((s) => s.megaDetails);
   const opponentReveals = useBattleSessionStore((s) => s.opponentReveals);
+  const stages = useBattleSessionStore((s) => s.stages);
 
   const trickRoom = field.trickRoomTurnsLeft > 0;
   const rows: Row[] = [];
@@ -42,6 +44,7 @@ export default function SpeedOrderPanel() {
         ...NO_SPEED_CONDITIONS,
         tailwind: (side === "yours" ? field.tailwindTurnsLeft.yours : field.tailwindTurnsLeft.opponents) > 0,
         paralyzed: status[side][name] === "paralysis",
+        stage: stages[side][name]?.spe ?? 0,
       };
       const megaOn = megaUsed[side] === name;
       const md = megaOn ? megaDetails[`${side}:${name}`] : undefined;
@@ -51,7 +54,7 @@ export default function SpeedOrderPanel() {
         if (!slot?.pokemon) continue;
         const base = (md?.stats ?? slot.pokemon.stats).find((s) => s.name === "speed")?.baseStat ?? 0;
         const speed = calculateEffectiveSpeed(base, slot.speedSp, slot.nature, slot.itemName, cond);
-        rows.push({ key: `y-${name}`, name, side, low: speed, high: speed, likely: speed, tailwind: cond.tailwind, paralyzed: cond.paralyzed, mega: megaOn });
+        rows.push({ key: `y-${name}`, name, side, low: speed, high: speed, likely: speed, tailwind: cond.tailwind, paralyzed: cond.paralyzed, stage: cond.stage, mega: megaOn });
       } else {
         const detail = oppSlots.find((s) => s.pokemon?.name === name)?.pokemon;
         if (!detail) continue;
@@ -70,7 +73,7 @@ export default function SpeedOrderPanel() {
         rows.push({
           key: `o-${name}`, name, side,
           low: Math.min(...speeds), high: Math.max(...speeds), likely: variants[0].speed,
-          tailwind: cond.tailwind, paralyzed: cond.paralyzed, mega: megaOn
+          tailwind: cond.tailwind, paralyzed: cond.paralyzed, stage: cond.stage,mega: megaOn
         });
       }
     }
@@ -134,7 +137,7 @@ export default function SpeedOrderPanel() {
       </ol>
 
       <p className="mt-2 text-[11px] text-[color:var(--ink)]/50">
-        Priority moves (Fake Out, Protect, Prankster, etc.) ignore this order. Speed stat stages aren't tracked yet.
+        Priority moves (Fake Out, Protect, Prankster, etc.) ignore this order.
       </p>
     </div>
   );

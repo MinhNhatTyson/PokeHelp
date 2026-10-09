@@ -14,6 +14,7 @@ import BackToOptimizer from "@/components/BackToOptimizer";
 import HpBar from "@/components/HpBar";
 import OpponentLoadoutPanel from "@/components/OpponentLoadoutPanel";
 import SpeedOrderPanel from "@/components/SpeedOrderPanel";
+import StagePanel, { StageBadges } from "@/components/StagePanel";
 
 function toggleSelection(list: string[], setList: (v: string[]) => void, name: string, max: number) {
   if (list.includes(name)) setList(list.filter((n) => n !== name));
@@ -310,12 +311,13 @@ export default function BattleGuidance() {
                     <HpBar pct={pct} className="h-2 flex-1" />
                     <span className="w-9 text-right text-[11px] tabular-nums text-[color:var(--ink)]">{pct}%</span>
                   </div>
+                  <StageBadges side={p.side} name={p.name} />
                   {megaUsed[p.side] === p.name && (
                     <span className="mt-1 block text-[10px] capitalize text-[color:var(--ink)]/60">
                       Ability: {(loadoutOf(p.side, p.name).ability ?? "unknown").replace(/-/g, " ")}
                     </span>
                   )}
-                  {p.side === "opponent" && <OpponentIntelLine name={p.name} />}
+                  {p.side === "opponent" && !p.fainted && <OpponentIntelLine name={p.name} />}
                   <span className="mt-1 block text-[10px] uppercase tracking-wide text-[color:var(--ink)]/40">
                     {p.side === "yours" ? "You" : "Opponent"}
                   </span>
@@ -335,6 +337,7 @@ export default function BattleGuidance() {
         </div>
 
         <SpeedOrderPanel />
+        <StagePanel />
         <div className="mt-3">
           <OpponentLoadoutPanel />
         </div>

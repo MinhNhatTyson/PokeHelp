@@ -645,7 +645,7 @@ export default function EventComposer({
                         ))}
                       </div>
                       <p className="text-[10px] text-[color:var(--ink)]/50">
-                        Estimates use the Gen 9 formula at Lv50. Your mon&apos;s bulk and the foe&apos;s spread, item and ability are guessed, and stat stages aren&apos;t tracked yet.
+                        Estimates use the Gen 9 formula at Lv50. Your mon&apos;s bulk and the foe&apos;s spread, item and ability are guessed, and stat stages come from the Stat stages panel.
                       </p>
                     </>
                   )}

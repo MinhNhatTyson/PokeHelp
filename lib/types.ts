@@ -182,6 +182,9 @@ export type StatusKind = "burn" | "poison" | "toxic" | "paralysis" | "sleep" | "
 export type StatusState = PerMon<StatusKind>; // missing name = healthy
 export interface StatusChange { side: BattleSide; name: string; prev: StatusKind | null; next: StatusKind | null }
 export interface MonRef { side: BattleSide; name: string }
+export type StageStat = "atk" | "def" | "spa" | "spd" | "spe";
+export type StageState = PerMon<Partial<Record<StageStat, number>>>; // missing = 0
+export interface StageChange { side: BattleSide; name: string; stat: StageStat; delta: number } // delta = what was actually applied (after clamping)
 
 export interface BattleEvent {
   id: string;
@@ -192,6 +195,9 @@ export interface BattleEvent {
   status?: StatusChange[];  // so deleting the event restores the previous status
   consumed?: MonRef[]; 
   mega?: { side: BattleSide; name: string; prevWeather?: { weather: FieldState["weather"]; turnsLeft: number } };
+  stages?: StageChange[];                                                   // entry effects (Intimidate...), reversed on undo
+  clearedStages?: { side: BattleSide; name: string; stages: Partial<Record<StageStat, number>> }[]; // outgoing mon's stages, restored on undo
+  fieldPrev?: Pick<FieldState, "weather" | "weatherTurnsLeft" | "terrain" | "terrainTurnsLeft">;    // field before a switch-in surge ability
 }
 
 export interface FaintedMons {

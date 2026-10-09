@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers, FaintedMons, HpState, HpChange, BattleSide, MonRef, PerMon, PokemonTypeName, StatusKind, StatusState, PokemonDetail } from "@/lib/types";
+import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers, FaintedMons, HpState, HpChange, BattleSide, MonRef, PerMon, PokemonTypeName, StatusKind, StatusState, PokemonDetail, StageState, StageStat } from "@/lib/types";
 import { useTeamStore } from "./teamStore";
 import { useOpponentTeamStore } from "./opponentTeamStore";
 import { cap, checkBerry, computeEndOfTurn, ResidualMon } from "@/lib/logic/residualEffects";
@@ -8,6 +8,7 @@ import { useLiveSessionStore } from "./liveSessionStore";
 import { getCommonSet, synthesizeMegaDetail } from "@/lib/data/commonSets";
 import { getAbilitySignal } from "@/lib/logic/abilitySignals";
 import { fetchPokemonDetail } from "@/lib/data/fetchAndCache";
+import { computeEntryEffects, applyStageDeltas } from "@/lib/logic/entryEffects";
 
 const EMPTY_FIELD_STATE: FieldState = {
   weather: "none",
@@ -32,6 +33,8 @@ interface BattleSessionState {
   status: StatusState;
   toxicTurns: PerMon<number>;
   itemUsed: PerMon<boolean>;
+  stages: StageState;
+  setStage: (side: BattleSide, name: string, stat: StageStat, value: number) => void;
   lastResiduals: string[];
   megaUsed: Record<BattleSide, string | null>;   // one Mega per side per battle
   megaDetails: Record<string, PokemonDetail>; 
@@ -66,6 +69,7 @@ const initialState = {
   status: { yours: {}, opponent: {} } as StatusState,
   toxicTurns: { yours: {}, opponent: {} } as PerMon<number>,
   itemUsed: { yours: {}, opponent: {} } as PerMon<boolean>,
+  stages: { yours: {}, opponent: {} } as StageState,
   lastResiduals: [] as string[],
   megaUsed: { yours: null, opponent: null } as Record<BattleSide, string | null>,
   megaDetails: {} as Record<string, PokemonDetail>,
@@ -81,8 +85,10 @@ const initialState = {
 export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
   ...initialState,
 
-  startSession: (yourTeamNames, opponentTeamNames, activeBattlers) =>
-    set({ ...initialState, started: true, sessionId: crypto.randomUUID(), yourTeamNames, opponentTeamNames, activeBattlers, initialLeads: activeBattlers }),
+  startSession: (yourTeamNames, opponentTeamNames, activeBattlers) => {
+    set({ ...initialState, started: true, sessionId: crypto.randomUUID(), yourTeamNames, opponentTeamNames, activeBattlers, initialLeads: activeBattlers });
+    set((s) => applyLeadEntries(s)); 
+  },
 
   resetSession: () => {
     const s = get();
@@ -175,23 +181,55 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
         }
       }
 
+      // Switch-in: the outgoing mon's stages reset, then the incoming mon's entry abilities fire
+      let stages = state.stages;
+      let stageChanges: BattleEvent["stages"];
+      let clearedStages: BattleEvent["clearedStages"];
+      let fieldPrev: BattleEvent["fieldPrev"];
+      const entryNotes: string[] = [];
+      if (extra?.switch) {
+        const { side, out, in: incoming } = extra.switch;
+        const old = stages[side][out];
+        if (old && Object.values(old).some((v) => v)) {
+          clearedStages = [{ side, name: out, stages: old }];
+          const rest = { ...stages[side] };
+          delete rest[out];
+          stages = { ...stages, [side]: rest };
+        }
+        const other: BattleSide = side === "yours" ? "opponent" : "yours";
+        const foes = state.activeBattlers[other]
+          .filter((n): n is string => !!n && !state.fainted[other].includes(n))
+          .map((n) => ({ name: n, ability: loadoutOf(other, n).ability }));
+        const res = computeEntryEffects({
+          side, name: incoming, ability: loadoutOf(side, incoming).ability, foes, field: fieldState,
+          stageOf: (s, n, k) => stages[s][n]?.[k] ?? 0,
+        });
+        if (res.stageChanges.length > 0) { stageChanges = res.stageChanges; stages = applyStageDeltas(stages, res.stageChanges); }
+        if (res.field) { fieldPrev = res.fieldPrev; fieldState = { ...fieldState, ...res.field }; }
+        entryNotes.push(...res.notes);
+      }
+
       return {
         hp,
         fainted,
         status,
         itemUsed,
         megaUsed, fieldState,
+        stages,
         currentTurnEvents: [
           ...state.currentTurnEvents,
           {
             id: crypto.randomUUID(),
-            sentenceFragment: [fragment, ...berryNotes].join("; "),
+            sentenceFragment: [fragment, ...berryNotes, ...entryNotes].join("; "),
             switch: extra?.switch,
             faint: added.length ? added : undefined,
             damage: changes.length ? changes : undefined,
             status: extra?.status,
             consumed: consumed.length ? consumed : undefined,
             mega: megaEvent,
+            stages: stageChanges,
+            clearedStages,
+            fieldPrev,
           },
         ],
       };
@@ -210,6 +248,10 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
       let megaUsed = state.megaUsed;
       let megaDetails = state.megaDetails;
       let fieldState = state.fieldState;
+      let stages = state.stages;
+      if (ev?.stages) stages = applyStageDeltas(stages, ev.stages, -1);
+      for (const c of ev?.clearedStages ?? []) stages = { ...stages, [c.side]: { ...stages[c.side], [c.name]: c.stages } };
+      if (ev?.fieldPrev) fieldState = { ...fieldState, ...ev.fieldPrev };
       if (ev?.mega) {
         const key = `${ev.mega.side}:${ev.mega.name}`;
         megaUsed = { ...megaUsed, [ev.mega.side]: null };
@@ -240,7 +282,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
       for (const c of ev?.consumed ?? []) {
         itemUsed = { ...itemUsed, [c.side]: { ...itemUsed[c.side], [c.name]: false } };
       }
-      return { currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id), activeBattlers, fainted, hp, status, itemUsed, megaUsed, megaDetails, fieldState };
+      return { currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id), activeBattlers, fainted, hp, status, itemUsed, megaUsed, megaDetails, fieldState, stages };
     }),
 
   // Called when a Switch event is confirmed — swaps the outgoing mon for the
@@ -254,6 +296,14 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
       list[idx] = incomingName;
       return { activeBattlers: { ...state.activeBattlers, [side]: list } };
     }),
+
+  setStage: (side, name, stat, value) =>
+    set((s) => ({
+      stages: {
+        ...s.stages,
+        [side]: { ...s.stages[side], [name]: { ...s.stages[side][name], [stat]: Math.max(-6, Math.min(6, Math.round(value))) } },
+      },
+    })),
 
   submitTurn: async () => {
     const state = get();
@@ -277,7 +327,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
           opponentTeam: state.opponentTeamNames,
           conversation: state.conversation,
           newTurnSentence: compiledSentence,
-          activeNote: describeBattlers(state.activeBattlers, eot.fainted, state.yourTeamNames.length, eot.hp, state.status, state.megaUsed),
+          activeNote: describeBattlers(state.activeBattlers, eot.fainted, state.yourTeamNames.length, eot.hp, state.status, state.megaUsed, state.stages),
           yourLoadouts: state.yourTeamNames.map((name) => {
             const slot = useTeamStore.getState().slots.find((x) => x.pokemon?.name === name);
             return {
@@ -353,7 +403,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
     }),
 }));
 
-function describeBattlers(a: ActiveBattlers, fainted: FaintedMons, yourTotal: number, hp: HpState, status: StatusState, megaUsed: Record<BattleSide, string | null>): string {
+function describeBattlers(a: ActiveBattlers, fainted: FaintedMons, yourTotal: number, hp: HpState, status: StatusState, megaUsed: Record<BattleSide, string | null>, stages: StageState): string {
   const live = (list: (string | null)[], down: string[]) =>
     list.filter((n): n is string => n !== null && !down.includes(n)).join(" + ") || "none";
   const names = (l: string[]) => (l.length ? l.join(", ") : "none");
@@ -375,11 +425,18 @@ function describeBattlers(a: ActiveBattlers, fainted: FaintedMons, yourTotal: nu
     const f = getCommonSet(n)?.megaForm;
     return f ? `${n} became ${f.formShowdownName} (ability now ${f.formAbility.replace(/-/g, " ")}; its old ability no longer applies)` : `${n} Mega Evolved`;
   };
+  const staged = (side: BattleSide) => {
+    const list = Object.entries(stages[side])
+      .filter(([n]) => !fainted[side].includes(n))
+      .flatMap(([n, st]) => Object.entries(st).filter(([, v]) => v).map(([k, v]) => `${n} ${k} ${v! > 0 ? "+" : ""}${v}`));
+    return list.length ? list.join(", ") : "none";
+  };
   return (
     `On the field after this turn — yours: ${live(a.yours, fainted.yours)}; opponent's: ${live(a.opponent, fainted.opponent)}. ` +
     `Fainted — yours: ${names(fainted.yours)}; opponent's: ${names(fainted.opponent)}. ` +
     `Remaining HP (% of max) — yours: ${hurt("yours")}; opponent's: ${hurt("opponent")}. ` +
     `Status conditions — yours: ${afflicted("yours")}; opponent's: ${afflicted("opponent")}. ` +
+    `Stat stages — yours: ${staged("yours")}; opponent's: ${staged("opponent")}. ` +
     `Mega Evolution — yours: ${megaLine("yours")}; opponent's: ${megaLine("opponent")}. A side that has used its Mega cannot Mega again. ` +
     `Remaining — you: ${Math.max(0, yourTotal - fainted.yours.length)} of ${yourTotal}, opponent: ${Math.max(0, 4 - fainted.opponent.length)} of 4`
   );
@@ -486,6 +543,25 @@ function decrementCounters(f: FieldState): FieldState {
       opponents: Math.max(0, f.tailwindTurnsLeft.opponents - 1),
     },
   };
+}
+
+function applyLeadEntries(s: BattleSessionState): Partial<BattleSessionState> {
+  let stages = s.stages;
+  let fieldState = s.fieldState;
+  for (const side of ["yours", "opponent"] as const) {
+    const other: BattleSide = side === "yours" ? "opponent" : "yours";
+    for (const name of s.activeBattlers[side]) {
+      if (!name) continue;
+      const foes = s.activeBattlers[other].filter((n): n is string => !!n).map((n) => ({ name: n, ability: loadoutOf(other, n).ability }));
+      const res = computeEntryEffects({
+        side, name, ability: loadoutOf(side, name).ability, foes, field: fieldState, startOfBattle: true,
+        stageOf: (sd, n, k) => stages[sd][n]?.[k] ?? 0,
+      });
+      stages = applyStageDeltas(stages, res.stageChanges);
+      if (res.field) fieldState = { ...fieldState, ...res.field };
+    }
+  }
+  return { stages, fieldState };
 }
 
 /** Copies the running session into liveSessionStore so Battle Optimizer can pre-fill its result logger. */

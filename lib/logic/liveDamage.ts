@@ -4,7 +4,7 @@ import {
   applyPreset, configFromOpponent, configFromTeamSlot, configToSetup, runDamageCalc,
   type DamageOutcome, type FieldSetup, type MonConfig,
 } from "@/lib/logic/damageCalc";
-import { baseLoadoutOf } from "@/lib/store/battleSessionStore";
+import { baseLoadoutOf, useBattleSessionStore } from "@/lib/store/battleSessionStore";
 
 export type CalcExtras = Pick<FieldSetup, "crit" | "helpingHand" | "reflect" | "lightScreen" | "auroraVeil">;
 export const DEFAULT_EXTRAS: CalcExtras = { crit: false, helpingHand: false, reflect: false, lightScreen: false, auroraVeil: false };
@@ -43,6 +43,10 @@ function buildConfig(
   }
   if (!cfg) return null;
 
+  // Layer in-battle reveals over the scouting guess (pre-Mega loadout; the Mega ability is applied below via useMega)
+  const loadout = baseLoadoutOf(who.side, who.name);
+  cfg = { ...cfg, item: loadout.item, ability: loadout.ability ?? cfg.ability };
+
   const cs = getCommonSet(who.name);
   const megaForm = cs?.megaForm;
   const useMega = who.mega && !!megaForm;
@@ -50,7 +54,9 @@ function buildConfig(
   let ability = cfg.ability;
   if (!useMega && megaForm && ability === megaForm.formAbility) ability = cs?.likelyAbility ?? null;
 
-  return { ...cfg, useMega, ability, burned: !!who.burned };
+  const st = useBattleSessionStore.getState().stages[who.side][who.name] ?? {};
+  const boosts = { atk: st.atk ?? 0, def: st.def ?? 0, spa: st.spa ?? 0, spd: st.spd ?? 0, spe: st.spe ?? 0 };
+  return { ...cfg, useMega, ability, burned: !!who.burned, boosts };
 }
 
 export function liveDamage(a: {

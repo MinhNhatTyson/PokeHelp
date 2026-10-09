@@ -9,6 +9,7 @@ export interface AbilitySignal {
   immunity?: PokemonTypeName;
   /** This ability sets the given weather on switch-in */
   weatherSets?: WeatherKind;
+  terrainSets?: "electric" | "grassy" | "misty" | "psychic";
   /** This ability gets a meaningful payoff (usually Speed) under the given weather */
   weatherBoostedBy?: WeatherKind;
   /** Lowers opposing physical attackers' Attack on switch-in */
@@ -25,6 +26,10 @@ export const ABILITY_SIGNALS: Record<string, AbilitySignal> = {
   drizzle: { name: "drizzle", weatherSets: "rain" },
   "sand-stream": { name: "sand-stream", weatherSets: "sand" },
   "snow-warning": { name: "snow-warning", weatherSets: "snow" },
+  "electric-surge": { name: "electric-surge", terrainSets: "electric" },
+  "grassy-surge": { name: "grassy-surge", terrainSets: "grassy" },
+  "misty-surge": { name: "misty-surge", terrainSets: "misty" },
+  "psychic-surge": { name: "psychic-surge", terrainSets: "psychic" },
 
   chlorophyll: { name: "chlorophyll", weatherBoostedBy: "sun" },
   "swift-swim": { name: "swift-swim", weatherBoostedBy: "rain" },
