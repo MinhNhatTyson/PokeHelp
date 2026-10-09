@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers, FaintedMons, HpState, HpChange, BattleSide, MonRef, PerMon, PokemonTypeName, StatusKind, StatusState, PokemonDetail, StageState, StageStat } from "@/lib/types";
+import { FieldState, BattleEvent, BattleConversationTurn, ActiveBattlers, FaintedMons, HpState, HpChange, BattleSide, MonRef, PerMon, PokemonTypeName, StatusKind, StatusState, PokemonDetail, StageState, StageStat, ScreensState, ScreenKind } from "@/lib/types";
 import { useTeamStore } from "./teamStore";
 import { useOpponentTeamStore } from "./opponentTeamStore";
 import { cap, checkBerry, computeEndOfTurn, ResidualMon } from "@/lib/logic/residualEffects";
@@ -34,6 +34,9 @@ interface BattleSessionState {
   toxicTurns: PerMon<number>;
   itemUsed: PerMon<boolean>;
   stages: StageState;
+  screens: ScreensState;
+  protectTurn: PerMon<number>; // turn number of each mon's last successful Protect-style move
+  setScreen: (side: BattleSide, kind: ScreenKind, turns: number) => void;
   setStage: (side: BattleSide, name: string, stat: StageStat, value: number) => void;
   lastResiduals: string[];
   megaUsed: Record<BattleSide, string | null>;   // one Mega per side per battle
@@ -51,7 +54,7 @@ interface BattleSessionState {
   startSession: (yourTeamNames: string[], opponentTeamNames: string[], activeBattlers: ActiveBattlers) => void;
   resetSession: () => void;
   setFieldState: (updates: Partial<FieldState>) => void;
-  addEvent: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status" | "mega">) => void;
+  addEvent: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status" | "mega" | "screen" | "protect">) => void;
   removeEvent: (id: string) => void;
   switchActiveBattler: (side: "yours" | "opponent", outgoingName: string, incomingName: string) => void;
   submitTurn: () => Promise<void>;
@@ -70,6 +73,11 @@ const initialState = {
   toxicTurns: { yours: {}, opponent: {} } as PerMon<number>,
   itemUsed: { yours: {}, opponent: {} } as PerMon<boolean>,
   stages: { yours: {}, opponent: {} } as StageState,
+  screens: {
+    yours: { reflect: 0, lightScreen: 0, auroraVeil: 0 },
+    opponent: { reflect: 0, lightScreen: 0, auroraVeil: 0 },
+  } as ScreensState,
+  protectTurn: { yours: {}, opponent: {} } as PerMon<number>,                                                                   
   lastResiduals: [] as string[],
   megaUsed: { yours: null, opponent: null } as Record<BattleSide, string | null>,
   megaDetails: {} as Record<string, PokemonDetail>,
@@ -209,6 +217,21 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
         entryNotes.push(...res.notes);
       }
 
+      let screens = state.screens;
+      let screenEvent: BattleEvent["screen"];
+      if (extra?.screen) {
+        const { side, kind, turns } = extra.screen;
+        screenEvent = { side, kind, turns, prev: screens[side][kind] };
+        screens = { ...screens, [side]: { ...screens[side], [kind]: turns } };
+      }
+      let protectTurn = state.protectTurn;
+      let protectEvent: BattleEvent["protect"];
+      if (extra?.protect) {
+        const { side, name } = extra.protect;
+        protectEvent = { side, name, prev: protectTurn[side][name] };
+        protectTurn = { ...protectTurn, [side]: { ...protectTurn[side], [name]: state.turnNumber } };
+      }
+
       return {
         hp,
         fainted,
@@ -216,6 +239,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
         itemUsed,
         megaUsed, fieldState,
         stages,
+        screens, protectTurn,
         currentTurnEvents: [
           ...state.currentTurnEvents,
           {
@@ -230,6 +254,8 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
             stages: stageChanges,
             clearedStages,
             fieldPrev,
+            screen: screenEvent,
+            protect: protectEvent,
           },
         ],
       };
@@ -249,9 +275,20 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
       let megaDetails = state.megaDetails;
       let fieldState = state.fieldState;
       let stages = state.stages;
+      let screens = state.screens;
+      let protectTurn = state.protectTurn;
       if (ev?.stages) stages = applyStageDeltas(stages, ev.stages, -1);
       for (const c of ev?.clearedStages ?? []) stages = { ...stages, [c.side]: { ...stages[c.side], [c.name]: c.stages } };
       if (ev?.fieldPrev) fieldState = { ...fieldState, ...ev.fieldPrev };
+      if (ev?.screen) {
+        screens = { ...screens, [ev.screen.side]: { ...screens[ev.screen.side], [ev.screen.kind]: ev.screen.prev ?? 0 } };
+      }
+      if (ev?.protect) {
+        const rest = { ...protectTurn[ev.protect.side] };
+        if (ev.protect.prev === undefined) delete rest[ev.protect.name];
+        else rest[ev.protect.name] = ev.protect.prev;
+        protectTurn = { ...protectTurn, [ev.protect.side]: rest };
+      }
       if (ev?.mega) {
         const key = `${ev.mega.side}:${ev.mega.name}`;
         megaUsed = { ...megaUsed, [ev.mega.side]: null };
@@ -282,7 +319,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
       for (const c of ev?.consumed ?? []) {
         itemUsed = { ...itemUsed, [c.side]: { ...itemUsed[c.side], [c.name]: false } };
       }
-      return { currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id), activeBattlers, fainted, hp, status, itemUsed, megaUsed, megaDetails, fieldState, stages };
+      return { currentTurnEvents: state.currentTurnEvents.filter((e) => e.id !== id), activeBattlers, fainted, hp, status, itemUsed, megaUsed, megaDetails, fieldState, stages, screens, protectTurn };
     }),
 
   // Called when a Switch event is confirmed — swaps the outgoing mon for the
@@ -305,13 +342,18 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
       },
     })),
 
+  setScreen: (side, kind, turns) =>
+    set((s) => ({
+      screens: { ...s.screens, [side]: { ...s.screens[side], [kind]: Math.max(0, Math.round(turns)) } },
+    })),
+
   submitTurn: async () => {
     const state = get();
     if (state.currentTurnEvents.length === 0) return;
 
     const eot = projectEndOfTurn(state); // computed now, committed only if the request succeeds (a retry can't double-apply)
 
-    const fieldSummary = describeFieldState(state.fieldState);
+    const fieldSummary = describeFieldState(state.fieldState, state.screens);
     const eventsSummary = state.currentTurnEvents.map((e) => e.sentenceFragment).join(". ");
     const residualSummary = eot.notes.length > 0 ? `End of turn: ${eot.notes.join("; ")}` : "";
     const compiledSentence = [fieldSummary, eventsSummary, residualSummary].filter(Boolean).join(". ") + ".";
@@ -368,6 +410,7 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
         toxicTurns: eot.toxicTurns,
         lastResiduals: eot.notes,
         fieldState: decrementCounters(s.fieldState),
+        screens: decrementScreens(s.screens),
       }));
     } catch {
       set({ adviceStatus: "error" });
@@ -522,13 +565,19 @@ export function previewEndOfTurn(): string[] {
   return s.started ? projectEndOfTurn(s).notes : [];
 }
 
-function describeFieldState(f: FieldState): string {
+function describeFieldState(f: FieldState, screens: ScreensState): string {
   const parts: string[] = [];
   if (f.weather !== "none") parts.push(`Weather is ${f.weather}${f.weatherTurnsLeft > 0 ? ` (${f.weatherTurnsLeft} turns left)` : ""}`);
   if (f.terrain !== "none") parts.push(`${f.terrain} terrain is active${f.terrainTurnsLeft > 0 ? ` (${f.terrainTurnsLeft} turns left)` : ""}`);
   if (f.trickRoomTurnsLeft > 0) parts.push(`Trick Room has ${f.trickRoomTurnsLeft} turns left`);
   if (f.tailwindTurnsLeft.yours > 0) parts.push(`Your Tailwind has ${f.tailwindTurnsLeft.yours} turns left`);
   if (f.tailwindTurnsLeft.opponents > 0) parts.push(`Opponent's Tailwind has ${f.tailwindTurnsLeft.opponents} turns left`);
+  const screenNames: Record<ScreenKind, string> = { reflect: "Reflect", lightScreen: "Light Screen", auroraVeil: "Aurora Veil" };
+  for (const side of ["yours", "opponent"] as const) {
+    for (const k of Object.keys(screenNames) as ScreenKind[]) {
+      if (screens[side][k] > 0) parts.push(`${side === "yours" ? "Your" : "Opponent's"} ${screenNames[k]} has ${screens[side][k]} turns left`);
+    }
+  }
   return parts.join(", ");
 }
 
@@ -543,6 +592,15 @@ function decrementCounters(f: FieldState): FieldState {
       opponents: Math.max(0, f.tailwindTurnsLeft.opponents - 1),
     },
   };
+}
+
+function decrementScreens(s: ScreensState): ScreensState {
+  const dec = (r: Record<ScreenKind, number>): Record<ScreenKind, number> => ({
+    reflect: Math.max(0, r.reflect - 1),
+    lightScreen: Math.max(0, r.lightScreen - 1),
+    auroraVeil: Math.max(0, r.auroraVeil - 1),
+  });
+  return { yours: dec(s.yours), opponent: dec(s.opponent) };
 }
 
 function applyLeadEntries(s: BattleSessionState): Partial<BattleSessionState> {

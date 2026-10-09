@@ -16,6 +16,7 @@ import TypeIcon from "@/components/TypeIcon";
 import { TYPE_COLOR, TYPE_TEXT_ON_COLOR } from "@/lib/typeMeta";
 import { PokemonTypeName } from "@/lib/types";
 import { useAiSettingsStore } from "@/lib/store/aiSettingsStore";
+import { opponentCoverageOf, userCoverageOf } from "@/lib/logic/optimizerInputs";
 
 const FEATURES: { href: string; label: string; blurb: string; type: PokemonTypeName }[] = [
     { href: "/speed", label: "Speed Check", blurb: "Will you outspeed it? Compare against likely spreads.", type: "electric" },
@@ -51,32 +52,8 @@ export default function BattleOptimizer() {
   // Clear only when leaving the page
   useEffect(() => () => setBackdropFigures([]), [setBackdropFigures]);
 
-  const userCoverage = useMemo(() => userSlots.map((s) => {
-    const mega = s.pokemon ? getActiveMega(s.pokemon.name, s.itemName) : null;
-    return {
-      name: s.pokemon?.name ?? "",
-      types: mega?.formTypes ?? s.pokemon?.types ?? [],
-      abilityName: s.abilityName,
-      itemName: s.itemName,
-      stats: s.pokemon ? statsFromEntries(s.pokemon.stats) : undefined,
-      moves: s.moves.filter((m): m is string => m !== null),
-    };
-  }), [userSlots]);
-  const opponentCoverage: CoverageMon[] = useMemo(
-    () => opponentSlots.map((s) => {
-      const commonSet = s.pokemon ? getCommonSet(s.pokemon.name) : null;
-      const effective = s.megaFormDetail ?? s.pokemon;
-      const abilityName = s.megaFormDetail ? commonSet?.megaForm?.formAbility ?? null : s.abilityName;
-      return {
-        name: s.pokemon?.name ?? "",
-        types: effective?.types ?? [],
-        abilityName,
-        itemName: s.itemName,
-        stats: effective ? statsFromEntries(effective.stats) : undefined,
-      };
-    }),
-    [opponentSlots]
-  );
+  const userCoverage = useMemo(() => userCoverageOf(userSlots), [userSlots]);
+  const opponentCoverage: CoverageMon[] = useMemo(() => opponentCoverageOf(opponentSlots), [opponentSlots]);
 
   const results = useMemo(() => {
     if (!userReady || !opponentReady) return null;

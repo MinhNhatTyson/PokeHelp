@@ -184,7 +184,9 @@ export interface StatusChange { side: BattleSide; name: string; prev: StatusKind
 export interface MonRef { side: BattleSide; name: string }
 export type StageStat = "atk" | "def" | "spa" | "spd" | "spe";
 export type StageState = PerMon<Partial<Record<StageStat, number>>>; // missing = 0
-export interface StageChange { side: BattleSide; name: string; stat: StageStat; delta: number } // delta = what was actually applied (after clamping)
+export interface StageChange { side: BattleSide; name: string; stat: StageStat; delta: number } 
+export type ScreenKind = "reflect" | "lightScreen" | "auroraVeil";
+export type ScreensState = Record<BattleSide, Record<ScreenKind, number>>; // turns left, 0 = not up
 
 export interface BattleEvent {
   id: string;
@@ -198,6 +200,8 @@ export interface BattleEvent {
   stages?: StageChange[];                                                   // entry effects (Intimidate...), reversed on undo
   clearedStages?: { side: BattleSide; name: string; stages: Partial<Record<StageStat, number>> }[]; // outgoing mon's stages, restored on undo
   fieldPrev?: Pick<FieldState, "weather" | "weatherTurnsLeft" | "terrain" | "terrainTurnsLeft">;    // field before a switch-in surge ability
+  screen?: { side: BattleSide; kind: ScreenKind; turns: number; prev?: number };  // screen set by this event; prev = turns before, for undo
+  protect?: { side: BattleSide; name: string; prev?: number };  
 }
 
 export interface FaintedMons {

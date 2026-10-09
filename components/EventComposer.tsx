@@ -5,7 +5,7 @@ import { getCommonSet, describeMegaForm, getActiveMega } from "@/lib/data/common
 import { baseLoadoutOf } from "@/lib/store/battleSessionStore";
 import { getAbilitySignal } from "@/lib/logic/abilitySignals";
 import { fetchMoveDetail, fetchMoveNameList } from "@/lib/data/fetchAndCache";
-import { BattleEvent, FaintedMons, FieldState, MoveDetail, MoveNameEntry, StatusChange, StatusKind } from "@/lib/types";
+import { BattleEvent, FaintedMons, FieldState, MoveDetail, MoveNameEntry, StatusChange, StatusKind, ScreenKind } from "@/lib/types";
 import { useTeamStore } from "@/lib/store/teamStore";
 import { useBattleSessionStore } from "@/lib/store/battleSessionStore";
 import { useListNav } from "@/lib/hooks/useListNav";
@@ -90,7 +90,6 @@ const EFFECT_OPTIONS = [
 ] as const;
 const CALC_TOGGLES: { key: keyof CalcExtras; label: string }[] = [
   { key: "crit", label: "Crit" }, { key: "helpingHand", label: "Helping Hand" },
-  { key: "reflect", label: "Reflect" }, { key: "lightScreen", label: "Light Screen" }, { key: "auroraVeil", label: "Aurora Veil" },
 ];
 
 
@@ -101,7 +100,8 @@ type FieldSetterEffect =
   | { kind: "weather"; value: Exclude<FieldState["weather"], "none"> }
   | { kind: "terrain"; value: Exclude<FieldState["terrain"], "none"> }
   | { kind: "trick-room" }
-  | { kind: "tailwind" };
+  | { kind: "tailwind" }
+  | { kind: "screen"; value: ScreenKind };
 
 const FIELD_SETTER_MOVES: Record<string, FieldSetterEffect> = {
   "sunny-day": { kind: "weather", value: "sun" },
@@ -115,6 +115,9 @@ const FIELD_SETTER_MOVES: Record<string, FieldSetterEffect> = {
   "psychic-terrain": { kind: "terrain", value: "psychic" },
   "trick-room": { kind: "trick-room" },
   tailwind: { kind: "tailwind" },
+  reflect: { kind: "screen", value: "reflect" },
+  "light-screen": { kind: "screen", value: "lightScreen" },
+  "aurora-veil": { kind: "screen", value: "auroraVeil" },
 };
 
 const NO_TARGET_API_VALUES = new Set(["user", "users-field", "entire-field", "all-pokemon", "opponents-field", "all-allies", "user-and-allies"]);
@@ -163,7 +166,7 @@ export default function EventComposer({
   yourTeamNames: string[]; // your bring-4
   opponentTeamNames: string[]; // opponent's known team-preview roster
   fainted: FaintedMons;
-  onConfirm: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status" | "mega">) => void;
+  onConfirm: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status" | "mega" | "screen" | "protect">) => void;
   onSwitch: (side: Side, outgoingName: string, incomingName: string) => void;
   onCancel: () => void;
   initialMode?: Mode;
@@ -172,6 +175,9 @@ export default function EventComposer({
   const teamSlots = useTeamStore((s) => s.slots);
   const fieldState = useBattleSessionStore((s) => s.fieldState);
   const setFieldState = useBattleSessionStore((s) => s.setFieldState);
+  const screens = useBattleSessionStore((s) => s.screens);
+  const protectTurn = useBattleSessionStore((s) => s.protectTurn);
+  const turnNumber = useBattleSessionStore((s) => s.turnNumber);
 
   const hp = useBattleSessionStore((s) => s.hp);
   const hpOfName = (name: string) => {
@@ -227,6 +233,7 @@ export default function EventComposer({
   const others = alive.filter((p) => p.name !== actor);
   const fieldSetter = moveSlug ? FIELD_SETTER_MOVES[moveSlug] : undefined;
   const isGuard = GUARD_MOVES.has(moveSlug);
+  const protectRepeat = isGuard && !!actorP && protectTurn[actorP.side][actorP.name] === turnNumber - 1;
   const moveDetail = detailResult && detailResult.slug === moveSlug && !fieldSetter ? detailResult.detail : null;
   const moveDetailStatus: "idle" | "loading" | "error" =
     !moveSlug || fieldSetter ? "idle"
@@ -326,11 +333,14 @@ export default function EventComposer({
     targetOutcomes[t] ?? (isStatusMove ? { kind: "worked" } : { kind: "damage", pct: 0 });
 
   const damagePreviews: Record<string, DamageOutcome> = {};
-  if (mode === "move" && actorP && moveDetail && moveSlug && !fieldSetter && !isSelfMove && !isStatusMove) {
-    const field = fieldForCalc(fieldState, calcExtras);
+  if (mode === "move" && actorP && moveDetail && moveSlug && !fieldSetter && !isSelfMove && !isStatusMove) {    
     for (const t of selectedTargets) {
       const tp = participants.find((p) => p.name === t);
       if (!tp) continue;
+      const sc = screens[tp.side];
+      const field = fieldForCalc(fieldState, {
+        ...calcExtras, reflect: sc.reflect > 0, lightScreen: sc.lightScreen > 0, auroraVeil: sc.auroraVeil > 0,
+      });
       const res = liveDamage({
         attacker: { side: actorP.side, name: actorP.name, mega: hasMegaEvolved(actorP.side, actorP.name), burned: statusOf(actorP.side, actorP.name) === "burn" },
         defender: { side: tp.side, name: tp.name, mega: hasMegaEvolved(tp.side, tp.name) },
@@ -408,6 +418,24 @@ export default function EventComposer({
     const moveLabel = formatMoveName(moveSlug);
 
     if (fieldSetter) {
+      if (fieldSetter.kind === "screen") {
+        const side = actorP.side;
+        const kind = fieldSetter.value;
+        if (kind === "auroraVeil" && fieldState.weather !== "snow") {
+          onConfirm(`${cap(actor)} used ${moveLabel} but it failed (Aurora Veil needs snow)`);
+          return;
+        }
+        if (screens[side][kind] > 0) {
+          onConfirm(`${cap(actor)} used ${moveLabel} but it failed (already up)`);
+          return;
+        }
+        const turns = baseLoadoutOf(side, actor).item === "light-clay" ? 8 : 5;
+        onConfirm(
+          `${cap(actor)} used ${moveLabel}, setting it up on ${side === "yours" ? "your" : "the opponent's"} side for ${turns} turns`,
+          { screen: { side, kind, turns } }
+        );
+        return;
+      }
       const endingTR = fieldSetter.kind === "trick-room" && fieldState.trickRoomTurnsLeft > 0;
       if (fieldSetter.kind === "weather") setFieldState({ weather: fieldSetter.value, weatherTurnsLeft: 5 });
       else if (fieldSetter.kind === "terrain") setFieldState({ terrain: fieldSetter.value, terrainTurnsLeft: 5 });
@@ -436,6 +464,7 @@ export default function EventComposer({
       onConfirm(text, {
         ...(selfFaint.length > 0 ? { faint: selfFaint } : {}),
         ...(heal > 0 ? { damage: [{ side: actorP.side, name: actor, pct: -heal }] } : {}),
+        ...(isGuard && selfOutcome === "worked" ? { protect: { side: actorP.side, name: actor } } : {}),
       });
       return;
     }
@@ -616,8 +645,10 @@ export default function EventComposer({
                     ))}
                   </div>
                   {isGuard && (
-                    <p className="mt-1.5 text-[11px] text-[color:var(--ink)]/50">
-                      Protect-style moves fail when used on consecutive turns.
+                    <p className={`mt-1.5 text-[11px] ${protectRepeat ? "rounded bg-amber-100 px-2 py-1 font-medium text-amber-900" : "text-[color:var(--ink)]/50"}`}>
+                      {protectRepeat
+                        ? `${cap(actor ?? "")} used a Protect-style move last turn, so this one will most likely fail.`
+                        : "Protect-style moves fail when used on consecutive turns."}
                     </p>
                   )}
                   {selfOutcome === "worked" && SELF_HEAL_MOVES[moveSlug] && actor && (
@@ -645,7 +676,7 @@ export default function EventComposer({
                         ))}
                       </div>
                       <p className="text-[10px] text-[color:var(--ink)]/50">
-                        Estimates use the Gen 9 formula at Lv50. Your mon&apos;s bulk and the foe&apos;s spread, item and ability are guessed, and stat stages come from the Stat stages panel.
+                        Estimates use the Gen 9 formula at Lv50. Your mon&apos;s bulk and the foe&apos;s spread, item and ability are guessed, stat stages come from the Stat stages panel and screens from Field status.
                       </p>
                     </>
                   )}

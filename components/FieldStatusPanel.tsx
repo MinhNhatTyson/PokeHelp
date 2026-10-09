@@ -21,6 +21,11 @@ const TERRAIN_META: Record<FieldState["terrain"], { label: string; icon: string 
 
 const DEFAULT_WEATHER_TURNS = 5;
 const DEFAULT_TERRAIN_TURNS = 5;
+const SCREEN_LABELS = [
+  ["reflect", "Reflect"],
+  ["lightScreen", "Light Screen"],
+  ["auroraVeil", "Aurora Veil"],
+] as const;
 
 function Stepper({
   label,
@@ -46,6 +51,8 @@ function Stepper({
 export default function FieldStatusPanel() {
   const fieldState = useBattleSessionStore((s) => s.fieldState);
   const setFieldState = useBattleSessionStore((s) => s.setFieldState);
+  const screens = useBattleSessionStore((s) => s.screens);
+  const setScreen = useBattleSessionStore((s) => s.setScreen);
 
   return (
     <div className="mt-3 rounded-lg bg-black/5 p-3">
@@ -114,6 +121,25 @@ export default function FieldStatusPanel() {
               onChange={(v) => setFieldState({ tailwindTurnsLeft: { ...fieldState.tailwindTurnsLeft, opponents: v } })}
             />
           </div>
+        </div>
+
+        <div className="col-span-2 rounded-md bg-white p-2.5">
+          <p className="text-[11px] font-medium uppercase text-[color:var(--ink)]/40">🛡️ Screens</p>
+          <div className="mt-1.5 grid grid-cols-2 gap-3">
+            {(["yours", "opponent"] as const).map((side) => (
+              <div key={side} className="space-y-1">
+                <p className="text-[10px] font-bold uppercase text-[color:var(--ink)]/50">
+                  {side === "yours" ? "Your side" : "Opponent's side"}
+                </p>
+                {SCREEN_LABELS.map(([kind, label]) => (
+                  <Stepper key={kind} label={label} value={screens[side][kind]} onChange={(v) => setScreen(side, kind, v)} />
+                ))}
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] text-[color:var(--ink)]/50">
+            Logging Reflect, Light Screen or Aurora Veil sets these automatically. Set one to 0 when it gets broken (Brick Break, Psychic Fangs).
+          </p>
         </div>
       </div>
     </div>

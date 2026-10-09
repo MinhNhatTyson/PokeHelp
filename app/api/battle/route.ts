@@ -29,6 +29,7 @@ function buildSystemInstruction(megaLines: string[], roster: string) {
   Fainted Pokémon can never be targeted or switched back in, so only suggest bench Pokémon that have not fainted. A side loses once all 4 of its Pokémon have fainted, so weigh the remaining counts in your advice. 
   HP values are percentages of max HP: use them to judge KO ranges, Focus Sash/Sturdy, and when to Protect or switch. 
   Status conditions (burn, poison, bad poison) and item/weather/terrain residual HP effects are applied automatically at the end of each turn and listed in the turn log as "End of turn: …"; trust the HP values given and do not count those effects twice. Burn halves physical damage and paralysis cuts Speed, so factor active status conditions into your advice.
+  Stat stages (e.g. "atk -1") are given in the turn note and already include Intimidate and other drops; trust them when judging damage and Speed order, and remember they reset when a Pokémon switches out.
   Turn-log entries may include "(calc expected X–Y%)". That range comes from the Gen 9 damage formula using assumed spreads. If the logged damage falls outside it, the real set differs from the guess (item, ability, bulk or nature), so say what that implies for the opponent.
   Be direct and specific. Do not restate the turn log. Prefer moves from the player's known move lists. For the opponent, only use moves revealed in the log or standard for that species, and say when you are guessing.`;
 }

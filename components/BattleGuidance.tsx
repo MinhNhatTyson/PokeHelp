@@ -15,6 +15,8 @@ import HpBar from "@/components/HpBar";
 import OpponentLoadoutPanel from "@/components/OpponentLoadoutPanel";
 import SpeedOrderPanel from "@/components/SpeedOrderPanel";
 import StagePanel, { StageBadges } from "@/components/StagePanel";
+import { rankBringFourCombos, getLeadPrediction } from "@/lib/logic/battleOptimizer";
+import { userCoverageOf, opponentCoverageOf } from "@/lib/logic/optimizerInputs";
 
 function toggleSelection(list: string[], setList: (v: string[]) => void, name: string, max: number) {
   if (list.includes(name)) setList(list.filter((n) => n !== name));
@@ -69,6 +71,16 @@ export default function BattleGuidance() {
     return () => { resetSession(); };
   }, [resetSession]);
 
+  function applyOptimizerPick() {
+    const history = useBattleHistoryStore.getState().entries;
+    const opponent = opponentCoverageOf(opponentSlots);
+    const top = rankBringFourCombos(userCoverageOf(teamSlots), opponent, history)[0];
+    if (!top) return;
+    setYourBringFour(top.members.map((m) => m.name));
+    setYourLeads(top.recommendedLead.map((m) => m.name));
+    setOpponentLeads(getLeadPrediction(opponent, history).leads.map((m) => m.name));
+  }
+
   const yourBuiltNames = teamSlots.filter((s) => s.pokemon).map((s) => s.pokemon!.name);
   // Team Preview reveals the opponent's full roster by species — but never
   // which 4 they'll actually bring, so we only ever ask "who are they
@@ -78,6 +90,7 @@ export default function BattleGuidance() {
 
   if (!started) {
     const canStart = yourBuiltNames.length > 0 && opponentPreviewNames.length > 0;
+    const canUsePick = teamSlots.every((s) => s.pokemon && s.abilityName) && opponentSlots.every((s) => s.pokemon);
     const bringFourDone = yourBringFour.length === 4;
     const readyToConfirm = bringFourDone && yourLeads.length === 2 && opponentLeads.length === 2;
 
@@ -98,6 +111,21 @@ export default function BattleGuidance() {
             </p>
           ) : (
             <div className="mt-4">
+              <div className="mb-4 rounded-lg border border-[color:var(--accent-gold)]/60 bg-[color:var(--accent-gold)]/20 p-3">
+                <button
+                  type="button"
+                  onClick={applyOptimizerPick}
+                  disabled={!canUsePick}
+                  className="btn-tactile btn-glow-gold min-h-[44px] w-full rounded-lg bg-[color:var(--accent-gold)] px-3 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Use optimizer&apos;s pick
+                </button>
+                <p className="mt-1.5 text-[11px] text-[color:var(--ink)]/60">
+                  {canUsePick
+                    ? "Fills your bring-4, your leads and the predicted opponent leads. You can still change any of them."
+                    : "Needs all 6 of your slots (Pokémon + ability) and all 6 opponent slots set."}
+                </p>
+              </div>
               <p className="text-xs font-medium uppercase text-[color:var(--ink)]/40">
                 Your bring-4 (pick 4 of your {yourBuiltNames.length})
               </p>
