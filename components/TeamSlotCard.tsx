@@ -2,7 +2,7 @@
 
 import { useTeamStore } from "@/lib/store/teamStore";
 import { TYPE_COLOR } from "@/lib/typeMeta";
-import { calculateEffectiveSpeed } from "@/lib/logic/statCalc";
+import { calculateEffectiveSpeed, MAX_TOTAL_SP } from "@/lib/logic/statCalc";
 import TypeBadge from "@/components/TypeBadge";
 
 export default function TeamSlotCard({ index, onOpen }: { index: number; onOpen: () => void }) {
@@ -35,6 +35,7 @@ export default function TeamSlotCard({ index, onOpen }: { index: number; onOpen:
     mon.stats.find((s) => s.name === "speed")?.baseStat ?? 0,
     slot.speedSp, slot.nature, slot.itemName
   );
+  const spTotal = Object.values(slot.spread).reduce((a, b) => a + b, 0) + slot.speedSp;
 
   return (
     <button
@@ -86,6 +87,10 @@ export default function TeamSlotCard({ index, onOpen }: { index: number; onOpen:
           <div className="flex justify-between gap-2">
             <dt className="opacity-60">Speed</dt>
             <dd className="font-semibold tabular-nums text-[color:var(--ink)]">{speed}</dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt className="opacity-60">SP</dt>
+            <dd className="font-semibold tabular-nums text-[color:var(--ink)]">{spTotal}/{MAX_TOTAL_SP}</dd>
           </div>
         </dl>
 

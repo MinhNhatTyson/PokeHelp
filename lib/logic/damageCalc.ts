@@ -58,19 +58,30 @@ const slugify = (s: string) => s.toLowerCase().replace(/\s+/g, "-");
 const idOf = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, ""); // same idea as the calc's own toID
 
 /** Every preset spends exactly 66 points (32 max per stat) */
-export function applyPreset(cfg: MonConfig, key: PresetKey): MonConfig {
-  const get = (n: string) => cfg.detail?.stats.find((s) => s.name === n)?.baseStat ?? 0;
+export function presetSp(detail: PokemonDetail | null, key: PresetKey): Record<StatKey, number> {
+  const get = (n: string) => detail?.stats.find((s) => s.name === n)?.baseStat ?? 0;
   const special = get("special-attack") >= get("attack");
   const sp = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 } as Record<StatKey, number>;
-  let nature = cfg.nature;
   if (key === "offense") {
     const off: StatKey = special ? "spa" : "atk";
     sp.hp = 2; sp.spe = 32; sp[off] = 32;
-    nature = nature ?? (special ? "modest" : "adamant");
   } else if (key === "balanced") { sp.hp = 32; sp.def = 17; sp.spd = 17; }
   else if (key === "physBulk") { sp.hp = 32; sp.def = 32; sp.spd = 2; }
   else if (key === "specBulk") { sp.hp = 32; sp.def = 2; sp.spd = 32; }
-  return { ...cfg, sp, nature };
+  return sp;
+}
+
+export function applyPreset(cfg: MonConfig, key: PresetKey): MonConfig {
+  const get = (n: string) => cfg.detail?.stats.find((s) => s.name === n)?.baseStat ?? 0;
+  const special = get("special-attack") >= get("attack");
+  let nature = cfg.nature;
+  if (key === "offense") nature = nature ?? (special ? "modest" : "adamant");
+  return { ...cfg, sp: presetSp(cfg.detail, key), nature };
+}
+
+/** True once the player has put any non-Speed SP on this Team Builder slot. */
+export function slotHasSpread(slot: TeamSlot): boolean {
+  return Object.values(slot.spread).some((v) => v > 0);
 }
 
 export function configFromTeamSlot(slot: TeamSlot): MonConfig | null {
@@ -81,7 +92,9 @@ export function configFromTeamSlot(slot: TeamSlot): MonConfig | null {
     item: slot.itemName, ability: slot.abilityName, nature: slot.nature,
     knownMoves: slot.moves.filter((m): m is string => m !== null),
   }, "offense");
-  return { ...cfg, sp: { ...cfg.sp, spe: slot.speedSp } };
+  // Real spread when the player set one; otherwise the offense preset guess (as before)
+  const sp = slotHasSpread(slot) ? { ...slot.spread, spe: slot.speedSp } : { ...cfg.sp, spe: slot.speedSp };
+  return { ...cfg, sp };
 }
 
 export function configFromOpponent(slot: OpponentSlot): MonConfig | null {

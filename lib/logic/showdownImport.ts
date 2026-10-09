@@ -7,6 +7,7 @@ export interface ParsedSet {
   ability: string | null;   // slug
   nature: NatureName | null;
   speedSp: number;
+  spread: Record<"hp" | "atk" | "def" | "spa" | "spd" | "spe", number>;
   moves: string[];          // slugs
 }
 
@@ -40,6 +41,7 @@ export function parseShowdownTeam(text: string): ParsedSet[] {
       species: SPECIES_ALIASES[speciesSlug] ?? speciesSlug,
       item: itemRaw ? toSlug(itemRaw) : null,
       ability: null, nature: null, speedSp: 0, moves: [],
+      spread: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
     };
 
     for (const line of lines.slice(1)) {
@@ -50,8 +52,12 @@ export function parseShowdownTeam(text: string): ParsedSet[] {
           const parts = m[1].split("/").map((p) => p.trim().match(/^(\d+)\s*(\w+)$/)).filter(Boolean) as RegExpMatchArray[];
           // Any value > 32 must be old-style EVs; otherwise treat as SP
           const isEvs = parts.some((p) => Number(p[1]) > MAX_SP_PER_STAT);
-          const spe = parts.find((p) => p[2].toLowerCase() === "spe");
-          if (spe) set.speedSp = isEvs ? evToSp(Number(spe[1])) : Math.min(MAX_SP_PER_STAT, Number(spe[1]));
+          for (const p of parts) {
+            const k = p[2].toLowerCase() as keyof ParsedSet["spread"];
+            if (!(k in set.spread)) continue;
+            set.spread[k] = isEvs ? evToSp(Number(p[1])) : Math.min(MAX_SP_PER_STAT, Number(p[1]));
+          }
+          set.speedSp = set.spread.spe;
       } else if ((m = line.match(/^(\w+)\s+nature$/i))) {
         const n = m[1].toLowerCase();
         if (n in NATURES) set.nature = n as NatureName;

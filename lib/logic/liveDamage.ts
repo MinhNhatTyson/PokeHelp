@@ -2,7 +2,7 @@ import type { FieldState, OpponentSlot, TeamSlot } from "@/lib/types";
 import { getCommonSet } from "@/lib/data/commonSets";
 import {
   applyPreset, configFromOpponent, configFromTeamSlot, configToSetup, runDamageCalc,
-  type DamageOutcome, type FieldSetup, type MonConfig,
+  type DamageOutcome, type FieldSetup, type MonConfig, slotHasSpread
 } from "@/lib/logic/damageCalc";
 import { baseLoadoutOf, useBattleSessionStore } from "@/lib/store/battleSessionStore";
 
@@ -30,8 +30,8 @@ function buildConfig(
   if (who.side === "yours") {
     const slot = teamSlots.find((s) => s.pokemon?.name === who.name);
     cfg = slot ? configFromTeamSlot(slot) : null;
-    // Team Builder only stores Speed SP, so a mon that is being hit gets a balanced bulk guess
-    if (cfg && role === "defender") cfg = applyPreset(cfg, "balanced");
+    // Only guess balanced bulk when the player hasn't set a spread in Team Builder
+    if (cfg && slot && role === "defender" && !slotHasSpread(slot)) cfg = applyPreset(cfg, "balanced");
   } else {
     const slot = oppSlots.find((s) => s.pokemon?.name === who.name);
     cfg = slot ? configFromOpponent(slot) : null;

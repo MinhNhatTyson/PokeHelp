@@ -8,6 +8,7 @@ import TypeBadge from "@/components/TypeBadge";
 import MovesetPicker from "./MovesetPicker";
 import { NATURE_LABEL, NatureName, calculateEffectiveSpeed } from "@/lib/logic/statCalc";
 import { useListNav } from "@/lib/hooks/useListNav";
+import SpreadEditor from "./SpreadEditor";
 
 const MAX_SUGGESTIONS = 8;
 
@@ -30,7 +31,6 @@ export default function TeamSlotPicker({ index }: { index: number }) {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const setSlotNature = useTeamStore((s) => s.setSlotNature);
-  const setSlotSpeedSp = useTeamStore((s) => s.setSlotSpeedSp);  
 
 
   useEffect(() => {
@@ -189,7 +189,7 @@ export default function TeamSlotPicker({ index }: { index: number }) {
             </select>
             <MovesetPicker slotIndex={index} />
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="mt-3">
             <div>
               <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Nature</label>
               <select
@@ -202,15 +202,9 @@ export default function TeamSlotPicker({ index }: { index: number }) {
                   <option key={key} value={key}>{label}</option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium uppercase text-[color:var(--ink)]/40">Speed SP <span className="normal-case opacity-60">(max 32)</span></label>
-              <input type="number" min={0} max={32} step={1} value={slot.speedSp}
-                onChange={(e) => setSlotSpeedSp(index, Number(e.target.value) || 0)}
-                className="mt-1 w-full rounded-md border border-black/10 bg-white px-2 py-2 text-sm text-[color:var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
-              />
-            </div>
+            </div>            
           </div>
+          <SpreadEditor slotIndex={index} />
           <p className="mt-1.5 text-xs text-[color:var(--ink)]/50">
             Effective Speed:{" "}
             <span className="font-medium text-[color:var(--ink)]">

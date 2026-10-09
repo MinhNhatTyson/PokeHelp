@@ -113,6 +113,8 @@ export interface ItemDetail {
   attributes: string[];
 }
 
+export type SpSpread = Record<"hp" | "atk" | "def" | "spa" | "spd", number>; // everything except Speed, which stays in speedSp
+
 export interface TeamSlot {
   pokemon: PokemonDetail | null;
   itemName: string | null;
@@ -120,7 +122,8 @@ export interface TeamSlot {
   roleNotes: string | null;
   moves: (string | null)[];
   nature: NatureName | null;  
-  speedSp: number;           
+  speedSp: number;      
+  spread: SpSpread;     
 }
 
 export interface PokemonMoveEntry {

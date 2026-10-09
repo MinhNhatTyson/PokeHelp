@@ -54,7 +54,7 @@ interface BattleSessionState {
   startSession: (yourTeamNames: string[], opponentTeamNames: string[], activeBattlers: ActiveBattlers) => void;
   resetSession: () => void;
   setFieldState: (updates: Partial<FieldState>) => void;
-  addEvent: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status" | "mega" | "screen" | "protect">) => void;
+  addEvent: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status" | "mega" | "screen" | "protect" | "stages">) => void;
   removeEvent: (id: string) => void;
   switchActiveBattler: (side: "yours" | "opponent", outgoingName: string, incomingName: string) => void;
   submitTurn: () => Promise<void>;
@@ -215,6 +215,12 @@ export const useBattleSessionStore = create<BattleSessionState>((set, get) => ({
         if (res.stageChanges.length > 0) { stageChanges = res.stageChanges; stages = applyStageDeltas(stages, res.stageChanges); }
         if (res.field) { fieldPrev = res.fieldPrev; fieldState = { ...fieldState, ...res.field }; }
         entryNotes.push(...res.notes);
+      }
+
+      // Stage changes from a logged move (setup, self-drops, debuffs). Deltas are already clamped, so undo is exact.
+      if (extra?.stages?.length) {
+        stageChanges = [...(stageChanges ?? []), ...extra.stages];
+        stages = applyStageDeltas(stages, extra.stages);
       }
 
       let screens = state.screens;

@@ -72,7 +72,7 @@ export default function ImportTeamModal({ open, onClose }: { open: boolean; onCl
       [0, 1, 2, 3].forEach((mi) => store.setSlotMove(i, mi, kept[mi] ?? null));
 
       if (set.nature) store.setSlotNature(i, set.nature);
-      store.setSlotSpeedSp(i, set.speedSp);
+      store.setSlotSpread(i, set.spread);
       imported.push(detail.name);
     }
 
@@ -103,8 +103,7 @@ export default function ImportTeamModal({ open, onClose }: { open: boolean; onCl
             <div className="flex-1 overflow-y-auto bg-[color:var(--screen)] p-4">
               <h2 className="font-heading text-lg text-[color:var(--ink)]">Import from Showdown</h2>
               <p className="mt-1 text-xs text-[color:var(--ink)]/60">
-                Paste a team in Pokémon Showdown format. This <strong>replaces your current team</strong>. Item, ability,
-                moves, nature and Speed EVs are imported; everything is checked against PokeAPI data.
+                Paste a team in Pokémon Showdown format. This <strong>replaces your current team</strong>. Item, ability, moves, nature and the full EV/SP spread are imported; everything is checked against PokeAPI data.
               </p>
               <textarea
                 value={text}

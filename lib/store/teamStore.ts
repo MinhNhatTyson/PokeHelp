@@ -1,13 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { PokemonDetail, TeamSlot } from "@/lib/types";
-import { evToSp, MAX_SP_PER_STAT, NatureName } from "../logic/statCalc";
-import { normalizeTeamSlot } from "@/lib/store/slotMigration";
+import { PokemonDetail, SpSpread, TeamSlot } from "@/lib/types";
+import { evToSp, MAX_SP_PER_STAT, MAX_TOTAL_SP, NatureName } from "../logic/statCalc";
+import { normalizeTeamSlot, emptySpread, sanitizeSpread } from "@/lib/store/slotMigration";
 
 export const TEAM_SIZE = 6;
 const EMPTY_SLOT: TeamSlot = {
   pokemon: null, itemName: null, abilityName: null, roleNotes: null,
-  moves: [null, null, null, null], nature: null, speedSp: 0,
+  moves: [null, null, null, null], nature: null, speedSp: 0, spread: emptySpread(),
 };
 function migrateSpeedSp(s: Partial<TeamSlot> & { speedEv?: number }): number {
   return typeof s.speedSp === "number" ? s.speedSp : evToSp(s.speedEv ?? 0);
@@ -29,6 +29,8 @@ interface TeamState {
   loadSlots: (slots: TeamSlot[], teamStrategy?: string) => void;
   setSlotNature: (index: number, nature: NatureName | null) => void;
   setSlotSpeedSp: (index: number, speedSp: number) => void;
+  setSlotSp: (index: number, stat: keyof SpSpread | "spe", value: number) => void;
+  setSlotSpread: (index: number, sp: SpSpread & { spe: number }) => void;
 }
 
 export const useTeamStore = create<TeamState>()(
@@ -43,7 +45,7 @@ export const useTeamStore = create<TeamState>()(
           const slots = [...state.slots];
           const isDuplicate = pokemon && slots.some((s, i) => i !== index && s.pokemon?.name === pokemon.name);
           if (isDuplicate) return state;
-          slots[index] = { pokemon, itemName: slots[index].itemName, abilityName: null, roleNotes: slots[index].roleNotes, moves: [null, null, null, null], nature: null, speedSp: 0 };
+          slots[index] = { pokemon, itemName: slots[index].itemName, abilityName: null, roleNotes: slots[index].roleNotes, moves: [null, null, null, null], nature: null, speedSp: 0, spread: emptySpread() }
           return { slots };
         }),
       setSlotMove: (index, moveIndex, moveName) =>
@@ -81,6 +83,7 @@ export const useTeamStore = create<TeamState>()(
             moves: s.moves ?? [null, null, null, null],
             nature: s.nature ?? null,
             speedSp: migrateSpeedSp(s),
+            spread: sanitizeSpread(s.spread),
             pokemon: s.pokemon ? { ...s.pokemon, moves: s.pokemon.moves ?? [] } : s.pokemon,
           })),
           teamStrategy: teamStrategy ?? "",
@@ -104,6 +107,29 @@ export const useTeamStore = create<TeamState>()(
           slots[index] = { ...slots[index], speedSp: Math.max(0, Math.min(MAX_SP_PER_STAT, speedSp)) };
           return { slots };
         }),
+      // One stat at a time: clamped to 32 and to whatever is left of the 66-point budget
+      setSlotSp: (index, stat, value) =>
+        set((state) => {
+          const slots = [...state.slots];
+          const s = slots[index];
+          const all: Record<string, number> = { ...s.spread, spe: s.speedSp };
+          const others = Object.entries(all).reduce((sum, [k, v]) => (k === stat ? sum : sum + v), 0);
+          const next = Math.max(0, Math.min(MAX_SP_PER_STAT, MAX_TOTAL_SP - others, Math.round(Number.isFinite(value) ? value : 0)));
+          slots[index] = stat === "spe" ? { ...s, speedSp: next } : { ...s, spread: { ...s.spread, [stat]: next } };
+          return { slots };
+        }),
+      // Whole spread at once (presets, Showdown import): each stat clamped to 0-32
+      setSlotSpread: (index, sp) =>
+        set((state) => {
+          const slots = [...state.slots];
+          const c = (n: number) => Math.max(0, Math.min(MAX_SP_PER_STAT, Math.round(n) || 0));
+          slots[index] = {
+            ...slots[index],
+            speedSp: c(sp.spe),
+            spread: { hp: c(sp.hp), atk: c(sp.atk), def: c(sp.def), spa: c(sp.spa), spd: c(sp.spd) },
+          };
+          return { slots };
+        }),
     }),
     {
       name: "pokehelp-active-team",
@@ -124,6 +150,7 @@ export const useTeamStore = create<TeamState>()(
             moves: s.moves ?? [null, null, null, null],
             nature: s.nature ?? null,
             speedSp: migrateSpeedSp(s),
+            spread: sanitizeSpread(s.spread),
             pokemon: s.pokemon ? { ...s.pokemon, moves: s.pokemon.moves ?? [] } : s.pokemon,
           })),
         };

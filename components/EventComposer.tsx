@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getCommonSet, describeMegaForm, getActiveMega } from "@/lib/data/commonSets";
-import { baseLoadoutOf } from "@/lib/store/battleSessionStore";
+import { baseLoadoutOf, loadoutOf } from "@/lib/store/battleSessionStore";
+import { getMoveStageEffect, computeMoveStages } from "@/lib/logic/moveStages";
 import { getAbilitySignal } from "@/lib/logic/abilitySignals";
 import { fetchMoveDetail, fetchMoveNameList } from "@/lib/data/fetchAndCache";
 import { BattleEvent, FaintedMons, FieldState, MoveDetail, MoveNameEntry, StatusChange, StatusKind, ScreenKind } from "@/lib/types";
@@ -166,7 +167,7 @@ export default function EventComposer({
   yourTeamNames: string[]; // your bring-4
   opponentTeamNames: string[]; // opponent's known team-preview roster
   fainted: FaintedMons;
-  onConfirm: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status" | "mega" | "screen" | "protect">) => void;
+  onConfirm: (fragment: string, extra?: Pick<BattleEvent, "switch" | "faint" | "damage" | "status" | "mega" | "screen" | "protect" | "stages">) => void;
   onSwitch: (side: Side, outgoingName: string, incomingName: string) => void;
   onCancel: () => void;
   initialMode?: Mode;
@@ -178,6 +179,7 @@ export default function EventComposer({
   const screens = useBattleSessionStore((s) => s.screens);
   const protectTurn = useBattleSessionStore((s) => s.protectTurn);
   const turnNumber = useBattleSessionStore((s) => s.turnNumber);
+  const stages = useBattleSessionStore((s) => s.stages);
 
   const hp = useBattleSessionStore((s) => s.hp);
   const hpOfName = (name: string) => {
@@ -350,6 +352,29 @@ export default function EventComposer({
     }
   }
 
+  const stageEffect = mode === "move" && moveSlug && !fieldSetter ? getMoveStageEffect(moveSlug) : null;
+  const stageResult = (() => {
+    if (!stageEffect || !actorP) return null;
+    const hits = isSelfMove
+      ? []
+      : selectedTargets.flatMap((t) => {
+          const tp = participants.find((p) => p.name === t);
+          const o = outcomeOf(t);
+          const landed = o.kind === "damage" ? o.pct > 0 : o.kind === "worked";
+          if (!tp || !landed) return [];
+          const koed = o.kind === "damage" && o.pct >= hpOfName(t);
+          return [{ side: tp.side, name: t, ability: loadoutOf(tp.side, t).ability, koed }];
+        });
+    const used = isSelfMove ? selfOutcome === "worked" : hits.length > 0;
+    if (!used) return null;
+    return computeMoveStages({
+      attacker: { side: actorP.side, name: actorP.name, ability: loadoutOf(actorP.side, actorP.name).ability },
+      targets: hits,
+      effect: stageEffect,
+      stageOf: (side, name, stat) => stages[side][name]?.[stat] ?? 0,
+    });
+  })();
+
   function toggleTarget(name: string) {
     setSelectedTargets((prev) => {
       if (prev.includes(name)) return prev.filter((n) => n !== name);
@@ -461,10 +486,11 @@ export default function EventComposer({
         : isGuard ? `${cap(actor)} used ${moveLabel} and it worked`
         : heal > 0 ? `${cap(actor)} used ${moveLabel}, restoring HP from ${before}% to ${before + heal}%`
         : `${cap(actor)} used ${moveLabel}`;
-      onConfirm(text, {
+      onConfirm(stageResult?.notes.length ? `${text}; ${stageResult.notes.join("; ")}` : text, {
         ...(selfFaint.length > 0 ? { faint: selfFaint } : {}),
         ...(heal > 0 ? { damage: [{ side: actorP.side, name: actor, pct: -heal }] } : {}),
         ...(isGuard && selfOutcome === "worked" ? { protect: { side: actorP.side, name: actor } } : {}),
+        ...(stageResult?.changes.length ? { stages: stageResult.changes } : {}),
       });
       return;
     }
@@ -495,12 +521,13 @@ export default function EventComposer({
     if (effect && landed) fragment += `, causing ${effect.toLowerCase()}`;
     if (alreadyStatused.length > 0) fragment += ` (${alreadyStatused.map((n) => cap(n)).join(", ")} already had a status condition)`;
     if (selfFaint.length > 0) fragment += `; ${cap(actor)} fainted`;
+    if (stageResult?.notes.length) fragment += `; ${stageResult.notes.join("; ")}`;
 
     const damage = outcomes.flatMap(({ t, o }) => {
       const side = participants.find((p) => p.name === t)?.side;
       return o.kind === "damage" && side ? [{ side, name: t, pct: o.pct }] : [];
     });
-    onConfirm(fragment, { damage, faint: selfFaint, status: statusChanges });
+    onConfirm(fragment, { damage, faint: selfFaint, status: statusChanges, stages: stageResult?.changes });
   }
 
   const moveNav = useListNav({
@@ -676,7 +703,7 @@ export default function EventComposer({
                         ))}
                       </div>
                       <p className="text-[10px] text-[color:var(--ink)]/50">
-                        Estimates use the Gen 9 formula at Lv50. Your mon&apos;s bulk and the foe&apos;s spread, item and ability are guessed, stat stages come from the Stat stages panel and screens from Field status.
+                        Estimates use the Gen 9 formula at Lv50. Your mon&apos;s bulk comes from its Team Builder spread (a balanced guess if none is set); the foe&apos;s spread, item and ability are guessed, stat stages come from the Stat stages panel and screens from Field status.
                       </p>
                     </>
                   )}
@@ -875,6 +902,15 @@ export default function EventComposer({
               </div>
             )
           )
+        )}
+
+        {mode === "move" && stageResult && stageResult.notes.length > 0 && (
+          <div className="mt-4 rounded-md border border-dashed border-black/20 bg-black/[0.03] px-3 py-2">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-[color:var(--ink)]/40">Stat stages applied automatically</p>
+            <ul className="mt-1 space-y-0.5 text-xs text-[color:var(--ink)]/70">
+              {stageResult.notes.map((n, i) => <li key={i}>{n}</li>)}
+            </ul>
+          </div>
         )}
 
         <div className="mt-5 flex gap-2">
