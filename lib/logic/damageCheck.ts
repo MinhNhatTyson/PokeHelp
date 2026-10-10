@@ -1,6 +1,6 @@
-import { calculate, Generations, Pokemon, Move } from "@smogon/calc";
+import { calculate, Generations, Pokemon, Move, Field } from "@smogon/calc";
 import type { CoverageMon } from "@/lib/logic/battleOptimizer";
-import { getCommonSet, CommonSetEntry } from "@/lib/data/commonSets";
+import { getCommonSet, CommonSetEntry, getActiveMega } from "@/lib/data/commonSets";
 
 const GEN = Generations.get(9);
 const VGC_LEVEL = 50; // VGC always battles at Level 50, regardless of in-game level
@@ -14,19 +14,35 @@ export interface LeadDamageCheck {
 
 const spToEv = (sp: number) => Math.min(252, sp * 8);
 
-function assumedSpread(mon: CoverageMon) {
+type CalcOpts = NonNullable<ConstructorParameters<typeof Pokemon>[2]>;
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const hasRealSpread = (mon: CoverageMon) => !!mon.spread && Object.values(mon.spread).some((v) => v > 0);
+
+function assumedSpread(
+  mon: CoverageMon, role: "attacker" | "defender"
+): { nature?: CalcOpts["nature"]; evs: NonNullable<CalcOpts["evs"]> } {
+  if (hasRealSpread(mon)) {
+    const s = mon.spread!;
+    return {
+      nature: mon.nature ? (cap(mon.nature) as CalcOpts["nature"]) : undefined,
+      evs: { hp: spToEv(s.hp), atk: spToEv(s.atk), def: spToEv(s.def), spa: spToEv(s.spa), spd: spToEv(s.spd), spe: spToEv(mon.speedSp ?? 0) },
+    };
+  }
+  // Defenders without a real spread get balanced bulk (previously they got an offense spread with 2 HP)
+  if (role === "defender") return { evs: { hp: spToEv(32), def: spToEv(17), spd: spToEv(17) } };
+
   const isSpecial = (mon.stats?.spAttack ?? 0) >= (mon.stats?.attack ?? 0);
   return isSpecial
-    ? { nature: "Modest" as const, evs: { hp: spToEv(2), spa: spToEv(32), spe: spToEv(32) } }
-    : { nature: "Adamant" as const, evs: { hp: spToEv(2), atk: spToEv(32), spe: spToEv(32) } };
+    ? { nature: "Modest", evs: { hp: spToEv(2), spa: spToEv(32), spe: spToEv(32) } }
+    : { nature: "Adamant", evs: { hp: spToEv(2), atk: spToEv(32), spe: spToEv(32) } };
 }
 
-function buildPokemon(mon: CoverageMon, commonSet: CommonSetEntry | null) {
-  const showdownName = commonSet?.megaForm?.formShowdownName ?? commonSet?.showdownName ?? mon.name;
-  const ability = mon.abilityName ?? commonSet?.megaForm?.formAbility ?? commonSet?.likelyAbility;
+function buildPokemon(mon: CoverageMon, commonSet: CommonSetEntry | null, role: "attacker" | "defender") {
+  const mega = mon.megaActive ? commonSet?.megaForm : undefined;
+  const showdownName = mega?.formShowdownName ?? commonSet?.showdownName ?? mon.name;
+  const ability = mega ? mega.formAbility : (mon.abilityName ?? commonSet?.likelyAbility);
   const item = mon.itemName ? formatItemForCalc(mon.itemName) : commonSet?.topItem;
-  const { nature, evs } = assumedSpread(mon);
-
+  const { nature, evs } = assumedSpread(mon, role);
   return new Pokemon(GEN, showdownName, { level: VGC_LEVEL, ability, item, nature, evs });
 }
 
@@ -43,10 +59,10 @@ export function checkLeadDamage(attacker: CoverageMon, defender: CoverageMon): L
   if (!moveName) return null; // no real move chosen and no curated fallback — nothing to check
 
   try {
-    const attackerPoke = buildPokemon(attacker, attackerSet);
-    const defenderPoke = buildPokemon(defender, getCommonSet(defender.name));
+    const attackerPoke = buildPokemon(attacker, attackerSet, "attacker");
+    const defenderPoke = buildPokemon(defender, getCommonSet(defender.name), "defender");
     const move = new Move(GEN, moveName);
-    const result = calculate(GEN, attackerPoke, defenderPoke, move);
+    const result = calculate(GEN, attackerPoke, defenderPoke, move, new Field({ gameType: "Doubles" }));
 
     return { attacker: attacker.name, defender: defender.name, move: moveName, description: result.desc() };
   } catch {

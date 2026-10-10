@@ -9,11 +9,14 @@ import MovesetPicker from "./MovesetPicker";
 import { NATURE_LABEL, NatureName, calculateEffectiveSpeed } from "@/lib/logic/statCalc";
 import { useListNav } from "@/lib/hooks/useListNav";
 import SpreadEditor from "./SpreadEditor";
+import { itemBlockReason, isMegaStone } from "@/lib/logic/teamRules";
 
 const MAX_SUGGESTIONS = 8;
 
 export default function TeamSlotPicker({ index }: { index: number }) {
   const slot = useTeamStore((s) => s.slots[index]);
+  const allSlots = useTeamStore((s) => s.slots);
+  const stoneElsewhere = allSlots.some((s, i) => i !== index && isMegaStone(s.itemName));
   const setSlotPokemon = useTeamStore((s) => s.setSlotPokemon);
   const setSlotItem = useTeamStore((s) => s.setSlotItem);
   const setSlotAbility = useTeamStore((s) => s.setSlotAbility);
@@ -58,8 +61,10 @@ export default function TeamSlotPicker({ index }: { index: number }) {
   const itemMatches = useMemo(() => {
     const q = itemQuery.trim().toLowerCase().replace(/ /g, "-");
     if (!q) return [];
-    return itemNames.filter((i) => i.name.startsWith(q)).slice(0, MAX_SUGGESTIONS);
-  }, [itemQuery, itemNames]);
+    return itemNames
+      .filter((i) => i.name.startsWith(q) && !itemBlockReason(allSlots, index, i.name))
+      .slice(0, MAX_SUGGESTIONS);
+  }, [itemQuery, itemNames, allSlots, index]);
   
   const pokeNav = useListNav({
     items: pokeMatches,
@@ -156,6 +161,11 @@ export default function TeamSlotPicker({ index }: { index: number }) {
               autoComplete="off"
               className="mt-1 w-full rounded-md border border-black/10 px-3 py-2 text-sm capitalize text-[color:var(--ink)] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent-gold)]"
             />
+            {stoneElsewhere && (
+              <p className="mt-1 text-[11px] text-[color:var(--ink)]/50">
+                Another slot already holds a Mega Stone, so Mega Stones (and items your teammates hold) are hidden here.
+              </p>
+            )}
             {showItemDropdown && itemMatches.length > 0 && (
               <div className="absolute z-10 mt-1 max-h-[40vh] w-full overflow-y-auto rounded-md border border-black/10 bg-white p-1 shadow-lg">
                 {itemMatches.map((i) => (

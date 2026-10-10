@@ -72,6 +72,26 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
     onOpen: () => setShowItemDropdown(true),
   });
 
+  const megaTakenElsewhere = () =>
+    useOpponentTeamStore.getState().slots.some((x, i) => i !== index && !!x.megaFormDetail);
+
+  async function assumeMegaHere() {
+    const mon = slot.pokemon;
+    const cs = mon ? getCommonSet(mon.name) : null;
+    if (!mon || !cs?.megaForm) return;
+    const store = useOpponentTeamStore.getState();
+    store.slots.forEach((s, i) => {
+      if (i === index || !s.megaFormDetail || !s.pokemon) return;
+      const other = getCommonSet(s.pokemon.name);
+      store.setSlotMegaFormDetail(i, null);
+      store.setSlotAbility(i, other && s.pokemon.abilities.some((a) => a.name === other.likelyAbility) ? other.likelyAbility : null);
+    });
+    setSlotItem(index, cs.topItem.toLowerCase().replace(/\s+/g, "-"));
+    const megaDetail = (await fetchPokemonDetail(cs.megaForm.formSpecies)) ?? synthesizeMegaDetail(mon, cs.megaForm);
+    setSlotMegaFormDetail(index, megaDetail);
+    setSlotAbility(index, cs.megaForm.formAbility);
+  }
+
   async function handleSelectPokemon(name: string) {
   setPokeQuery("");
   setShowPokeDropdown(false);
@@ -85,7 +105,7 @@ export default function OpponentSlotPicker({ index }: { index: number }) {
       const guessedItemSlug = commonSet.topItem.toLowerCase().replace(/\s+/g, "-");
       setSlotItem(index, guessedItemSlug);
 
-      if (commonSet.megaForm) {
+      if (commonSet.megaForm && !megaTakenElsewhere()) {
         // Guessed item IS the Mega Stone — assume turn-1 Mega Evolution by default.
         const megaDetail = (await fetchPokemonDetail(commonSet.megaForm.formSpecies))
         ?? synthesizeMegaDetail(detail, commonSet.megaForm);
@@ -111,7 +131,7 @@ async function handleSelectItem(name: string) {
   const commonSet = getCommonSet(mon.name);
   if (commonSet?.megaForm) {
     const isMegaStone = name === commonSet.topItem.toLowerCase().replace(/\s+/g, "-");
-    if (isMegaStone) {
+    if (isMegaStone && !megaTakenElsewhere()) {
       const megaDetail = (await fetchPokemonDetail(commonSet.megaForm.formSpecies))
         ?? synthesizeMegaDetail(mon, commonSet.megaForm);
       setSlotMegaFormDetail(index, megaDetail);
@@ -192,7 +212,7 @@ async function handleSelectItem(name: string) {
                   <span className="rounded-full bg-[color:var(--accent-gold)] px-2 py-0.5 text-[10px] font-semibold uppercase text-black">Mega</span>
                 </div>
                 <p className="mt-1.5 text-xs text-[color:var(--ink)]/50">
-                  Mega Evolves via {activeSet.topItem}. A Mega has exactly one ability, so it&apos;s locked. Change the item to undo.
+                  Mega Evolves via {activeSet.topItem}. A Mega has exactly one ability, so it&apos;s locked. Only one opponent is assumed to Mega: use the button on another Mega-capable slot to move it. Change the item to undo.
                 </p>
               </>
             ) : (
@@ -213,6 +233,15 @@ async function handleSelectItem(name: string) {
                   <p className="mt-1.5 text-xs text-[color:var(--ink)]/50">
                     Can Mega Evolve via {activeSet.topItem} → <span className="capitalize">{activeSet.megaForm.formAbility.replace(/-/g, " ")}</span>
                   </p>
+                )}
+                {activeSet?.megaForm && (
+                  <button
+                    type="button"
+                    onClick={assumeMegaHere}
+                    className="btn-tactile mt-1.5 min-h-[36px] rounded-full bg-[color:var(--accent-gold)] px-3 text-xs font-semibold text-black"
+                  >
+                    Assume this one Mega Evolves
+                  </button>
                 )}
               </>
             )}

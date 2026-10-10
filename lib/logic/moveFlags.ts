@@ -61,6 +61,7 @@ export function moveFlagsTrusted(): boolean {
 export interface MoveQuickInfo {
   type: PokemonTypeName | null;
   category: "physical" | "special" | "status" | null;
+  basePower: number;
   flags: MoveFlagKey[];
 }
 
@@ -73,6 +74,7 @@ export function getMoveQuickInfo(slug: string): MoveQuickInfo | null {
   return {
     type: (POKEMON_TYPES as readonly string[]).includes(t) ? (t as PokemonTypeName) : null,
     category: c === "physical" || c === "special" || c === "status" ? c : null,
+    basePower: Number(raw.basePower ?? raw.bp) || 0,
     flags: flagsOf(raw),
   };
 }

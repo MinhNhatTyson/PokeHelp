@@ -60,7 +60,8 @@ export default function TeamSuggestionPanel() {
     if (!suggestion || emptyIndex === -1) return;
     setAdopting(true);
     const detail = await fetchPokemonDetail(suggestion.species);
-    if (detail) {
+    const alreadyOnTeam = slots.some((s) => s.pokemon?.name === detail?.name);
+    if (detail && !alreadyOnTeam) {
       setSlotPokemon(emptyIndex, detail);
       setSlotItem(emptyIndex, suggestion.itemName);
       setSlotAbility(emptyIndex, suggestion.abilityName);

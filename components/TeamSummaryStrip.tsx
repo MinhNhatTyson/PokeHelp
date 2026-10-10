@@ -70,7 +70,7 @@ export default function TeamSummaryStrip() {
           </div>
         </div>
       </div>
-      <p className="mt-2 text-[11px] text-[color:var(--ink)]/40">Types only (STAB) — abilities, items and moves aren&apos;t factored in.</p>
+      <p className="mt-2 text-[11px] text-[color:var(--ink)]/40">Defense is types only. Coverage uses chosen moves, otherwise STAB. Abilities and items aren't factored in.</p>
     </div>
   );
 }

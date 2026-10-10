@@ -1,8 +1,18 @@
 import { PokemonTypeName, POKEMON_TYPES, TeamSlot, TeamOffenseReport, TeamDefenseMatrixRow, EffectivenessMultiplier, TeamDefenseMatrix } from "@/lib/types";
 import { getSingleMultiplier } from "@/lib/logic/effectiveness";
+import { getActiveMega } from "@/lib/data/commonSets";
+import { attackTypesOf } from "@/lib/logic/attackTypes";
 
 function teamMembers(slots: TeamSlot[]) {
-  return slots.filter((s) => s.pokemon).map((s) => s.pokemon!);
+  return slots.filter((s) => s.pokemon).map((s) => {
+    const mega = getActiveMega(s.pokemon!.name, s.itemName);
+    return {
+      ...s.pokemon!,
+      types: mega?.formTypes ?? s.pokemon!.types,
+      chosenMoves: s.moves.filter((m): m is string => m !== null),
+      ability: mega ? mega.formAbility : s.abilityName,
+    };
+  });
 }
 
 export function getTeamOffenseReport(slots: TeamSlot[]): TeamOffenseReport {
@@ -15,7 +25,7 @@ export function getTeamOffenseReport(slots: TeamSlot[]): TeamOffenseReport {
   for (const target of POKEMON_TYPES) {
     let best = 0;
     for (const mon of members) {
-      for (const attackType of mon.types) {
+      for (const attackType of attackTypesOf({ types: mon.types, moves: mon.chosenMoves, ability: mon.ability })) {
         best = Math.max(best, getSingleMultiplier(attackType, target));
       }
     }

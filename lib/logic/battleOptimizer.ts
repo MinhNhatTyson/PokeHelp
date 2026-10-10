@@ -1,9 +1,11 @@
-import { PokemonTypeName, POKEMON_TYPES, EffectivenessMultiplier, BattleHistoryEntry } from "@/lib/types";
+import { PokemonTypeName, POKEMON_TYPES, EffectivenessMultiplier, BattleHistoryEntry, SpSpread } from "@/lib/types";
 import { getSingleMultiplier } from "@/lib/logic/effectiveness";
 import { getAbilitySignal } from "@/lib/logic/abilitySignals";
 import { getCommonSet } from "@/lib/data/commonSets";
 import { checkLeadDamage, LeadDamageCheck } from "@/lib/logic/damageCheck";
 import { getItemSignal } from "@/lib/logic/itemSignals";
+import { calculateEffectiveSpeed, type NatureName } from "@/lib/logic/statCalc";
+import { attackTypesOf } from "@/lib/logic/attackTypes";
 
 export const HISTORY_WEIGHT = 0.6;
 export const SIGNAL_WEIGHT = 0.4;
@@ -88,8 +90,9 @@ interface LeadSignals {
 }
 
 function effectiveSpeed(mon: CoverageMon): number {
-  const item = getItemSignal(mon.itemName);
-  return (mon.stats?.speed ?? 0) * (item?.speedMultiplier ?? 1);
+  const base = mon.stats?.speed ?? 0;
+  const known = mon.speedSp !== undefined && (mon.speedSp > 0 || !!mon.nature);
+  return calculateEffectiveSpeed(base, known ? mon.speedSp! : 32, known ? mon.nature ?? null : "jolly", mon.itemName ?? null);
 }
 
 function getLeadSignals(mon: CoverageMon): LeadSignals {
@@ -117,7 +120,7 @@ function leadScore(mon: CoverageMon): number {
   if (s.isWeatherSetter) score += 2;
   if (s.isTailwindSetter) score += 1;
   if (s.isTrickRoomSetter) score += 1;
-  score += effectiveSpeed(mon) / 100; // mild tiebreak, now item-aware (Scarf counts as faster)
+  score += effectiveSpeed(mon) / 160;
   return score;
 }
 
@@ -203,6 +206,10 @@ export interface CoverageMon {
   itemName?: string | null;
   stats?: { hp: number; attack: number; defense: number; spAttack: number; spDefense: number; speed: number };
   moves?: string[];
+  megaActive?: boolean;          // this mon is assumed Mega Evolved
+  nature?: NatureName | null;    // user side only
+  speedSp?: number;              // user side only
+  spread?: SpSpread;    
 }
 
 export function statsFromEntries(entries: { name: string; baseStat: number }[]) {
@@ -269,10 +276,16 @@ function defenseMultiplier(attacker: PokemonTypeName, defender: CoverageMon): Ef
   return (m1 * m2) as EffectivenessMultiplier;
 }
 
+function abilityNow(mon: CoverageMon): string | null {
+  if (mon.megaActive) return getCommonSet(mon.name)?.megaForm?.formAbility ?? mon.abilityName;
+  return mon.abilityName;
+}
+
 function bestOffenseMultiplier(attacker: CoverageMon, defender: CoverageMon): EffectivenessMultiplier {
   const defenderSignal = getAbilitySignal(defender.abilityName);
   let best: EffectivenessMultiplier = 0;
-  for (const atkType of attacker.types) {
+  const attackTypes = attackTypesOf({ types: attacker.types, moves: attacker.moves, ability: abilityNow(attacker) });
+  for (const atkType of attackTypes) {
     const m = defenseMultiplier(atkType, { ...defender, abilityName: defenderSignal ? defender.abilityName : null });
     if (m > best) best = m;
   }
@@ -296,6 +309,7 @@ function scoreCombo(members: CoverageMon[], opponents: CoverageMon[]): ComboScor
     const attackersOfType = opponents.filter((o) => o.types.includes(attackType));
     const avgPower = attackersOfType.reduce((sum, o) => sum + bestAttackingStat(o), 0) / attackersOfType.length;
     const powerFactor = avgPower / BASELINE_ATTACKING_STAT; // >1 = hits harder than average
+    const QUAD_WEAKNESS_FACTOR = 1.75; 
 
     let membersWeak = 0;
     let weakPenalty = 0;
@@ -303,8 +317,9 @@ function scoreCombo(members: CoverageMon[], opponents: CoverageMon[]): ComboScor
       const m = defenseMultiplier(attackType, member);
       if (m >= 2) {
         membersWeak += 1;
-        weakPenalty += weight * powerFactor * itemWeaknessMitigation(member);
+        weakPenalty += weight * powerFactor * itemWeaknessMitigation(member) * (m >= 4 ? QUAD_WEAKNESS_FACTOR : 1);
       } else if (m === 0) defenseScore += 1 * weight;
+      else if (m <= 0.25) defenseScore += 0.75 * weight; 
       else if (m <= 0.5) defenseScore += 0.5 * weight;
     }
     if (membersWeak > 0) {

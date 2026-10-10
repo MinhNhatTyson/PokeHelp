@@ -172,7 +172,7 @@ export default function BattleOptimizer() {
           <div className="mt-8 border-t border-black/10 pt-6">
             <h2 className="font-heading text-lg text-[color:var(--ink)]">Recommended lineups</h2>
             <p className="mt-1 text-xs text-[color:var(--ink)]/50">
-              Heuristic score from type coverage + ability signals — not a moveset-level simulation. Use it as a starting point, not gospel.
+              our offense uses your chosen moves' types (the opponent's use STAB). Not a full simulation.
             </p>
             <div className="mt-3">
               <button

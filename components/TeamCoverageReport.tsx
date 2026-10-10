@@ -47,7 +47,7 @@ export default function TeamCoverageReport({
         </div>
       ) : (
         <div className="mt-4 space-y-4">
-          <p className="text-xs text-[color:var(--ink)]/50">Based on each member&apos;s own types (STAB), not movesets.</p>
+          <p className="text-xs text-[color:var(--ink)]/50">Uses each member's chosen damaging moves (50+ power); falls back to its own types if no moves are picked.</p>
           <div>
             <p className="text-sm font-medium text-[color:var(--ink)]/70">Super effective against</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">

@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useTeamStore, TEAM_SIZE } from "@/lib/store/teamStore";
 import { fetchPokemonDetail, fetchPokemonNameList, fetchCompetitiveItemNameList } from "@/lib/data/fetchAndCache";
 import { parseShowdownTeam } from "@/lib/logic/showdownImport";
+import { itemBlockReason } from "@/lib/logic/teamRules";
 
 async function resolveSpecies(slug: string) {
   const direct = await fetchPokemonDetail(slug);
@@ -56,8 +57,13 @@ export default function ImportTeamModal({ open, onClose }: { open: boolean; onCl
       const i = slotIndex++;
       store.setSlotPokemon(i, detail);
       if (set.item) {
-        store.setSlotItem(i, set.item);
-        if (!itemNames.has(set.item)) warnings.push(`${detail.name}: item "${set.item}" isn't in the item list — kept anyway.`);
+        const blocked = itemBlockReason(useTeamStore.getState().slots, i, set.item);
+        if (blocked) {
+          warnings.push(`${detail.name}: ${blocked} Item left empty.`);
+        } else {
+          store.setSlotItem(i, set.item);
+          if (!itemNames.has(set.item)) warnings.push(`${detail.name}: item "${set.item}" isn't in the item list — kept anyway.`);
+        }
       }
       if (set.ability) {
         if (detail.abilities.some((a) => a.name === set.ability)) store.setSlotAbility(i, set.ability);

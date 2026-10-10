@@ -12,6 +12,10 @@ export function userCoverageOf(slots: TeamSlot[]): CoverageMon[] {
       itemName: s.itemName,
       stats: s.pokemon ? statsFromEntries(s.pokemon.stats) : undefined,
       moves: s.moves.filter((m): m is string => m !== null),
+      megaActive: !!mega,
+      nature: s.nature,
+      speedSp: s.speedSp,
+      spread: s.spread,
     };
   });
 }
@@ -27,6 +31,7 @@ export function opponentCoverageOf(slots: OpponentSlot[]): CoverageMon[] {
       abilityName,
       itemName: s.itemName,
       stats: effective ? statsFromEntries(effective.stats) : undefined,
+      megaActive: !!s.megaFormDetail,
     };
   });
 }

@@ -83,6 +83,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Suggested species failed validation" }, { status: 502 });
     }
     pokeData = await pokeRes.json();
+    if (members.some((m) => m.name === pokeData.name)) {
+      return NextResponse.json({ error: "Suggested species is already on the team" }, { status: 502 });
+    }
   } catch (err) {
     console.error("PokeAPI species validation threw:", err);
     return NextResponse.json({ error: "Species validation failed" }, { status: 502 });
